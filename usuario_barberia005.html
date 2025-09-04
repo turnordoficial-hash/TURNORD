@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TurnORD - Usuario</title>
+
+<!-- Base estático -->
+<base href="./" />
+
+<!-- Favicons -->
+<link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
+<link rel="icon" type="image/png" sizes="16x16" href="imegenlogin/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="imegenlogin/favicon-32x32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="imegenlogin/apple-touch-icon.png">
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+</script>
+
+<script>
+  function inicializarModoOscuro() {
+    const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
+    document.documentElement.classList.toggle('dark', modoOscuro);
+  }
+  inicializarModoOscuro();
+</script>
+</head>
+
+<body class="bg-gray-200 dark:bg-gray-900 text-white min-h-screen flex items-center justify-center px-4" data-negocio-id="barberia005">
+
+<button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+  <!-- Iconos sol/luna -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  </svg>
+</button>
+
+<div class="text-center text-blue-900 dark:text-blue-300 w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
+  <h1 class="text-2xl tracking-wide mb-2 font-bold">TURNORD</h1>
+  <p class="text-xl font-semibold">Hola, ¿Cómo Estás?</p>
+  <p class="text-sm text-gray-500 dark:text-gray-400 mb-8" id="fecha-de-hoy"></p>
+
+  <div class="bg-gray-100 dark:bg-gray-700 text-blue-900 dark:text-blue-200 p-6 rounded-xl mb-6 shadow-inner">
+    <div class="text-4xl font-bold" id="turno-actual">00</div>
+    <div class="text-sm mt-2 font-medium">TURNO ACTUAL</div>
+    <div class="text-lg font-semibold mt-4"><span id="conteo-turno">0</span> EN ESPERA</div>
+  </div>
+
+  <button onclick="document.getElementById('modal').classList.remove('hidden')"
+    class="bg-blue-900 hover:bg-blue-800 dark:bg-blue-700 dark:hover:bg-blue-600 transition w-full py-3 text-white font-semibold rounded-xl">
+    TOMAR TURNO
+  </button>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden px-4">
+    <div class="bg-white dark:bg-gray-800 text-blue-900 dark:text-blue-300 rounded-2xl w-full max-w-2xl p-6 relative shadow-2xl">
+      <button id="btn-cerrar-modal" class="absolute top-4 right-4 text-blue-900 dark:text-blue-300 text-2xl font-bold" type="button">&times;</button>
+      <h2 class="text-xl font-bold mb-4">Tomar turno</h2>
+      <form id="formRegistroNegocio" class="space-y-4">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1 dark:text-gray-300">Nombre</label>
+            <input type="text" id="nombre" name="nombre" required placeholder="Nombre"
+              pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}" maxlength="40"
+              class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 dark:text-gray-300">Teléfono</label>
+            <input type="tel" id="telefono" name="telefono" required placeholder="Teléfono"
+              pattern="[0-9]{8,15}" maxlength="15"
+              class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+          </div>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium mb-1">Servicio</label>
+          <select id="servicio" name="tipo" required class="w-full border border-blue-300 rounded-lg p-2 focus:ring-blue-400 focus:border-blue-400">
+            <option value="">Selecciona servicio</option>
+            <!-- Los servicios se cargarán dinámicamente desde usuario/usuario.js -->
+          </select>
+        </div>
+
+        <div class="flex justify-between items-center pt-4">
+          <span id="estadoRegistro" class="text-green-600 dark:text-green-400 text-sm">Servicios</span>
+          <button type="submit" class="bg-blue-900 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 dark:hover:bg-blue-600 transition">
+            Registrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="listaEspera" class="space-y-2 mt-4"></div>
+  <div id="mensaje-turno"></div>
+</div>
+<!-- Errores -->
+<script>
+  window.addEventListener('error', e => {
+    const box = document.getElementById('app-error') || document.body.appendChild(document.createElement('div'));
+    box.id = 'app-error';
+    box.style.cssText = 'position:fixed;bottom:10px;left:10px;right:10px;background:#fee2e2;color:#991b1b;padding:10px;border-radius:8px;z-index:9999';
+    box.textContent = 'Error: ' + (e.message || 'Error en la aplicación.');
+  });
+</script>
+
+<!-- Modo oscuro -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggleButton = document.getElementById('toggleDarkMode');
+    toggleButton.addEventListener('click', () => {
+      const isDarkMode = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('modoOscuro', isDarkMode);
+    });
+  });
+</script>
+<script type="module" src="usuario/usuario.js"></script>
+</body>
+</html>
