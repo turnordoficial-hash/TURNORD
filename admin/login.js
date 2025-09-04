@@ -22,19 +22,28 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
     // Asignar el negocio_id al usuario después del login exitoso
     if (data.user) {
-      const negocioConfig = Config.getNegocioConfig();
+      const negocioId = document.body.dataset.negocioId;
+      if (!negocioId) {
+        console.error("No se encontró el ID del negocio en el atributo data-negocio-id del body.");
+        throw new Error("ID de negocio no especificado en la página.");
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { negocio_id: negocioConfig.id }
+        data: { negocio_id: negocioId }
       });
       
       if (updateError) {
-        console.warn('No se pudo actualizar el negocio_id:', updateError.message);
+        // No es un error fatal, pero sí un aviso importante.
+        console.warn('No se pudo actualizar el negocio_id para el usuario:', updateError.message);
       }
-    }
 
-    // Si el login es exitoso, Supabase guarda la sesión.
-    // Redirigir al panel de administración usando configuración centralizada.
-    window.location.replace(Config.getRoute('panel'));
+      // Redirigir al panel específico del negocio.
+      // Ya no se usa Config.getRoute('panel') para permitir la redirección dinámica.
+      window.location.replace(`panel_${negocioId}.html`);
+
+    } else {
+       throw new Error("Inicio de sesión exitoso pero no se encontró el objeto de usuario.");
+    }
 
   } catch (error) {
     console.error('Error en el inicio de sesión:', error.message);

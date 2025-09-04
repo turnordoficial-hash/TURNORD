@@ -1,27 +1,19 @@
 import { supabase } from '../database.js';
 
-let negocioId; // Se obtendrá del usuario autenticado
-
-async function getNegocioId() {
-  if (negocioId) return negocioId;
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (user && user.user_metadata && user.user_metadata.negocio_id) {
-    negocioId = user.user_metadata.negocio_id;
-    return negocioId;
+/**
+ * Lee el ID del negocio desde el atributo 'data-negocio-id' en el <body>.
+ * @returns {string} El ID del negocio.
+ * @throws {Error} Si el atributo no se encuentra, detiene la ejecución.
+ */
+function getNegocioId() {
+  const negocioId = document.body.dataset.negocioId;
+  if (!negocioId) {
+    const errorMsg = "Error Crítico: No se pudo identificar el negocio (falta 'data-negocio-id' en el body). La página no puede funcionar.";
+    console.error(errorMsg);
+    alert(errorMsg);
+    throw new Error(errorMsg);
   }
-
-  // Fallback to localStorage
-  const businessIdFromStorage = localStorage.getItem('businessId');
-  if (businessIdFromStorage) {
-    negocioId = businessIdFromStorage;
-    return negocioId;
-  }
-
-  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
-  window.location.replace('login.html');
-  return null;
+  return negocioId;
 }
 
 let turnoActual = null;
@@ -51,7 +43,7 @@ async function cargarServicios() {
     const { data, error } = await supabase
       .from('servicios')
       .select('nombre,duracion_min')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', getNegocioId())
       .eq('activo', true);
     if (error) throw error;
     serviciosCache = {};
@@ -73,7 +65,7 @@ async function cargarHoraLimite() {
     const { data } = await supabase
       .from('configuracion_negocio')
       .select('hora_apertura, hora_cierre, limite_turnos, dias_operacion')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', getNegocioId())
       .maybeSingle();
     if (data) {
       if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
@@ -88,8 +80,7 @@ async function cargarHoraLimite() {
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', async () => {
-    await getNegocioId();
-    if (!negocioId) return;
+    getNegocioId(); // Validar que el ID existe al inicio.
   // Inicializar modo oscuro
   initThemeToggle();
   
@@ -151,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     .channel('config-turno-admin')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` },
+      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${getNegocioId()}` },
       async () => {
         await cargarHoraLimite();
         refrescarUI();
@@ -212,7 +203,7 @@ async function verificarDiaLaboralFecha(fecha = new Date()) {
     const { data, error } = await supabase
       .from('configuracion_negocio')
       .select('dias_operacion')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', getNegocioId())
       .single();
 
     if (error) {
@@ -269,7 +260,7 @@ supabase
   .channel('servicios-turno')
   .on(
     'postgres_changes',
-    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
+    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${getNegocioId()}` },
     async () => {
       await cargarServicios();
     }
@@ -384,7 +375,7 @@ async function tomarTurno(event) {
   const { count: totalHoy, error: countError } = await supabase
     .from('turnos')
     .select('id', { count: 'exact', head: true })
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', fechaHoy);
   if (countError) {
     mostrarNotificacion('No se pudo validar el límite de turnos.', 'error');
@@ -405,7 +396,7 @@ async function tomarTurno(event) {
       const { data: existe } = await supabase
         .from('turnos')
         .select('id')
-        .eq('negocio_id', negocioId)
+        .eq('negocio_id', getNegocioId())
         .eq('fecha', hoyCheck)
         .eq('turno', nuevoTurno)
         .limit(1);
@@ -419,7 +410,7 @@ async function tomarTurno(event) {
 
   const hoy = new Date().toISOString().slice(0, 10);
   const { error } = await supabase.from('turnos').insert([{
-    negocio_id: negocioId,
+    negocio_id: getNegocioId(),
     turno: nuevoTurno,
     nombre: nombre,
     telefono: telefono,
@@ -464,7 +455,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: enAtencion } = await supabase
       .from('turnos')
       .select('servicio, started_at')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', getNegocioId())
       .eq('fecha', hoy)
       .eq('estado', 'En atención')
       .order('started_at', { ascending: true })
@@ -491,7 +482,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: cola } = await supabase
       .from('turnos')
       .select('turno, servicio')
-      .eq('negocio_id', negocioId)
+      .eq('negocio_id', getNegocioId())
       .eq('estado', 'En espera')
       .order('orden', { ascending: true })
       .order('created_at', { ascending: true });
@@ -535,7 +526,7 @@ async function generarNuevoTurno() {
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', fechaHoy)
     .like('turno', `${letraHoy}%`)
     .order('created_at', { ascending: false })
@@ -566,7 +557,7 @@ async function cargarTurnos() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En atención')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy)
     .order('started_at', { ascending: true });
 
@@ -576,7 +567,7 @@ async function cargarTurnos() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy)
     .order('orden', { ascending: true })
     .order('created_at', { ascending: true });
@@ -758,7 +749,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'Atendido')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy);
     
   if (errorAtendidos) {
@@ -771,7 +762,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'Devuelto')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy);
     
   if (errorDevueltos) {
@@ -837,7 +828,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy);
     
   if (!errorEspera && turnosEspera) {
@@ -942,7 +933,7 @@ function suscribirseTurnos() {
     .channel('turnos-admin')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
+      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${getNegocioId()}` },
       () => {
         refrescarUI();
       }
@@ -1055,7 +1046,7 @@ async function devolverTurno() {
   const { data: maxData, error: maxErr } = await supabase
     .from('turnos')
     .select('orden')
-    .eq('negocio_id', negocioId)
+    .eq('negocio_id', getNegocioId())
     .eq('fecha', hoy)
     .order('orden', { ascending: false })
     .limit(1);
