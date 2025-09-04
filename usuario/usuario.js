@@ -95,9 +95,12 @@ async function obtenerConfig() {
     .from('configuracion_negocio')
     .select('hora_apertura, hora_cierre, limite_turnos, mostrar_tiempo_estimado')
     .eq('negocio_id', getNegocioId())
-    .single();
+    .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("Error fetching config:", error);
+    throw error;
+  }
 
   // Actualizar cache
   if (data) {
@@ -113,14 +116,18 @@ async function actualizarConfiguracion() {
   try {
     const config = await obtenerConfig();
     if (config) {
-      mostrarNotificacionConfiguracion(
-        'Configuración actualizada',
-        `Horarios: ${config.hora_apertura} - ${config.hora_cierre} | Límite: ${config.limite_turnos} turnos`
-      );
-      console.log('Configuración actualizada:', config);
+      // Notificación silenciosa en la consola para no molestar al usuario si todo está bien.
+      console.log('Configuración cargada:', config);
+    } else {
+      // Si no hay configuración, es un estado válido (negocio nuevo), pero notificamos en la consola.
+      console.warn('No se encontró configuración para este negocio. Se usarán los valores por defecto.');
+      // Opcional: Podríamos mostrar una notificación visual si fuera un problema crítico.
+      // mostrarNotificacionConfiguracion('Aviso', 'No se encontró configuración para este negocio.');
     }
   } catch (error) {
     console.error('Error al actualizar configuración:', error);
+    // Notificar al usuario que hubo un problema al cargar la configuración esencial.
+    mostrarNotificacionConfiguracion('Error de Configuración', 'No se pudo cargar la configuración del negocio. Algunas funciones pueden no estar disponibles.');
   }
 }
 
