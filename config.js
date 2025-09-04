@@ -1,8 +1,8 @@
 // config.js - Configuración centralizada
 const Config = {
   // === CONFIGURACIÓN DE SUPABASE ===
-  supabaseUrl: 'https://fhequkvqxsbdkmgmoftp.supabase.co', // superbase url
-  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZXF1a3ZxeHNiZGttZ21vZnRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5MTM3NzAsImV4cCI6MjA2OTQ4OTc3MH0.tVXmyBG39oxWJVlmFwHXAaYDBWxakssZ7g-BywmlZEM', // superbase llave
+  supabaseUrl: 'https://ujxasfligvocdqfuiyql.supabase.co', // superbase url
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqeGFzZmxpZ3ZvY2RxZnVpeXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5OTE1NDMsImV4cCI6MjA3MjU2NzU0M30.fUMuAdcvG0LcWhF53KlS3XD5Xp1tq4uKQ6T8atBB2IE', // superbase llave
 
   // === CONFIGURACIÓN DE RUTAS ===
   routes: {
