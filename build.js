@@ -7,7 +7,6 @@ const JavaScriptObfuscator = require('javascript-obfuscator');
 async function buildProduction() {
   const files = [
     'database.js',
-    'config.js',
     'admin/negocio.js',
     'admin/turno.js',
     'usuario/usuario.js'
