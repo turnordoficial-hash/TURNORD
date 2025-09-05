@@ -2,38 +2,26 @@
 import { supabase } from '../database.js';
 import Config from '../config.js';
 
-/**
- * Lee el ID del negocio desde el atributo 'data-negocio-id' en el <body>.
- * @returns {string} El ID del negocio.
- * @throws {Error} Si el atributo no se encuentra, detiene la ejecución.
- */
-function getNegocioId() {
-  const negocioId = document.body.dataset.negocioId;
-  if (!negocioId) {
-    const errorMsg = "Error Crítico: No se pudo identificar el negocio (falta 'data-negocio-id' en el body). La página no puede funcionar.";
-    console.error(errorMsg);
-    alert(errorMsg);
-    throw new Error(errorMsg);
-  }
-  return negocioId;
-}
+// Configuración centralizada del negocio
+const negocioConfig = Config.getNegocioConfig();
+const negocioId = negocioConfig.id;
 
 // Estado en memoria/localStorage
 let turnoAsignado = null;
 let intervaloContador = null;
 let telefonoUsuario = localStorage.getItem('telefonoUsuario') || null;
 
-// Cache de configuración (se carga desde la DB)
-let HORA_LIMITE_TURNOS = "23:00"; // Default
+// Cache de configuración desde config.js
+let HORA_LIMITE_TURNOS = negocioConfig.configuracion.hora_limite_turnos;
 let configCache = {
-  hora_apertura: "08:00", // Default
-  hora_cierre: "23:00", // Default
-  limite_turnos: 50 // Default
+  hora_apertura: negocioConfig.configuracion.hora_apertura,
+  hora_cierre: negocioConfig.configuracion.hora_cierre,
+  limite_turnos: negocioConfig.configuracion.limite_turnos
 };
 
 // Persistencia del deadline del turno para que el contador continúe al volver a la pestaña
 function getDeadlineKey(turno) {
-  return `turnoDeadline:${getNegocioId()}:${turno}`;
+  return `turnoDeadline:${negocioId}:${turno}`;
 }
 
 // Catálogo de servicios (nombre -> duracion_min)
@@ -43,7 +31,7 @@ async function cargarServiciosActivos() {
     const { data, error } = await supabase
       .from('servicios')
       .select('nombre,duracion_min')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('activo', true)
       .order('nombre', { ascending: true });
 
@@ -94,13 +82,10 @@ async function obtenerConfig() {
   const { data, error } = await supabase
     .from('configuracion_negocio')
     .select('hora_apertura, hora_cierre, limite_turnos, mostrar_tiempo_estimado')
-    .eq('negocio_id', getNegocioId())
-    .maybeSingle();
+    .eq('negocio_id', negocioId)
+    .single();
 
-  if (error) {
-    console.error("Error fetching config:", error);
-    throw error;
-  }
+  if (error) throw new Error(error.message);
 
   // Actualizar cache
   if (data) {
@@ -116,18 +101,14 @@ async function actualizarConfiguracion() {
   try {
     const config = await obtenerConfig();
     if (config) {
-      // Notificación silenciosa en la consola para no molestar al usuario si todo está bien.
-      console.log('Configuración cargada:', config);
-    } else {
-      // Si no hay configuración, es un estado válido (negocio nuevo), pero notificamos en la consola.
-      console.warn('No se encontró configuración para este negocio. Se usarán los valores por defecto.');
-      // Opcional: Podríamos mostrar una notificación visual si fuera un problema crítico.
-      // mostrarNotificacionConfiguracion('Aviso', 'No se encontró configuración para este negocio.');
+      mostrarNotificacionConfiguracion(
+        'Configuración actualizada',
+        `Horarios: ${config.hora_apertura} - ${config.hora_cierre} | Límite: ${config.limite_turnos} turnos`
+      );
+      console.log('Configuración actualizada:', config);
     }
   } catch (error) {
     console.error('Error al actualizar configuración:', error);
-    // Notificar al usuario que hubo un problema al cargar la configuración esencial.
-    mostrarNotificacionConfiguracion('Error de Configuración', 'No se pudo cargar la configuración del negocio. Algunas funciones pueden no estar disponibles.');
   }
 }
 
@@ -162,7 +143,7 @@ async function contarTurnosDia(fechaISO) {
   const { count, error } = await supabase
     .from('turnos')
     .select('id', { count: 'exact', head: true })
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', fechaISO);
 
   if (error) throw new Error(error.message);
@@ -175,7 +156,7 @@ async function verificarBreakNegocio() {
     const { data, error } = await supabase
       .from('estado_negocio')
       .select('en_break, break_end_time, break_message')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -231,7 +212,7 @@ async function verificarDiaLaboralFecha(fecha = new Date()) {
     const { data, error } = await supabase
       .from('configuracion_negocio')
       .select('dias_operacion')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .single();
 
     if (error) {
@@ -273,7 +254,7 @@ async function generarNuevoTurno() {
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', fechaHoy)
     .like('turno', `${letraHoy}%`)
     .order('created_at', { ascending: false })
@@ -293,7 +274,7 @@ async function verificarTurnoActivo() {
   const { data, error } = await supabase
     .from('turnos')
     .select('*')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('estado', 'En espera')
     .eq('telefono', telefonoUsuario)
     .order('created_at', { ascending: false });
@@ -314,7 +295,7 @@ async function obtenerPosicionEnFila(turnoUsuario) {
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('estado', 'En espera')
     .order('created_at', { ascending: true });
 
@@ -334,7 +315,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: enAtencion } = await supabase
       .from('turnos')
       .select('servicio, started_at')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('fecha', hoy)
       .eq('estado', 'En atención')
       .order('started_at', { ascending: true })
@@ -361,7 +342,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: cola } = await supabase
       .from('turnos')
       .select('turno, servicio')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('estado', 'En espera')
       .order('orden', { ascending: true })
       .order('created_at', { ascending: true });
@@ -452,7 +433,7 @@ async function mostrarMensajeConfirmacion(turnoData) {
         .from('turnos')
         .update({ estado: 'Cancelado' })
         .eq('turno', turnoData.turno)
-        .eq('negocio_id', getNegocioId())
+        .eq('negocio_id', negocioId)
         .eq('telefono', telefonoUsuario);
 
       if (error) {
@@ -486,7 +467,7 @@ async function actualizarTurnoActualYConteo() {
   const { data: enAtencion } = await supabase
     .from('turnos')
     .select('turno')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
     .eq('estado', 'En atención')
     .order('started_at', { ascending: true })
@@ -499,7 +480,7 @@ async function actualizarTurnoActualYConteo() {
     const { data: enEspera } = await supabase
       .from('turnos')
       .select('turno')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('fecha', hoy)
       .eq('estado', 'En espera')
       .order('created_at', { ascending: true })
@@ -510,7 +491,7 @@ async function actualizarTurnoActualYConteo() {
   const { count } = await supabase
     .from('turnos')
     .select('*', { count: 'exact', head: true })
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
     .eq('estado', 'En espera');
 
@@ -567,7 +548,7 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
   const { data: turnosActivos } = await supabase
     .from('turnos')
     .select('*')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('estado', 'En espera')
     .eq('telefono', telefonoUsuario);
 
@@ -583,7 +564,7 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
 
   const { error } = await supabase.from('turnos').insert([
     {
-      negocio_id: getNegocioId(),
+      negocio_id: negocioId,
       turno: nuevoTurno,
       nombre,
       telefono,
@@ -707,7 +688,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     .channel('turnos-usuario')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${getNegocioId()}` },
+      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
       async () => {
     // ... existing code ...
 
@@ -716,7 +697,7 @@ supabase
   .channel('servicios-usuario')
   .on(
     'postgres_changes',
-    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${getNegocioId()}` },
+    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
     async () => {
       await cargarServiciosActivos();
     }
@@ -728,7 +709,7 @@ supabase
           const { data, error } = await supabase
             .from('turnos')
             .select('*')
-            .eq('negocio_id', getNegocioId())
+            .eq('negocio_id', negocioId)
             .eq('telefono', telefonoUsuario)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -761,7 +742,7 @@ supabase
     .channel('estado-negocio-usuario')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'estado_negocio', filter: `negocio_id=eq.${getNegocioId()}` },
+      { event: '*', schema: 'public', table: 'estado_negocio', filter: `negocio_id=eq.${negocioId}` },
       async () => {
         const estado = await verificarBreakNegocio();
         if (btnTomarTurno) {
@@ -783,7 +764,7 @@ supabase
     .channel('configuracion-negocio-usuario')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${getNegocioId()}` },
+      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` },
       async () => {
         await actualizarConfiguracion();
       }
@@ -829,7 +810,7 @@ export async function tomarTurno(nombre, telefono, servicio, fechaISO, horaHHMM)
     const ahora = new Date();
     const { error: insertError } = await supabase.from('turnos').insert([
       {
-      negocio_id: getNegocioId(),
+        negocio_id: negocioId,
         nombre,
         telefono,
         servicio,

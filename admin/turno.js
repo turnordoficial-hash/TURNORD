@@ -1,19 +1,27 @@
 import { supabase } from '../database.js';
 
-/**
- * Lee el ID del negocio desde el atributo 'data-negocio-id' en el <body>.
- * @returns {string} El ID del negocio.
- * @throws {Error} Si el atributo no se encuentra, detiene la ejecución.
- */
-function getNegocioId() {
-  const negocioId = document.body.dataset.negocioId;
-  if (!negocioId) {
-    const errorMsg = "Error Crítico: No se pudo identificar el negocio (falta 'data-negocio-id' en el body). La página no puede funcionar.";
-    console.error(errorMsg);
-    alert(errorMsg);
-    throw new Error(errorMsg);
+let negocioId; // Se obtendrá del usuario autenticado
+
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
   }
-  return negocioId;
+
+  // Fallback to localStorage
+  const businessIdFromStorage = localStorage.getItem('businessId');
+  if (businessIdFromStorage) {
+    negocioId = businessIdFromStorage;
+    return negocioId;
+  }
+
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace('login.html');
+  return null;
 }
 
 let turnoActual = null;
@@ -23,6 +31,42 @@ let HORA_LIMITE_TURNOS = "23:00"; // valor por defecto
 let LIMITE_TURNOS = 50; // valor por defecto
 let chart = null; // Variable para almacenar la instancia del gráfico
 let ALLOWED_DAYS = [1,2,3,4,5,6];
+
+let activeTurnIntervals = {}; // Almacena los intervalos de los timers activos
+
+function iniciarTimerParaTurno(turno) {
+  const timerEl = document.getElementById(`timer-${turno.id}`);
+  const duracionMin = serviciosCache[turno.servicio];
+
+  if (!timerEl || !duracionMin || !turno.started_at) {
+    if (timerEl) timerEl.textContent = '--:--';
+    return;
+  }
+
+  const startTime = new Date(turno.started_at).getTime();
+  const endTime = startTime + duracionMin * 60 * 1000;
+
+  const updateTimer = () => {
+    const ahora = Date.now();
+    const restanteMs = Math.max(0, endTime - ahora);
+
+    if (restanteMs === 0) {
+      timerEl.textContent = '00:00';
+      if (activeTurnIntervals[turno.id]) {
+        clearInterval(activeTurnIntervals[turno.id]);
+        delete activeTurnIntervals[turno.id];
+      }
+      return;
+    }
+
+    const minutos = Math.floor(restanteMs / 60000);
+    const segundos = Math.floor((restanteMs % 60000) / 1000);
+    timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+  };
+
+  updateTimer(); // Initial call
+  activeTurnIntervals[turno.id] = setInterval(updateTimer, 1000);
+}
 
 // Unificar refrescos de UI para evitar llamadas duplicadas
 let __refreshTimer = null;
@@ -39,11 +83,16 @@ function refrescarUI() {
 // Cache de servicios (nombre -> duracion_min)
 let serviciosCache = {};
 async function cargarServicios() {
+  const id = getNegocioId();
+  if (!id) {
+      console.warn("No se pudo obtener el negocioId, no se cargarán los servicios.");
+      return;
+  }
   try {
     const { data, error } = await supabase
       .from('servicios')
       .select('nombre,duracion_min')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', id)
       .eq('activo', true);
     if (error) throw error;
     serviciosCache = {};
@@ -54,8 +103,9 @@ async function cargarServicios() {
       sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
         data.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
     }
+    console.log("Servicios cargados en cache:", serviciosCache);
   } catch (e) {
-    console.warn('No se pudieron cargar servicios, usando fallback.', e);
+    console.error('Error crítico al cargar servicios:', e);
   }
 }
 
@@ -65,7 +115,7 @@ async function cargarHoraLimite() {
     const { data } = await supabase
       .from('configuracion_negocio')
       .select('hora_apertura, hora_cierre, limite_turnos, dias_operacion')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .maybeSingle();
     if (data) {
       if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
@@ -80,7 +130,8 @@ async function cargarHoraLimite() {
 
 // Inicialización cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', async () => {
-    getNegocioId(); // Validar que el ID existe al inicio.
+    await getNegocioId();
+    if (!negocioId) return;
   // Inicializar modo oscuro
   initThemeToggle();
   
@@ -142,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     .channel('config-turno-admin')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${getNegocioId()}` },
+      { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` },
       async () => {
         await cargarHoraLimite();
         refrescarUI();
@@ -203,7 +254,7 @@ async function verificarDiaLaboralFecha(fecha = new Date()) {
     const { data, error } = await supabase
       .from('configuracion_negocio')
       .select('dias_operacion')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .single();
 
     if (error) {
@@ -260,7 +311,7 @@ supabase
   .channel('servicios-turno')
   .on(
     'postgres_changes',
-    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${getNegocioId()}` },
+    { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
     async () => {
       await cargarServicios();
     }
@@ -375,7 +426,7 @@ async function tomarTurno(event) {
   const { count: totalHoy, error: countError } = await supabase
     .from('turnos')
     .select('id', { count: 'exact', head: true })
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', fechaHoy);
   if (countError) {
     mostrarNotificacion('No se pudo validar el límite de turnos.', 'error');
@@ -396,7 +447,7 @@ async function tomarTurno(event) {
       const { data: existe } = await supabase
         .from('turnos')
         .select('id')
-        .eq('negocio_id', getNegocioId())
+        .eq('negocio_id', negocioId)
         .eq('fecha', hoyCheck)
         .eq('turno', nuevoTurno)
         .limit(1);
@@ -410,7 +461,7 @@ async function tomarTurno(event) {
 
   const hoy = new Date().toISOString().slice(0, 10);
   const { error } = await supabase.from('turnos').insert([{
-    negocio_id: getNegocioId(),
+    negocio_id: negocioId,
     turno: nuevoTurno,
     nombre: nombre,
     telefono: telefono,
@@ -455,7 +506,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: enAtencion } = await supabase
       .from('turnos')
       .select('servicio, started_at')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('fecha', hoy)
       .eq('estado', 'En atención')
       .order('started_at', { ascending: true })
@@ -482,7 +533,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const { data: cola } = await supabase
       .from('turnos')
       .select('turno, servicio')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .eq('estado', 'En espera')
       .order('orden', { ascending: true })
       .order('created_at', { ascending: true });
@@ -526,7 +577,7 @@ async function generarNuevoTurno() {
   const { data, error } = await supabase
     .from('turnos')
     .select('turno')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', fechaHoy)
     .like('turno', `${letraHoy}%`)
     .order('created_at', { ascending: false })
@@ -550,6 +601,10 @@ async function generarNuevoTurno() {
 
 // Cargar turnos en espera
 async function cargarTurnos() {
+  // Limpiar todos los timers existentes antes de volver a renderizar
+  Object.values(activeTurnIntervals).forEach(clearInterval);
+  activeTurnIntervals = {};
+
   const hoy = new Date().toISOString().slice(0, 10);
 
   // Buscar si hay un turno actualmente en atención
@@ -557,7 +612,7 @@ async function cargarTurnos() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En atención')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
     .order('started_at', { ascending: true });
 
@@ -567,7 +622,7 @@ async function cargarTurnos() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
     .order('orden', { ascending: true })
     .order('created_at', { ascending: true });
@@ -670,14 +725,15 @@ async function cargarTurnos() {
       div.className = 'turn-card-atencion bg-green-50 dark:bg-green-900/30 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800 transition-all cursor-pointer hover:shadow-md';
       div.dataset.id = t.id;
       div.innerHTML = `
-        <div class="flex justify-between items-start">
+        <div class="flex justify-between items-center">
           <span class="text-2xl font-bold text-green-700 dark:text-green-400">${t.turno}</span>
-          <span class="text-xs bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-0.5 rounded-full">Atendiendo</span>
+          <div id="timer-${t.id}" class="text-lg font-bold text-red-500 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded-lg">--:--</div>
         </div>
         <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${t.nombre || 'Cliente'}</p>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${t.servicio || 'Servicio'}</p>
       `;
       listaAtencion.appendChild(div);
+      iniciarTimerParaTurno(t);
     });
   }
 
@@ -749,7 +805,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'Atendido')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy);
     
   if (errorAtendidos) {
@@ -762,7 +818,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'Devuelto')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy);
     
   if (errorDevueltos) {
@@ -828,7 +884,7 @@ async function cargarEstadisticas() {
     .from('turnos')
     .select('*')
     .eq('estado', 'En espera')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy);
     
   if (!errorEspera && turnosEspera) {
@@ -933,7 +989,7 @@ function suscribirseTurnos() {
     .channel('turnos-admin')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${getNegocioId()}` },
+      { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
       () => {
         refrescarUI();
       }
@@ -1046,7 +1102,7 @@ async function devolverTurno() {
   const { data: maxData, error: maxErr } = await supabase
     .from('turnos')
     .select('orden')
-    .eq('negocio_id', getNegocioId())
+    .eq('negocio_id', negocioId)
     .eq('fecha', hoy)
     .order('orden', { ascending: false })
     .limit(1);
