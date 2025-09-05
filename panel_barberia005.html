@@ -38,7 +38,7 @@
       const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
       document.documentElement.classList.toggle('dark', modoOscuro);
     }
-    
+
     // Ejecutar al cargar
     inicializarModoOscuro();
   </script>
@@ -61,7 +61,7 @@
   .responsive-container { max-width: 1280px; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
 </style>
 </head>
-<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" data-negocio-id="barberia005">
   <!-- Botón modo oscuro -->
   <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -77,11 +77,11 @@
     <aside class="w-64 bg-primary-700 dark:bg-primary-700 text-white p-6 hidden md:block">
       <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
       <nav class="space-y-4">
-        <a href="panel.html" class="block hover:text-white rounded px-3 py-2">Inicio</a>
-        <a href="turno.html" class="block bg-white text-gray-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
-        <a href="negocio.html" class="block hover:text-white rounded px-3 py-2">Mi negocio</a>
-        <a href="configuracion.html" class="block hover:text-white rounded px-3 py-2 hidden">Configuración</a>
-        <a href="cierre.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
+        <a href="panel_barberia005.html" class="block hover:text-white rounded px-3 py-2">Inicio</a>
+        <a href="turno_barberia005.html" class="block bg-white text-gray-900 font-semibold rounded px-3 py-2 shadow">Turnos</a>
+        <a href="negocio_barberia005.html" class="block hover:text-white rounded px-3 py-2">Mi negocio</a>
+        <a href="configuracion_barberia005.html" class="block hover:text-white rounded px-3 py-2 hidden">Configuración</a>
+        <a href="cierre_barberia005.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
       </nav>
     </aside>
 
