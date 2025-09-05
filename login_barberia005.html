@@ -29,7 +29,7 @@
       const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
       document.documentElement.classList.toggle('dark', modoOscuro);
     }
-    
+
     // Ejecutar al cargar
     inicializarModoOscuro();
   </script>
@@ -42,7 +42,7 @@
     }
   </script>
 </head>
-<body class="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
+<body class="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900" data-negocio-id="barberia005">
   <!-- Botón modo oscuro -->
   <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">

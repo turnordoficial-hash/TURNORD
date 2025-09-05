@@ -1,30 +1,27 @@
-
-
-
-// auto.js
 import { supabase } from './database.js';
 
+/**
+ * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
+ * @returns {string|undefined} El ID del negocio o undefined si no se encuentra.
+ */
+function getNegocioId() {
+    return document.body.dataset.negocioId;
+}
+
 (async () => {
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
 
-  if (!session) {
-    // No hay sesión activa, redirigir al login
-    window.location.replace('login.html');
-    return;
-  }
+    if (!session) {
+        // No hay sesión activa, redirigir a la página de login correspondiente.
+        const negocioId = getNegocioId();
+        const loginUrl = negocioId ? `login_${negocioId}.html` : 'login.html';
 
-  // Hay sesión, obtenemos el usuario
-  const user = session.user;
+        console.log(`Usuario no autenticado. Redirigiendo a ${loginUrl}`);
+        window.location.replace(loginUrl);
+        return;
+    }
 
-  // Guardamos el UUID de Supabase en localStorage
-  localStorage.setItem('userId', user.id);
-
-  // Si quieres usar un ID fijo de negocio (barberia0001)
-  localStorage.setItem('businessId', 'barberia0001');
-
-  console.log('Usuario autenticado:', user.email);
-  console.log('UUID de usuario guardado:', user.id);
-  console.log('ID de negocio guardado:', 'barberia0001');
+    // El usuario está autenticado.
+    // La sesión es manejada por las librerías de Supabase, no es necesario hacer nada más aquí.
+    console.log('Acceso autorizado para:', session.user.email);
 })();

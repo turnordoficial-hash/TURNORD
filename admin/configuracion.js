@@ -1,58 +1,108 @@
-// configuracion.js
+import { supabase } from '../database.js';
 
-// Nota: La lógica de Supabase ha sido eliminada.
-// El tema se maneja ahora 100% en el lado del cliente usando localStorage
-// a través del helper global `window.theme` que viene de `assets/theme.js`.
+/**
+ * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
+ * @returns {string|null} El ID del negocio o null si no está presente.
+ */
+function getNegocioId() {
+    const id = document.body.dataset.negocioId;
+    if (!id) {
+        console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
+        alert('Error de configuración: No se pudo identificar el negocio.');
+    }
+    return id;
+}
+
+const negocioId = getNegocioId();
+
+async function loadThemeFromDB() {
+    if (!negocioId) return;
+
+    try {
+        const { data, error } = await supabase
+            .from('configuracion_negocio')
+            .select('theme_primary, theme_mode')
+            .eq('negocio_id', negocioId)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+            const primary = data.theme_primary || 'blue';
+            const mode = data.theme_mode || 'light';
+            window.theme.apply(primary, mode);
+
+            // Update the dropdowns to reflect the loaded theme
+            document.getElementById('theme-primary').value = primary;
+            document.getElementById('theme-mode').value = mode;
+        }
+    } catch (error) {
+        console.error('Error cargando el tema desde la base de datos:', error.message);
+    }
+}
+
+async function saveThemeToDB() {
+    if (!negocioId) return;
+
+    const primary = document.getElementById('theme-primary').value;
+    const mode = document.getElementById('theme-mode').value;
+    const statusEl = document.getElementById('status');
+
+    try {
+        statusEl.textContent = 'Guardando...';
+        const { error } = await supabase
+            .from('configuracion_negocio')
+            .upsert({
+                negocio_id: negocioId,
+                theme_primary: primary,
+                theme_mode: mode,
+            }, { onConflict: 'negocio_id' });
+
+        if (error) throw error;
+
+        statusEl.textContent = 'Guardado ✅';
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+
+    } catch (error) {
+        statusEl.textContent = 'Error al guardar ❌';
+        console.error('Error guardando el tema en la base de datos:', error.message);
+    }
+}
 
 function setupThemePage() {
-  const themePrimarySelect = document.getElementById('theme-primary');
-  const themeModeSelect = document.getElementById('theme-mode');
-  const saveButton = document.getElementById('btn-guardar');
-  const statusEl = document.getElementById('status');
-  const themeToggleBtn = document.getElementById('theme-toggle');
+    const themePrimarySelect = document.getElementById('theme-primary');
+    const themeModeSelect = document.getElementById('theme-mode');
+    const saveButton = document.getElementById('btn-guardar');
+    const themeToggleBtn = document.getElementById('theme-toggle');
 
-  if (!themePrimarySelect || !themeModeSelect || !saveButton || !statusEl) {
-    console.error('No se encontraron todos los elementos de configuración del tema.');
-    return;
-  }
+    if (!themePrimarySelect || !themeModeSelect || !saveButton) {
+        console.error('No se encontraron todos los elementos de configuración del tema.');
+        return;
+    }
 
-  // 1. Cargar la configuración guardada en localStorage al iniciar
-  const currentTheme = window.theme.get();
-  themePrimarySelect.value = currentTheme.primary;
-  themeModeSelect.value = currentTheme.mode;
+    // Live preview
+    themePrimarySelect.addEventListener('change', () => {
+        window.theme.setPrimary(themePrimarySelect.value);
+    });
 
-  // 2. Implementar la vista previa en vivo
-  themePrimarySelect.addEventListener('change', () => {
-    window.theme.setPrimary(themePrimarySelect.value);
-  });
+    themeModeSelect.addEventListener('change', () => {
+        window.theme.setMode(themeModeSelect.value);
+    });
 
-  themeModeSelect.addEventListener('change', () => {
-    window.theme.setMode(themeModeSelect.value);
-  });
+    // Save to DB
+    saveButton.addEventListener('click', saveThemeToDB);
 
-  // 3. El botón de guardar ahora solo da feedback, ya que los cambios se aplican y guardan al instante.
-  saveButton.addEventListener('click', () => {
-    statusEl.textContent = 'Guardado ✅';
-    setTimeout(() => {
-      statusEl.textContent = '';
-    }, 2000);
-  });
-
-  // 4. Sincronizar el botón de toggle principal con el select
-  themeToggleBtn?.addEventListener('click', () => {
-      // Damos un pequeño delay para asegurar que theme.js actualice el localStorage primero
-      setTimeout(() => {
-        const currentMode = window.theme.get().mode;
-        themeModeSelect.value = currentMode;
-      }, 50);
-  });
+    // Sync main toggle button
+    themeToggleBtn?.addEventListener('click', () => {
+        setTimeout(() => {
+            const currentMode = window.theme.get().mode;
+            themeModeSelect.value = currentMode;
+        }, 50);
+    });
 }
 
-// Cargar la configuración de la página cuando el DOM esté listo.
-// El helper `window.theme` de `assets/theme.js` se carga antes que este script,
-// por lo que debería estar disponible.
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupThemePage);
-} else {
+document.addEventListener('DOMContentLoaded', () => {
+    if (!negocioId) return;
     setupThemePage();
-}
+    loadThemeFromDB();
+});

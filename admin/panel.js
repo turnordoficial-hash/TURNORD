@@ -1,20 +1,33 @@
-// panel.js
 import { supabase } from '../database.js';
-import Config from '../config.js';
 
-let negocioId; // Se obtendrá del usuario autenticado
 let atencionInterval = null; // Timer para el turno en atención
 let serviciosCache = {}; // Cache para duraciones de servicios
 
-// Cargar servicios una vez al inicio
+/**
+ * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
+ * Este ID es crucial para todas las operaciones de la base de datos en esta página.
+ * @returns {string|null} El ID del negocio o null si no está presente.
+ */
+function getNegocioId() {
+  const id = document.body.dataset.negocioId;
+  if (!id) {
+    console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
+    alert('Error de configuración: No se pudo identificar el negocio. Contacte a soporte.');
+  }
+  return id;
+}
+
+// Obtener el ID del negocio al inicio y usarlo globalmente en este script.
+const negocioId = getNegocioId();
+
+// Cargar la duración de los servicios para el cálculo de los timers.
 async function cargarServicios() {
-  const currentNegocioId = await getNegocioId();
-  if (!currentNegocioId) return;
+  if (!negocioId) return;
   try {
     const { data, error } = await supabase
       .from('servicios')
       .select('nombre, duracion_min')
-      .eq('negocio_id', currentNegocioId);
+      .eq('negocio_id', negocioId);
     if (error) throw error;
     serviciosCache = (data || []).reduce((acc, srv) => {
       acc[srv.nombre] = srv.duracion_min;
@@ -25,199 +38,128 @@ async function cargarServicios() {
   }
 }
 
-async function getNegocioId() {
-  if (negocioId) return negocioId;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user && user.user_metadata && user.user_metadata.negocio_id) {
-    negocioId = user.user_metadata.negocio_id;
-    return negocioId;
-  }
-  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
-  window.location.replace(Config.getRoute('login'));
-  return null;
-}
-
-
-// Utilidad: fecha local YYYY-MM-DD
+// Utilidad para formatear fechas a YYYY-MM-DD en la zona horaria local.
 function ymdLocal(dateLike) {
   const d = new Date(dateLike);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Función para actualizar los contadores en el DOM
+// Actualiza los contadores de la UI (En espera, Atendidos, Total).
 function actualizarContadores(turnosHoy) {
-  document.getElementById('turnosEspera').textContent =
-    turnosHoy.filter(t => t.estado === 'En espera').length;
-  document.getElementById('turnosAtendidos').textContent =
-    turnosHoy.filter(t => t.estado === 'Atendido').length;
+  document.getElementById('turnosEspera').textContent = turnosHoy.filter(t => t.estado === 'En espera').length;
+  document.getElementById('turnosAtendidos').textContent = turnosHoy.filter(t => t.estado === 'Atendido').length;
   document.getElementById('turnosDia').textContent = turnosHoy.length;
 }
 
-// Función para actualizar la tabla con los turnos del día
+// Dibuja la tabla del historial de turnos del día.
 function actualizarTabla(turnosHoy) {
   const tabla = document.getElementById('tablaHistorial');
-  tabla.innerHTML =
-    turnosHoy.length === 0
+  if (!tabla) return;
+
+  tabla.innerHTML = turnosHoy.length === 0
       ? `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay turnos registrados hoy.</td></tr>`
-      : '';
-
-  turnosHoy.forEach(turno => {
-    const fila = document.createElement('tr');
-    fila.innerHTML = `
-      <td class="py-2 px-4 border-b">${turno.turno}</td>
-      <td class="py-2 px-4 border-b">${turno.nombre || 'Sin nombre'}</td>
-      <td class="py-2 px-4 border-b">${turno.hora || 'Sin hora'}</td>
-      <td class="py-2 px-4 border-b">
-        <span class="${
-          turno.estado === 'En espera'
-            ? 'text-yellow-500'
-            : turno.estado === 'Atendido'
-            ? 'text-green-500'
-            : 'text-gray-500'
-        } font-bold">${turno.estado}</span>
-      </td>
-    `;
-    tabla.appendChild(fila);
-  });
+      : turnosHoy.map(turno => `
+          <tr>
+            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.turno}</td>
+            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.nombre || 'N/A'}</td>
+            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.hora || 'N/A'}</td>
+            <td class="py-2 px-4 border-b dark:border-gray-700">
+              <span class="${turno.estado === 'En espera' ? 'text-yellow-500' : turno.estado === 'Atendido' ? 'text-green-500' : 'text-gray-500'} font-bold">${turno.estado}</span>
+            </td>
+          </tr>
+        `).join('');
 }
 
-// Utilidad: día UTC YYYY-MM-DD
-function ymdUTC(dateLike) {
-  return new Date(dateLike).toISOString().slice(0, 10);
-}
-
-// Función para cargar datos y actualizar vista, devuelve los turnos del día
+// Carga los datos principales de la página (turnos) y actualiza la UI.
 async function cargarDatos() {
-  const currentNegocioId = await getNegocioId();
-  if (!currentNegocioId) return;
+  if (!negocioId) return;
 
   try {
     const hoyLocal = ymdLocal(new Date());
-    const hoyUTC = ymdUTC(new Date());
     const { data, error } = await supabase
       .from('turnos')
       .select('*')
-      .eq('negocio_id', currentNegocioId)
-      .or(`fecha.eq.${hoyUTC},fecha.eq.${hoyLocal}`)
+      .eq('negocio_id', negocioId)
+      .eq('fecha', hoyLocal)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     const turnosHoy = data || [];
-
     actualizarContadores(turnosHoy);
     actualizarTabla(turnosHoy);
     actualizarTurnoEnAtencion(turnosHoy);
 
-    return turnosHoy;
   } catch (err) {
-    console.error('Error al cargar datos:', err);
-    const tabla = document.getElementById('tablaHistorial');
-    if (tabla) {
-      tabla.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos del panel.</td></tr>`;
-    }
-    const e1 = document.getElementById('turnosEspera');
-    const e2 = document.getElementById('turnosAtendidos');
-    const e3 = document.getElementById('turnosDia');
-    if (e1) e1.textContent = '0';
-    if (e2) e2.textContent = '0';
-    if (e3) e3.textContent = '0';
-    return [];
+    console.error('Error al cargar datos del panel:', err);
+    document.getElementById('tablaHistorial').innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos.</td></tr>`;
   }
 }
 
-// Función para limpiar historial del día actual
+// Limpia el historial de turnos que ya no están activos.
 async function limpiarHistorialTurnos() {
-    const currentNegocioId = await getNegocioId();
-    if (!currentNegocioId) return;
-
-  if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
+  if (!negocioId) return;
+  if (!confirm('¿Estás seguro de que quieres limpiar el historial de turnos atendidos y cancelados del día?')) return;
 
   const btn = document.getElementById('btnLimpiarHistorial');
-  const tabla = document.getElementById('tablaHistorial');
-  const e1 = document.getElementById('turnosEspera');
-  const e2 = document.getElementById('turnosAtendidos');
-  const e3 = document.getElementById('turnosDia');
 
   try {
-    btn && (btn.disabled = true, btn.textContent = 'Limpiando...');
-    // Borrar todos los turnos que ya no están activos
-    const { error: deleteError } = await supabase
+    btn.disabled = true;
+    btn.textContent = 'Limpiando...';
+
+    const { error } = await supabase
       .from('turnos')
       .delete()
-      .eq('negocio_id', currentNegocioId)
+      .eq('negocio_id', negocioId)
       .in('estado', ['Atendido', 'Cancelado', 'No presentado']);
 
-    if (deleteError) throw deleteError;
+    if (error) throw error;
 
-    // Limpiar UI inmediata
-    if (tabla) tabla.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay turnos registrados hoy.</td></tr>`;
-    if (e1) e1.textContent = '0';
-    if (e2) e2.textContent = '0';
-    if (e3) e3.textContent = '0';
-
-    alert('✅ Historial limpiado con éxito');
-
-    // Refrescar de la fuente para confirmar estado
-    await cargarDatos();
+    alert('✅ Historial limpiado con éxito.');
+    await cargarDatos(); // Refrescar la vista
   } catch (error) {
     console.error('Error al limpiar historial:', error);
-    alert('❌ Error al limpiar historial: ' + (error?.message || error));
+    alert('❌ Error al limpiar historial: ' + error.message);
   } finally {
-    btn && (btn.disabled = false, btn.textContent = 'Limpiar historial');
+    btn.disabled = false;
+    btn.textContent = 'Limpiar historial';
   }
 }
 
-// Suscripción en tiempo real para actualizar datos al instante
-async function suscribirseTurnos() {
-    const currentNegocioId = await getNegocioId();
-    if (!currentNegocioId) return;
+// Configura la suscripción a cambios en la tabla de turnos en tiempo real.
+function suscribirseTurnos() {
+  if (!negocioId) return;
 
-  supabase
-    .channel('canal-turnos')
-    .on(
-      'postgres_changes',
-      {
+  const channel = supabase
+    .channel(`turnos-negocio-${negocioId}`)
+    .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'turnos',
-        filter: `negocio_id=eq.${currentNegocioId}`,
+        filter: `negocio_id=eq.${negocioId}`,
       },
-      async payload => {
-        console.log('🟢 Actualización en tiempo real:', payload);
-        await cargarDatos();
+      payload => {
+        console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
+        cargarDatos();
       }
     )
     .subscribe();
+
+  return channel;
 }
 
-// Función para resaltar menú activo en sidebar
-function resaltarMenu() {
-  const path = window.location.pathname.split('/').pop();
-  document.querySelectorAll('aside nav a').forEach(link => {
-    const href = link.getAttribute('href');
-    if (href === path) {
-      link.classList.add('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
-    } else {
-      link.classList.remove('bg-white', 'text-blue-900', 'font-semibold', 'shadow');
-    }
-  });
-}
-
-// Función para actualizar el turno en atención y su timer
+// Actualiza la tarjeta del turno que está "En atención" y gestiona su temporizador.
 function actualizarTurnoEnAtencion(turnosHoy) {
   const enAtencion = turnosHoy.find(t => t.estado === 'En atención');
   const card = document.getElementById('turno-en-atencion-card');
+  if (!card) return;
 
   if (atencionInterval) {
     clearInterval(atencionInterval);
     atencionInterval = null;
   }
 
-  if (enAtencion && card) {
+  if (enAtencion) {
     card.classList.remove('hidden');
     document.getElementById('atencion-turno').textContent = enAtencion.turno;
     document.getElementById('atencion-cliente').textContent = enAtencion.nombre;
@@ -231,38 +173,31 @@ function actualizarTurnoEnAtencion(turnosHoy) {
       const endTime = startTime + duracionMin * 60 * 1000;
 
       const updateTimer = () => {
-        const ahora = Date.now();
-        const restanteMs = Math.max(0, endTime - ahora);
-
-        if (restanteMs === 0) {
-          timerEl.textContent = '00:00';
-          clearInterval(atencionInterval);
-          return;
-        }
-
+        const restanteMs = Math.max(0, endTime - Date.now());
         const minutos = Math.floor(restanteMs / 60000);
         const segundos = Math.floor((restanteMs % 60000) / 1000);
         timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+        if (restanteMs === 0) clearInterval(atencionInterval);
       };
 
-      updateTimer(); // Llama inmediatamente para no esperar 1 segundo
+      updateTimer();
       atencionInterval = setInterval(updateTimer, 1000);
-    } else {
-      if (timerEl) timerEl.textContent = '--:--';
+    } else if (timerEl) {
+      timerEl.textContent = '--:--';
     }
-  } else if (card) {
+  } else {
     card.classList.add('hidden');
   }
 }
 
-// Inicialización al cargar la página
+// Inicialización de la página.
 window.addEventListener('DOMContentLoaded', async () => {
-  await getNegocioId();
-  await cargarServicios(); // Cargar duración de servicios
-  resaltarMenu();
-  cargarDatos();
-  suscribirseTurnos();
-});
+  if (!negocioId) return; // Detener si no hay ID de negocio
 
-// Exponer limpiar historial al global para el botón
-window.limpiarHistorialTurnos = limpiarHistorialTurnos;
+  await cargarServicios();
+  await cargarDatos();
+  suscribirseTurnos();
+
+  // Exponer la función de limpiar historial al objeto window para que el HTML la pueda llamar.
+  window.limpiarHistorialTurnos = limpiarHistorialTurnos;
+});
