@@ -2,29 +2,14 @@
 import { supabase } from '../database.js';
 import Config from '../config.js';
 
+let negocioId; // Se obtendrá del usuario autenticado
 let atencionInterval = null; // Timer para el turno en atención
 let serviciosCache = {}; // Cache para duraciones de servicios
 
-/**
- * Lee el ID del negocio desde el atributo 'data-negocio-id' en el <body>.
- * Esta es ahora la fuente de verdad para saber en qué contexto de negocio opera la página.
- * @returns {string} El ID del negocio.
- * @throws {Error} Si el atributo no se encuentra, detiene la ejecución.
- */
-function getNegocioId() {
-  const negocioId = document.body.dataset.negocioId;
-  if (!negocioId) {
-    const errorMsg = "Error Crítico: No se pudo identificar el negocio (falta 'data-negocio-id' en el body). La página no puede funcionar.";
-    console.error(errorMsg);
-    alert(errorMsg);
-    throw new Error(errorMsg);
-  }
-  return negocioId;
-}
-
 // Cargar servicios una vez al inicio
 async function cargarServicios() {
-  const currentNegocioId = getNegocioId();
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
   try {
     const { data, error } = await supabase
       .from('servicios')
@@ -38,6 +23,18 @@ async function cargarServicios() {
   } catch (error) {
     console.error("Error cargando la duración de los servicios:", error);
   }
+}
+
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
+  }
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace(Config.getRoute('login'));
+  return null;
 }
 
 
@@ -94,7 +91,8 @@ function ymdUTC(dateLike) {
 
 // Función para cargar datos y actualizar vista, devuelve los turnos del día
 async function cargarDatos() {
-  const currentNegocioId = getNegocioId();
+  const currentNegocioId = await getNegocioId();
+  if (!currentNegocioId) return;
 
   try {
     const hoyLocal = ymdLocal(new Date());
@@ -133,7 +131,8 @@ async function cargarDatos() {
 
 // Función para limpiar historial del día actual
 async function limpiarHistorialTurnos() {
-    const currentNegocioId = getNegocioId();
+    const currentNegocioId = await getNegocioId();
+    if (!currentNegocioId) return;
 
   if (!confirm('¿Estás seguro que quieres limpiar el historial del día?')) return;
 
@@ -174,7 +173,8 @@ async function limpiarHistorialTurnos() {
 
 // Suscripción en tiempo real para actualizar datos al instante
 async function suscribirseTurnos() {
-    const currentNegocioId = getNegocioId();
+    const currentNegocioId = await getNegocioId();
+    if (!currentNegocioId) return;
 
   supabase
     .channel('canal-turnos')
@@ -257,7 +257,7 @@ function actualizarTurnoEnAtencion(turnosHoy) {
 
 // Inicialización al cargar la página
 window.addEventListener('DOMContentLoaded', async () => {
-  getNegocioId(); // Esto valida que el ID exista al inicio.
+  await getNegocioId();
   await cargarServicios(); // Cargar duración de servicios
   resaltarMenu();
   cargarDatos();

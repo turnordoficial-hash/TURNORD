@@ -1,20 +1,18 @@
 import { supabase } from '../database.js';
 import Config from '../config.js';
 
-/**
- * Lee el ID del negocio desde el atributo 'data-negocio-id' en el <body>.
- * @returns {string} El ID del negocio.
- * @throws {Error} Si el atributo no se encuentra, detiene la ejecución.
- */
-function getNegocioId() {
-  const negocioId = document.body.dataset.negocioId;
-  if (!negocioId) {
-    const errorMsg = "Error Crítico: No se pudo identificar el negocio (falta 'data-negocio-id' en el body). La página no puede funcionar.";
-    console.error(errorMsg);
-    alert(errorMsg);
-    throw new Error(errorMsg);
+let negocioId; // Se obtendrá del usuario autenticado
+
+async function getNegocioId() {
+  if (negocioId) return negocioId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+    negocioId = user.user_metadata.negocio_id;
+    return negocioId;
   }
-  return negocioId;
+  alert('No se pudo obtener el ID del negocio. Por favor, inicie sesión de nuevo.');
+  window.location.replace(Config.getRoute('login'));
+  return null;
 }
 
 // Variables para el control de break
@@ -24,7 +22,8 @@ let breakInterval = null;
 
 // Inicialización cuando el DOM está cargado
 document.addEventListener('DOMContentLoaded', async () => {
-  getNegocioId(); // Valida que el ID exista al inicio
+  await getNegocioId();
+  if (!negocioId) return;
 
   initThemeToggle();
   actualizarFechaHora();
@@ -127,7 +126,7 @@ async function obtenerGanancias() {
     const { data, error } = await supabase
       .from('turnos')
       .select('fecha, monto_cobrado')
-      .eq('negocio_id', getNegocioId());
+      .eq('negocio_id', negocioId);
 
     if (error) throw error;
 
@@ -307,7 +306,7 @@ async function cargarConfiguracion() {
     const { data, error } = await supabase
       .from('configuracion_negocio')
       .select('*')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .maybeSingle();
 
     if (error) throw error;
@@ -383,7 +382,7 @@ async function guardarConfiguracion(event) {
     const { error } = await supabase
       .from('configuracion_negocio')
       .upsert({
-        negocio_id: getNegocioId(),
+        negocio_id: negocioId,
         hora_apertura: horaApertura,
         hora_cierre: horaCierre,
         limite_turnos: limiteTurnos,
@@ -423,7 +422,7 @@ async function verificarEstadoBreak() {
     const { data, error } = await supabase
       .from('estado_negocio')
       .select('*')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
@@ -462,7 +461,7 @@ async function iniciarBreak() {
     const { error } = await supabase
       .from('estado_negocio')
       .upsert({
-        negocio_id: getNegocioId(),
+        negocio_id: negocioId,
         en_break: true,
         break_start_time: now.toISOString(),
         break_end_time: endTime.toISOString(),
@@ -488,7 +487,7 @@ async function finalizarBreak() {
     const { error } = await supabase
       .from('estado_negocio')
       .upsert({
-        negocio_id: getNegocioId(),
+        negocio_id: negocioId,
         en_break: false,
         break_start_time: null,
         break_end_time: null,
@@ -561,7 +560,7 @@ async function verificarBreakActivo() {
     const { data, error } = await supabase
       .from('estado_negocio')
       .select('en_break, break_end_time, break_message')
-      .eq('negocio_id', getNegocioId())
+      .eq('negocio_id', negocioId)
       .single();
 
     if (error && error.code !== 'PGRST116') {

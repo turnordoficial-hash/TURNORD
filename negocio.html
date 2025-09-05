@@ -424,17 +424,7 @@
   <script type="module" src="./admin/negocio.js"></script>
   <script type="module">
     import { supabase } from './database.js';
-
-    function getNegocioId() {
-      const negocioId = document.body.dataset.negocioId;
-      if (!negocioId) {
-        alert("Error Crítico: No se pudo identificar el negocio. La página no puede funcionar.");
-        throw new Error("Missing data-negocio-id on body element");
-      }
-      return negocioId;
-    }
-    const negocioId = getNegocioId();
-
+    const negocioId = 'barberia0001';
     (async () => {
       try {
         const { data } = await supabase
