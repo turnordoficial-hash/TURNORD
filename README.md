@@ -8,7 +8,7 @@ La aplicación está construida con HTML, CSS y JavaScript "vanilla". Utiliza Su
 
 ## Configuración
 
-La aplicación se conecta a Supabase mediante las credenciales configuradas directamente en el archivo `config.js`. Las credenciales de Supabase ya están incluidas en este archivo para facilitar la conexión inmediata con la base de datos.
+La aplicación se conecta a Supabase mediante las credenciales configuradas en `database.js`.
 
 ## Proceso de Build
 
