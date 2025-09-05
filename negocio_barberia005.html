@@ -8,7 +8,15 @@
 <!-- Base dinámico -->
 <script>
   const isGitHub = location.hostname.includes('github.io');
-  const baseHref = isGitHub ? '/TURNORD/' : '/';
+  let baseHref = '/';
+  if (isGitHub) {
+    // Pathname on GitHub Pages is /<repo-name>/...
+    const pathParts = location.pathname.split('/');
+    // The repo name is the first part of the path after the initial slash
+    if (pathParts.length > 1 && pathParts[1]) {
+      baseHref = `/${pathParts[1]}/`;
+    }
+  }
   const base = document.createElement('base');
   base.href = baseHref;
   document.head.appendChild(base);
