@@ -10,6 +10,3 @@ node_modules/
 # Archivos temporales
 .DS_Store
 Thumbs.db
-
-# Environment variables
-.env
