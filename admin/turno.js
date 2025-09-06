@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mobileMenuButton = document.getElementById('mobile-menu-button');
     const sidebar = document.getElementById('sidebar');
     document.getElementById('listaEspera')?.addEventListener('click', handleReorderClick);
+    document.getElementById('listaEspera')?.addEventListener('dblclick', handleDoubleClickDelete);
     document.getElementById('listaAtencion')?.addEventListener('click', (e) => {
         const card = e.target.closest('.turn-card-atencion');
         if (card && card.dataset.id) {
@@ -473,7 +474,10 @@ async function cargarTurnos() {
     for (let index = 0; index < dataRender.length; index++) {
         const t = dataRender[index];
         const div = document.createElement('div');
-        div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md';
+        div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md cursor-pointer';
+        div.dataset.id = t.id;
+        div.dataset.nombre = t.nombre;
+        div.dataset.turno = t.turno;
         const horaCreacion = new Date(`${t.fecha}T${t.hora}`);
         const ahora = new Date();
         const minutosEsperaReal = Math.floor((ahora - horaCreacion) / 60000);
@@ -824,3 +828,42 @@ window.cerrarModal = cerrarModal;
 window.cerrarModalPago = cerrarModalPago;
 window.devolverTurno = devolverTurno;
 window.atenderAhora = atenderAhora;
+
+async function handleDoubleClickDelete(event) {
+    const card = event.target.closest('.bg-blue-50');
+    if (!card) return;
+
+    const turnId = card.dataset.id;
+    const turnNombre = card.dataset.nombre;
+    const turnNumero = card.dataset.turno;
+
+    if (!turnId || !turnNombre || !turnNumero) return;
+
+    Swal.fire({
+        title: '¿Eliminar Turno?',
+        html: `¿Estás seguro de que quieres eliminar el turno <strong>${turnNumero}</strong> de <strong>${turnNombre}</strong>?<br>Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'No, cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                const { error } = await supabase
+                    .from('turnos')
+                    .delete()
+                    .eq('id', turnId);
+
+                if (error) throw error;
+
+                mostrarNotificacion('Turno eliminado con éxito.', 'success');
+                refrescarUI();
+            } catch (error) {
+                console.error('Error al eliminar turno:', error);
+                mostrarNotificacion('Error al eliminar el turno.', 'error');
+            }
+        }
+    });
+}

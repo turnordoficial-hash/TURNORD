@@ -244,13 +244,22 @@ async function mostrarMensajeConfirmacion(turnoData) {
             alert('Error al cancelar el turno: ' + error.message);
             return;
         }
+        // Mostrar un mensaje de cancelación y luego limpiar la UI.
         mensajeContenedor.innerHTML = `<div class="bg-red-100 text-red-700 rounded-xl p-4 shadow mt-4 text-sm">❌ Has cancelado tu turno <strong>${turnoData.turno}</strong>.</div>`;
-        document.querySelector('button[onclick*="modal"]').disabled = false;
+
+        // Limpiar estado local
         turnoAsignado = null;
-        clearInterval(intervaloContador);
+        telefonoUsuario = null;
+        if (intervaloContador) clearInterval(intervaloContador);
         localStorage.removeItem(getDeadlineKey(turnoData.turno));
         localStorage.removeItem(`telefonoUsuario_${negocioId}`);
-        telefonoUsuario = null;
+
+        // Reactivar el botón de tomar turno
+        const btnTomarTurno = document.querySelector('button[onclick*="modal"]');
+        if (btnTomarTurno) btnTomarTurno.disabled = false;
+
+        // La suscripción en tiempo real de Supabase se encargará de actualizar la vista.
+        // Forzamos una actualización local inmediata para el usuario actual.
         await actualizarTurnoActualYConteo();
     });
 }
