@@ -829,6 +829,131 @@ window.cerrarModalPago = cerrarModalPago;
 window.devolverTurno = devolverTurno;
 window.atenderAhora = atenderAhora;
 
+let recognition = null;
+let isRecognizing = false;
+
+function iniciarReconocimientoVoz() {
+    const voiceCommandButton = document.getElementById('voice-command-button');
+    const micIcon = document.getElementById('mic-icon');
+    const micLoading = document.getElementById('mic-loading');
+    const voiceCommandText = document.getElementById('voice-command-text');
+
+    if (isRecognizing) {
+        if (recognition) {
+            recognition.stop();
+        }
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        mostrarNotificacion('Tu navegador no soporta el reconocimiento de voz.', 'error');
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'es-ES';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+        isRecognizing = true;
+        micIcon.classList.add('hidden');
+        micLoading.classList.remove('hidden');
+        voiceCommandText.textContent = 'Escuchando...';
+        voiceCommandButton.classList.add('bg-red-500', 'hover:bg-red-600');
+        voiceCommandButton.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+    };
+
+    recognition.onend = () => {
+        isRecognizing = false;
+        micIcon.classList.remove('hidden');
+        micLoading.classList.add('hidden');
+        voiceCommandText.textContent = 'Comando de Voz';
+        voiceCommandButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+        voiceCommandButton.classList.add('bg-purple-600', 'hover:bg-purple-700');
+        recognition = null; // Clean up
+    };
+
+    recognition.onerror = (event) => {
+        if (event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'not-allowed') {
+            mostrarNotificacion('No se pudo iniciar el reconocimiento. Revisa los permisos del micrófono.', 'warning');
+        } else {
+            mostrarNotificacion('Error en el reconocimiento de voz: ' + event.error, 'error');
+        }
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        procesarComandoVoz(transcript);
+    };
+
+    recognition.start();
+}
+
+window.iniciarReconocimientoVoz = iniciarReconocimientoVoz;
+
+function hablar(texto) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(texto);
+        utterance.lang = 'es-ES';
+        utterance.rate = 1;
+        utterance.pitch = 1;
+
+        let voices = window.speechSynthesis.getVoices();
+        const spanishVoice = voices.find(voice => voice.lang === 'es-ES' || voice.lang.startsWith('es-'));
+        if (spanishVoice) {
+            utterance.voice = spanishVoice;
+        } else {
+             window.speechSynthesis.onvoiceschanged = () => {
+                voices = window.speechSynthesis.getVoices();
+                const spanishVoice = voices.find(voice => voice.lang === 'es-ES' || voice.lang.startsWith('es-'));
+                if (spanishVoice) {
+                    utterance.voice = spanishVoice;
+                }
+            };
+        }
+
+        window.speechSynthesis.speak(utterance);
+    } else {
+        console.warn('La síntesis de voz no es soportada en este navegador.');
+    }
+}
+
+function procesarComandoVoz(transcript) {
+    mostrarNotificacion(`Comando recibido: "${transcript}"`, 'info');
+
+    const comandosSiguiente = ['siguiente turno', 'cuál turno sigue', 'quién sigue', 'próximo turno'];
+    const comandosAtender = ['pasar turno', 'atender turno', 'pase el turno', 'siguiente', 'atender', 'pasar'];
+
+    if (comandosSiguiente.some(cmd => transcript.includes(cmd))) {
+        if (turnoActual && turnoActual.nombre) {
+            const texto = `El siguiente turno es de ${turnoActual.nombre}.`;
+            hablar(texto);
+            mostrarNotificacion(texto, 'success');
+        } else {
+            const texto = 'No hay más turnos en espera.';
+            hablar(texto);
+            mostrarNotificacion(texto, 'warning');
+        }
+    } else if (comandosAtender.some(cmd => transcript.includes(cmd))) {
+        if (turnoActual) {
+            hablar(`Atendiendo a ${turnoActual.nombre}.`);
+            atenderAhora();
+        } else {
+            const texto = 'No hay turnos para atender.';
+            hablar(texto);
+            mostrarNotificacion(texto, 'warning');
+        }
+    } else {
+        const texto = 'No se reconoció un comando válido.';
+        hablar(texto);
+        mostrarNotificacion(texto, 'error');
+    }
+}
+
+
 async function handleDoubleClickDelete(event) {
     const card = event.target.closest('.bg-blue-50');
     if (!card) return;
