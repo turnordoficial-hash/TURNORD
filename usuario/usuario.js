@@ -321,6 +321,28 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
     await actualizarTurnoActualYConteo();
 }
 
+function simpleSentimentAnalysis(text) {
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+        return 0;
+    }
+    const positiveWords = ['bueno', 'bien', 'excelente', 'increíble', 'genial', 'fantástico', 'perfecto', 'rápido', 'amable', 'profesional', 'limpio', 'recomendado', 'satisfecho', 'gracias', 'encantado', 'mejor'];
+    const negativeWords = ['malo', 'terrible', 'horrible', 'lento', 'grosero', 'sucio', 'decepcionado', 'nunca', 'jamás', 'problema', 'queja', 'espera', 'tarde'];
+
+    let score = 0;
+    const words = text.toLowerCase().replace(/[.,!?;]/g, '').split(/\s+/);
+
+    words.forEach(word => {
+        if (positiveWords.includes(word)) {
+            score++;
+        } else if (negativeWords.includes(word)) {
+            score--;
+        }
+    });
+
+    const normalizedScore = words.length > 0 ? score / words.length : 0;
+    return Math.max(-1, Math.min(1, normalizedScore));
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     if (!negocioId) return;
     await obtenerConfig();
@@ -360,10 +382,82 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         await tomarTurnoSimple(nombre, telefono, servicio);
     });
+
+    const comentarioModal = document.getElementById('comentario-modal');
+    const formComentario = document.getElementById('formComentario');
+    const btnCerrarComentarioModal = document.getElementById('btn-cerrar-comentario-modal');
+
+    function cerrarComentarioModalYLimpiar() {
+        if (comentarioModal) {
+            comentarioModal.classList.add('hidden');
+            formComentario?.reset();
+        }
+
+        const turnoNumero = comentarioModal?.dataset.turnoNumero;
+        if (turnoNumero) {
+            localStorage.removeItem(getDeadlineKey(turnoNumero));
+        }
+        localStorage.removeItem(`telefonoUsuario_${negocioId}`);
+        telefonoUsuario = null;
+        turnoAsignado = null;
+        if (btnTomarTurno) btnTomarTurno.disabled = false;
+        if (intervaloContador) clearInterval(intervaloContador);
+    }
+
+    if (formComentario) {
+        formComentario.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const rating = formComentario.rating.value;
+            const comentarioText = formComentario.comentario.value.trim();
+            const turnoId = comentarioModal.dataset.turnoId;
+            const nombreCliente = comentarioModal.dataset.nombreCliente;
+            const telefonoCliente = comentarioModal.dataset.telefonoCliente;
+
+            const sentimiento = simpleSentimentAnalysis(comentarioText);
+
+            try {
+                const { error } = await supabase.from('comentarios').insert([
+                    {
+                        negocio_id: negocioId,
+                        turno_id: turnoId,
+                        nombre_cliente: nombreCliente,
+                        telefono_cliente: telefonoCliente,
+                        calificacion: rating,
+                        comentario: comentarioText,
+                        sentimiento_score: sentimiento
+                    }
+                ]);
+                if (error) throw error;
+                alert('¡Gracias por tu comentario!');
+            } catch (error) {
+                console.error('Error al guardar comentario:', error);
+                alert('No se pudo guardar tu comentario. Por favor, inténtalo de nuevo.');
+            } finally {
+                cerrarComentarioModalYLimpiar();
+            }
+        });
+    }
+
+    if (btnCerrarComentarioModal) {
+        btnCerrarComentarioModal.addEventListener('click', () => {
+            cerrarComentarioModalYLimpiar();
+        });
+    }
+
     supabase.channel(`turnos-usuario-${negocioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, async (payload) => {
         if (telefonoUsuario) {
             const { data } = await supabase.from('turnos').select('*').eq('negocio_id', negocioId).eq('telefono', telefonoUsuario).order('created_at', { ascending: false }).limit(1).single();
-            if (data && data.estado !== 'En espera') {
+
+            if (data && data.estado === 'Atendido') {
+                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-green-100 text-green-700 rounded-xl p-4 shadow mt-4 text-sm">✅ Tu turno <strong>${data.turno}</strong> ha sido atendido. ¡Gracias por tu visita!</div>`;
+                if (comentarioModal) {
+                    comentarioModal.classList.remove('hidden');
+                    comentarioModal.dataset.turnoId = data.id;
+                    comentarioModal.dataset.nombreCliente = data.nombre;
+                    comentarioModal.dataset.telefonoCliente = data.telefono;
+                    comentarioModal.dataset.turnoNumero = data.turno;
+                }
+            } else if (data && data.estado !== 'En espera') {
                 document.getElementById('mensaje-turno').innerHTML = `<div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">✅ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.</div>`;
                 turnoAsignado = null;
                 btnTomarTurno.disabled = false;
