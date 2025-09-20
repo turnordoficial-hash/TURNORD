@@ -387,13 +387,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     const formComentario = document.getElementById('formComentario');
     const btnCerrarComentarioModal = document.getElementById('btn-cerrar-comentario-modal');
 
-    function cerrarComentarioModalYLimpiar() {
+    function cerrarComentarioModal() {
         if (comentarioModal) {
             comentarioModal.classList.add('hidden');
             formComentario?.reset();
         }
+    }
 
-        const turnoNumero = comentarioModal?.dataset.turnoNumero;
+    function limpiarSesionDeUsuario(turnoNumero) {
         if (turnoNumero) {
             localStorage.removeItem(getDeadlineKey(turnoNumero));
         }
@@ -433,14 +434,14 @@ window.addEventListener('DOMContentLoaded', async () => {
                 console.error('Error al guardar comentario:', error);
                 alert('No se pudo guardar tu comentario. Por favor, inténtalo de nuevo.');
             } finally {
-                cerrarComentarioModalYLimpiar();
+                cerrarComentarioModal();
             }
         });
     }
 
     if (btnCerrarComentarioModal) {
         btnCerrarComentarioModal.addEventListener('click', () => {
-            cerrarComentarioModalYLimpiar();
+            cerrarComentarioModal();
         });
     }
 
@@ -448,23 +449,24 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (telefonoUsuario) {
             const { data } = await supabase.from('turnos').select('*').eq('negocio_id', negocioId).eq('telefono', telefonoUsuario).order('created_at', { ascending: false }).limit(1).single();
 
-            if (data && data.estado === 'Atendido') {
-                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-green-100 text-green-700 rounded-xl p-4 shadow mt-4 text-sm">✅ Tu turno <strong>${data.turno}</strong> ha sido atendido. ¡Gracias por tu visita!</div>`;
+            if (!data) return;
+
+            if (data.estado === 'En atención') {
+                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">🔔 ¡Es tu turno! <strong>${data.turno}</strong> está siendo atendido.</div>`;
                 if (comentarioModal) {
                     comentarioModal.classList.remove('hidden');
                     comentarioModal.dataset.turnoId = data.id;
                     comentarioModal.dataset.nombreCliente = data.nombre;
                     comentarioModal.dataset.telefonoCliente = data.telefono;
-                    comentarioModal.dataset.turnoNumero = data.turno;
                 }
-            } else if (data && data.estado !== 'En espera') {
-                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">✅ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.</div>`;
-                turnoAsignado = null;
-                btnTomarTurno.disabled = false;
-                if (intervaloContador) clearInterval(intervaloContador);
-                localStorage.removeItem(getDeadlineKey(data.turno));
-                localStorage.removeItem(`telefonoUsuario_${negocioId}`);
-                telefonoUsuario = null;
+            } else if (data.estado === 'Atendido') {
+                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-green-100 text-green-700 rounded-xl p-4 shadow mt-4 text-sm">✅ Tu turno <strong>${data.turno}</strong> ha sido completado. ¡Gracias por tu visita!</div>`;
+                cerrarComentarioModal();
+                limpiarSesionDeUsuario(data.turno);
+            } else if (data.estado !== 'En espera') {
+                document.getElementById('mensaje-turno').innerHTML = `<div class="bg-gray-100 text-gray-700 rounded-xl p-4 shadow mt-4 text-sm">ℹ️ Tu turno <strong>${data.turno}</strong> ha sido ${data.estado.toLowerCase()}.</div>`;
+                cerrarComentarioModal();
+                limpiarSesionDeUsuario(data.turno);
             }
         }
         await actualizarTurnoActualYConteo();
