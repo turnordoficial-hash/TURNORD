@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comentarios - TurnoRD Admin</title>
+
+  <!-- Base dinámico -->
+  <script>
+    const isGitHub = location.hostname.includes('github.io');
+    let baseHref = '/';
+    if (isGitHub) {
+      const pathParts = location.pathname.split('/');
+      if (pathParts.length > 1 && pathParts[1]) {
+        baseHref = `/${pathParts[1]}/`;
+      }
+    }
+    const base = document.createElement('base');
+    base.href = baseHref;
+    document.head.appendChild(base);
+  </script>
+
+  <link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
+  <script type="module" src="auth-guard.js"></script>
+  <script src="assets/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    function inicializarModoOscuro() {
+      const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
+      document.documentElement.classList.toggle('dark', modoOscuro);
+    }
+    inicializarModoOscuro();
+    tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+  </script>
+</head>
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" data-negocio-id="barberia005">
+
+  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+    <!-- SVGs for dark mode toggle -->
+  </button>
+
+  <div class="flex min-h-screen">
+    <aside class="w-64 bg-primary-700 dark:bg-primary-700 text-white p-6 hidden md:block">
+      <h2 class="text-2xl font-bold mb-8">TurnoRD Admin</h2>
+      <nav class="space-y-4">
+        <a href="panel_barberia005.html" class="block hover:text-white rounded px-3 py-2">Inicio</a>
+        <a href="turno_barberia005.html" class="block hover:text-white rounded px-3 py-2">Turnos</a>
+        <a href="negocio_barberia005.html" class="block hover:text-white rounded px-3 py-2">Mi negocio</a>
+        <a href="comentarios_barberia005.html" class="block bg-white text-gray-900 font-semibold rounded px-3 py-2 shadow">Comentarios</a>
+        <a href="cierre_barberia005.html" id="cerrarSesion" class="block hover:text-red-400 mt-6 rounded px-3 py-2">Cerrar sesión</a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 p-4 sm:p-6 w-full">
+      <h1 class="text-2xl font-bold mb-6">Comentarios de Clientes</h1>
+
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 overflow-x-auto">
+        <table class="min-w-full text-left">
+          <thead>
+            <tr>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Cliente</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Calificación</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Comentario</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Sentimiento</th>
+              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-comentarios" class="dark:text-gray-300">
+            <!-- Las filas se insertarán desde admin/comentarios.js -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
+    © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
+  </footer>
+
+  <script type="module" src="admin/comentarios.js"></script>
+  <script>
+    document.getElementById('toggleDarkMode').addEventListener('click', function() {
+      if (window.theme && window.theme.toggleMode) window.theme.toggleMode();
+    });
+  </script>
+</body>
+</html>

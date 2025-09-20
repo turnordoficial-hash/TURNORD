@@ -114,6 +114,41 @@
   <div id="listaEspera" class="space-y-2 mt-4"></div>
   <div id="mensaje-turno"></div>
 </div>
+
+<!-- Modal de Comentario -->
+<div id="comentario-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden px-4">
+  <div class="bg-white dark:bg-gray-800 text-blue-900 dark:text-blue-300 rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
+    <button id="btn-cerrar-comentario-modal" class="absolute top-4 right-4 text-blue-900 dark:text-blue-300 text-2xl font-bold" type="button">&times;</button>
+    <h2 class="text-xl font-bold mb-4 text-center">¡Gracias por tu visita!</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">Nos encantaría saber cómo fue tu experiencia.</p>
+    <form id="formComentario" class="space-y-4">
+      <div>
+        <label class="block text-sm text-center font-medium mb-2 dark:text-gray-300">Calificación</label>
+        <div class="flex flex-row-reverse justify-center items-center rating">
+          <input type="radio" id="star5" name="rating" value="5" class="hidden peer" required /><label for="star5" class="cursor-pointer text-4xl text-gray-400 peer-hover:text-yellow-400 peer-checked:text-yellow-500 hover:text-yellow-400">★</label>
+          <input type="radio" id="star4" name="rating" value="4" class="hidden peer" /><label for="star4" class="cursor-pointer text-4xl text-gray-400 peer-hover:text-yellow-400 peer-checked:text-yellow-500 hover:text-yellow-400">★</label>
+          <input type="radio" id="star3" name="rating" value="3" class="hidden peer" /><label for="star3" class="cursor-pointer text-4xl text-gray-400 peer-hover:text-yellow-400 peer-checked:text-yellow-500 hover:text-yellow-400">★</label>
+          <input type="radio" id="star2" name="rating" value="2" class="hidden peer" /><label for="star2" class="cursor-pointer text-4xl text-gray-400 peer-hover:text-yellow-400 peer-checked:text-yellow-500 hover:text-yellow-400">★</label>
+          <input type="radio" id="star1" name="rating" value="1" class="hidden peer" /><label for="star1" class="cursor-pointer text-4xl text-gray-400 peer-hover:text-yellow-400 peer-checked:text-yellow-500 hover:text-yellow-400">★</label>
+        </div>
+        <style>
+          .rating:not(:hover) input:checked ~ label,
+          .rating:hover input:hover ~ label {
+            color: #f59e0b; /* yellow-500 */
+          }
+        </style>
+      </div>
+      <div>
+        <label for="comentario" class="block text-sm font-medium mb-1 dark:text-gray-300">Comentario (opcional)</label>
+        <textarea id="comentario" name="comentario" rows="4" placeholder="Cuéntanos más..." class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+      </div>
+      <button type="submit" class="bg-blue-900 dark:bg-blue-700 text-white w-full py-3 rounded-lg hover:bg-blue-800 dark:hover:bg-blue-600 transition font-semibold">
+        Enviar Comentario
+      </button>
+    </form>
+  </div>
+</div>
+
 <!-- Errores -->
 <script>
   window.addEventListener('error', e => {
