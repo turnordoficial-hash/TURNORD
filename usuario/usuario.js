@@ -26,6 +26,78 @@ function getDeadlineKey(turno) {
     return `turnoDeadline:${negocioId}:${turno}`;
 }
 
+/**
+ * Solicita permiso para mostrar notificaciones.
+ */
+function solicitarPermisoNotificacion() {
+    if (!("Notification" in window)) {
+        console.log("Este navegador no soporta notificaciones de escritorio");
+    } else if (Notification.permission === "granted") {
+        return; // El permiso ya fue concedido
+    } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Permiso para notificaciones concedido.");
+            }
+        });
+    }
+}
+
+/**
+ * Envía una notificación al usuario si los permisos están concedidos.
+ * @param {object} turnoData - Datos del turno del usuario (debe incluir `turno` y `nombre`).
+ */
+function enviarNotificacion(turnoData) {
+    const notificationKey = `notification_sent_${negocioId}_${turnoData.turno}`;
+    if (localStorage.getItem(notificationKey)) {
+        return; // Notificación ya enviada para este turno.
+    }
+
+    if (Notification.permission === "granted") {
+        const title = `¡Prepárate, ${turnoData.nombre}!`;
+        const options = {
+            body: 'Queda 1 persona antes que tú. ¡Ya puedes venir a la barbería!',
+            icon: 'imegenlogin/android-chrome-192x192.png',
+            badge: 'imegenlogin/favicon-32x32.png',
+            tag: `turno-aviso-${negocioId}` // Evita notificaciones apiladas.
+        };
+
+        new Notification(title, options);
+        localStorage.setItem(notificationKey, 'true');
+    }
+}
+
+/**
+ * Verifica la posición del usuario en la cola y notifica si es el próximo.
+ */
+async function checkTurnoPositionAndNotify() {
+    if (!telefonoUsuario || !turnoAsignado) return;
+
+    try {
+        const { data: enEspera, error } = await supabase
+            .from('turnos')
+            .select('turno, nombre')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', obtenerFechaActual())
+            .eq('estado', 'En espera')
+            .order('orden', { ascending: true })
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        const miTurnoIndex = enEspera.findIndex(t => t.turno === turnoAsignado);
+
+        // Notificar si queda 1 persona delante (índice 1) o si es el primero en espera (índice 0)
+        // Esto cubre más casos, por ejemplo, si el barbero está libre.
+        if (miTurnoIndex === 1 || miTurnoIndex === 0) {
+            enviarNotificacion(enEspera[miTurnoIndex]);
+        }
+    } catch (error) {
+        console.error("Error al verificar la posición del turno para notificar:", error);
+    }
+}
+
+
 async function cargarServiciosActivos() {
     if (!negocioId) return;
     try {
@@ -172,6 +244,7 @@ async function verificarTurnoActivo() {
         .eq('telefono', telefonoUsuario)
         .order('created_at', { ascending: false });
     if (error || !data || data.length === 0) return false;
+    solicitarPermisoNotificacion(); // Solicitar permiso si hay un turno activo
     turnoAsignado = data[0].turno;
     await mostrarMensajeConfirmacion(data[0]);
     return true;
@@ -313,6 +386,7 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
         alert('Error al registrar turno: ' + error.message);
         return;
     }
+    solicitarPermisoNotificacion(); // Solicitar permiso al tomar un nuevo turno
     turnoAsignado = nuevoTurno;
     await mostrarMensajeConfirmacion({ nombre, turno: nuevoTurno });
     document.getElementById('formRegistroNegocio')?.reset();
@@ -446,10 +520,26 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     supabase.channel(`turnos-usuario-${negocioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, async (payload) => {
-        if (telefonoUsuario) {
+
+        await actualizarTurnoActualYConteo();
+
+        if (telefonoUsuario && turnoAsignado) {
+
+            await checkTurnoPositionAndNotify();
+
             const { data } = await supabase.from('turnos').select('*').eq('negocio_id', negocioId).eq('telefono', telefonoUsuario).order('created_at', { ascending: false }).limit(1).single();
 
-            if (!data) return;
+            if (!data) {
+                 limpiarSesionDeUsuario(turnoAsignado);
+                 document.getElementById('mensaje-turno').innerHTML = '';
+                 return;
+            }
+
+            if (data.turno !== turnoAsignado) {
+                turnoAsignado = data.turno;
+                await mostrarMensajeConfirmacion(data);
+                return;
+            }
 
             if (data.estado === 'En atención') {
                 document.getElementById('mensaje-turno').innerHTML = `<div class="bg-blue-100 text-blue-700 rounded-xl p-4 shadow mt-4 text-sm">🔔 ¡Es tu turno! <strong>${data.turno}</strong> está siendo atendido.</div>`;
@@ -469,7 +559,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                 limpiarSesionDeUsuario(data.turno);
             }
         }
-        await actualizarTurnoActualYConteo();
     }).subscribe();
     supabase.channel(`servicios-usuario-${negocioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` }, cargarServiciosActivos).subscribe();
     supabase.channel(`estado-negocio-usuario-${negocioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'estado_negocio', filter: `negocio_id=eq.${negocioId}` }, async () => {
