@@ -126,8 +126,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const mobileMenuButton = document.getElementById('mobile-menu-button');
     const sidebar = document.getElementById('sidebar');
-    document.getElementById('listaEspera')?.addEventListener('click', handleReorderClick);
-    document.getElementById('listaEspera')?.addEventListener('dblclick', handleDoubleClickDelete);
+    const listaEspera = document.getElementById('listaEspera');
+    if (listaEspera) {
+        listaEspera.addEventListener('dblclick', handleDoubleClickDelete);
+        listaEspera.addEventListener('dragstart', handleDragStart);
+        listaEspera.addEventListener('dragover', handleDragOver);
+        listaEspera.addEventListener('drop', handleDrop);
+        listaEspera.addEventListener('dragend', handleDragEnd);
+    }
     document.getElementById('listaAtencion')?.addEventListener('click', (e) => {
         const card = e.target.closest('.turn-card-atencion');
         if (card && card.dataset.id) {
@@ -156,33 +162,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         .subscribe();
 });
 
-async function handleReorderClick(event) {
-    const button = event.target.closest('.btn-subir, .btn-bajar');
-    if (!button) return;
-    const isSubir = button.classList.contains('btn-subir');
-    const turnId = button.dataset.id;
-    const currentIndex = dataRender.findIndex(t => t.id == turnId);
-    if (currentIndex === -1) return;
-    const otherIndex = isSubir ? currentIndex - 1 : currentIndex + 1;
-    if (otherIndex < 0 || otherIndex >= dataRender.length) return;
-    const currentTurn = dataRender[currentIndex];
-    const otherTurn = dataRender[otherIndex];
-    if (!confirm(`¿Seguro que quieres mover el turno ${currentTurn.turno}?`)) return;
-    const updates = [
-        supabase.from('turnos').update({ orden: otherTurn.orden }).eq('id', currentTurn.id),
-        supabase.from('turnos').update({ orden: currentTurn.orden }).eq('id', otherTurn.id)
-    ];
+let draggedItem = null;
+
+function handleDragStart(event) {
+    const target = event.target.closest('.turn-card-espera');
+    if (!target) {
+        event.preventDefault();
+        return;
+    }
+    draggedItem = target;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', target.dataset.id);
+    setTimeout(() => {
+        draggedItem.classList.add('opacity-50');
+    }, 0);
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const target = event.target.closest('.turn-card-espera');
+    if (target && target !== draggedItem) {
+        const container = target.parentNode;
+        const rect = target.getBoundingClientRect();
+        const isAfter = event.clientY > rect.top + rect.height / 2;
+        if (isAfter) {
+            container.insertBefore(draggedItem, target.nextSibling);
+        } else {
+            container.insertBefore(draggedItem, target);
+        }
+    }
+}
+
+async function handleDrop(event) {
+    event.preventDefault();
+    if (!draggedItem) return;
+
+    draggedItem.classList.remove('opacity-50');
+    const container = document.getElementById('listaEspera');
+    const cards = Array.from(container.querySelectorAll('.turn-card-espera'));
+    const turnUpdates = cards.map((card, index) => ({
+        id: card.dataset.id,
+        orden: index
+    }));
+
+    // Optimistically update UI
+    dataRender = turnUpdates.map(update => {
+        const originalTurn = dataRender.find(t => t.id == update.id);
+        return { ...originalTurn, orden: update.orden };
+    }).sort((a, b) => a.orden - b.orden);
+
+    // Update database
+    const updates = turnUpdates.map(update =>
+        supabase.from('turnos').update({ orden: update.orden }).eq('id', update.id)
+    );
+
     try {
         const results = await Promise.all(updates);
         const hasError = results.some(res => res.error);
-        if (hasError) throw new Error('Una de las actualizaciones falló.');
+        if (hasError) {
+            throw new Error('Una o más actualizaciones de turnos fallaron.');
+        }
         mostrarNotificacion('Turnos reordenados con éxito.', 'success');
-        await refrescarUI();
     } catch (error) {
         console.error('Error al reordenar turnos:', error);
-        mostrarNotificacion('Error al reordenar los turnos.', 'error');
+        mostrarNotificacion('Error al guardar el nuevo orden de los turnos.', 'error');
+        // Revert UI if DB update fails
+        await refrescarUI();
+    } finally {
+        draggedItem = null;
     }
 }
+
+function handleDragEnd(event) {
+    if (draggedItem) {
+        draggedItem.classList.remove('opacity-50');
+        draggedItem = null;
+    }
+}
+
 
 function initThemeToggle() {
     const themeToggle = document.getElementById('theme-toggle');
@@ -474,9 +532,10 @@ async function cargarTurnos() {
     for (let index = 0; index < dataRender.length; index++) {
         const t = dataRender[index];
         const div = document.createElement('div');
-        div.className = 'bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md cursor-pointer';
+        div.className = 'turn-card-espera bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md cursor-grab';
         div.dataset.id = t.id;
         div.dataset.nombre = t.nombre;
+        div.draggable = true;
         div.dataset.turno = t.turno;
         const horaCreacion = new Date(`${t.fecha}T${t.hora}`);
         const ahora = new Date();
@@ -496,12 +555,6 @@ async function cargarTurnos() {
         </div>
       </div>
       <div class="mt-2 flex justify-end space-x-2">
-        <button class="btn-subir p-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full disabled:opacity-50" data-id="${t.id}" data-orden="${t.orden}" ${index === 0 ? 'disabled' : ''}>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
-        </button>
-        <button class="btn-bajar p-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full disabled:opacity-50" data-id="${t.id}" data-orden="${t.orden}" ${index === dataRender.length - 1 ? 'disabled' : ''}>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7 7"></path></svg>
-        </button>
       </div>`;
         lista.appendChild(div);
     }
