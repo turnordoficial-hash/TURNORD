@@ -26,20 +26,93 @@ function getDeadlineKey(turno) {
     return `turnoDeadline:${negocioId}:${turno}`;
 }
 
+// Clave pública VAPID - ¡Esta clave debe ser generada y almacenada de forma segura!
+// Es seguro exponerla en el lado del cliente.
+const VAPID_PUBLIC_KEY = 'BC5jD225d3BEpkV1E_gQSv2hSRn2kX2h5lVfIYG3_k2Z7Fq5ZzXVy7i_h5kHl-bO3F4GfI8aZ3E2Xl8Yk9ZzC7Q';
+
 /**
- * Solicita permiso para mostrar notificaciones.
+ * Registra el Service Worker.
  */
-function solicitarPermisoNotificacion() {
-    if (!("Notification" in window)) {
-        console.log("Este navegador no soporta notificaciones de escritorio");
-    } else if (Notification.permission === "granted") {
-        return; // El permiso ya fue concedido
-    } else if (Notification.permission !== "denied") {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                console.log("Permiso para notificaciones concedido.");
-            }
+function registrarServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('Service Worker registrado con éxito:', registration);
+      })
+      .catch(error => {
+        console.error('Error al registrar el Service Worker:', error);
+      });
+  }
+}
+
+/**
+ * Convierte la clave VAPID de base64 a un Uint8Array.
+ */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Guarda la suscripción en la base de datos.
+ * @param {PushSubscription} subscription - El objeto de suscripción.
+ */
+async function guardarSuscripcion(subscription) {
+  if (!telefonoUsuario || !negocioId) return;
+
+  try {
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert({
+        user_id: telefonoUsuario, // Usamos el teléfono como ID de usuario
+        subscription: subscription,
+        negocio_id: negocioId
+      }, {
+        onConflict: 'user_id, negocio_id' // Si ya existe, actualiza la suscripción
+      });
+
+    if (error) throw error;
+    console.log('Suscripción guardada en la base de datos.');
+  } catch (error) {
+    console.error('Error al guardar la suscripción:', error);
+  }
+}
+
+
+/**
+ * Solicita permiso para notificaciones y crea la suscripción push.
+ */
+async function solicitarPermisoNotificacion() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.warn('Las notificaciones push no son soportadas por este navegador.');
+        return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+        console.log('Permiso para notificaciones no concedido.');
+        return;
+    }
+
+    console.log('Permiso para notificaciones concedido.');
+
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
+
+        console.log('Suscripción push obtenida:', subscription);
+        await guardarSuscripcion(subscription);
+    } catch (error) {
+        console.error('Error al suscribirse a las notificaciones push:', error);
     }
 }
 
@@ -418,6 +491,7 @@ function simpleSentimentAnalysis(text) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+    registrarServiceWorker(); // Registrar el service worker al cargar la página
     if (!negocioId) return;
     await obtenerConfig();
     await cargarServiciosActivos();

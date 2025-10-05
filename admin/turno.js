@@ -783,6 +783,48 @@ function cerrarModalPago() {
     }
 }
 
+async function notificarSiguienteEnCola() {
+    // dataRender es el array de turnos en espera, ya ordenado.
+    // El turno que se acaba de llamar estaba en el índice 0. El siguiente es el del índice 1.
+    const siguienteTurno = dataRender.length > 1 ? dataRender[1] : null;
+
+    if (!siguienteTurno || !siguienteTurno.telefono) {
+        console.log('No hay siguiente turno en la cola para notificar.');
+        return;
+    }
+
+    try {
+        console.log(`Intentando notificar al siguiente en cola: ${siguienteTurno.nombre} (${siguienteTurno.telefono})`);
+
+        const { data, error } = await supabase.functions.invoke('send-push-notification', {
+            body: {
+                telefono: siguienteTurno.telefono,
+                negocio_id: negocioId,
+                message: {
+                    title: `¡Prepárate, ${siguienteTurno.nombre}!`,
+                    body: 'Queda 1 persona antes que tú. ¡Dirígete al local!'
+                }
+            }
+        });
+
+        if (error) {
+            console.error('Error devuelto por la función de notificación:', error.message);
+            mostrarNotificacion(`No se pudo notificar a ${siguienteTurno.nombre}.`, 'warning');
+            return;
+        }
+
+        if (data.success) {
+            mostrarNotificacion(`Notificación push enviada a ${siguienteTurno.nombre}.`, 'info');
+        } else {
+             mostrarNotificacion(`Fallo al enviar notificación a ${siguienteTurno.nombre}: ${data.error}`, 'warning');
+        }
+
+    } catch (invokeError) {
+        console.error('Error al invocar la función de notificación push:', invokeError);
+        mostrarNotificacion('Error de red al intentar enviar la notificación push.', 'error');
+    }
+}
+
 async function atenderAhora() {
     if (!turnoActual) {
         mostrarNotificacion('No hay turno en espera.', 'warning');
@@ -798,6 +840,10 @@ async function atenderAhora() {
         return;
     }
     mostrarNotificacion(`Atendiendo turno ${turnoActual.turno}`, 'success');
+
+    // Notificar al siguiente en la cola DESPUÉS de atender al actual.
+    await notificarSiguienteEnCola();
+
     refrescarUI();
 }
 
