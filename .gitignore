@@ -1,0 +1,12 @@
+# Archivos temporales
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+.DS_Store
+Thumbs.db

@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "https://deno.land/x/supabase_functions@v1.3.0/mod.ts": "https://deno.land/x/supabase_functions@v1.3.0/mod.ts",
+    "web-push": "https://deno.land/x/web_push@0.3.0/mod.ts"
+  }
+}
