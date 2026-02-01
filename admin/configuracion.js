@@ -23,6 +23,8 @@ async function loadThemeFromDB() {
             .from('configuracion_negocio')
             .select('theme_primary, theme_mode')
             .eq('negocio_id', negocioId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (error) throw error;

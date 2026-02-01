@@ -1,18 +1,20 @@
 // database.js
 
 // Credenciales de Supabase.
-const SUPABASE_URL = 'https://ujxasfligvocdqfuiyql.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqeGFzZmxpZ3ZvY2RxZnVpeXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5OTE1NDMsImV4cCI6MjA3MjU2NzU0M30.fUMuAdcvG0LcWhF53KlS3XD5Xp1tq4uKQ6T8atBB2IE';
+const SUPABASE_URL = 'https://wjvwjirhxenotvdewbmm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdndqaXJoeGVub3R2ZGV3Ym1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5Mzc1MTEsImV4cCI6MjA4NTUxMzUxMX0.8tze0Dr0Js-aFpOMt7QKa5ImfcDnkZAUKomrjJXjcig';
 
 let supabase;
+let supabaseReadyResolve;
+const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
 
 function initializeSupabase() {
   try {
-    // createClient se carga globalmente desde el script del CDN en los HTML
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       const { createClient } = window.supabase;
       supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
       console.log("Supabase client initialized successfully.");
+      supabaseReadyResolve && supabaseReadyResolve(supabase);
     } else {
       throw new Error('Supabase client not found on window object. Make sure the Supabase CDN script is loaded before this script.');
     }
@@ -22,10 +24,16 @@ function initializeSupabase() {
   }
 }
 
-// Esperar a que el DOM esté completamente cargado antes de inicializar Supabase.
-// Esto asegura que el script del CDN de Supabase se haya ejecutado y previene errores.
-document.addEventListener('DOMContentLoaded', initializeSupabase);
+if (document.readyState !== 'loading') {
+  initializeSupabase();
+} else {
+  document.addEventListener('DOMContentLoaded', initializeSupabase);
+}
 
-// Exportar la variable supabase. Otros módulos que la importen
-// recibirán la instancia una vez que se haya inicializado.
-export { supabase };
+async function ensureSupabase() {
+  if (supabase) return supabase;
+  await supabaseReady;
+  return supabase;
+}
+
+export { supabase, ensureSupabase };

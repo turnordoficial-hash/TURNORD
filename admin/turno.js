@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
 
 let turnoActual = null;
 let dataRender = []; // Cache of waiting list turns for reordering
@@ -100,6 +100,8 @@ async function cargarHoraLimite() {
             .from('configuracion_negocio')
             .select('hora_apertura, hora_cierre, limite_turnos, dias_operacion')
             .eq('negocio_id', negocioId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
         if (data) {
             if (data.hora_apertura) HORA_APERTURA = data.hora_apertura;
@@ -113,6 +115,7 @@ async function cargarHoraLimite() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await ensureSupabase();
     if (!negocioId) return;
     initThemeToggle();
     actualizarFechaHora();

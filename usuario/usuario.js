@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -35,7 +35,8 @@ const VAPID_PUBLIC_KEY = 'BC5jD225d3BEpkV1E_gQSv2hSRn2kX2h5lVfIYG3_k2Z7Fq5ZzXVy7
  */
 function registrarServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
+    const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
+    navigator.serviceWorker.register(swPath)
       .then(registration => {
         console.log('Service Worker registrado con éxito:', registration);
       })
@@ -339,7 +340,9 @@ async function obtenerConfig() {
             .from('configuracion_negocio')
             .select('hora_apertura, hora_cierre, limite_turnos, mostrar_tiempo_estimado')
             .eq('negocio_id', negocioId)
-            .single();
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
         if (error) throw error;
         if (data) configCache = { ...configCache, ...data };
         return data;
@@ -367,8 +370,9 @@ async function verificarBreakNegocio() {
             .from('estado_negocio')
             .select('en_break, break_end_time, break_message')
             .eq('negocio_id', negocioId)
-            .single();
-        if (error && error.code !== 'PGRST116') return { enBreak: false, mensaje: null };
+            .limit(1)
+            .maybeSingle();
+        if (error) return { enBreak: false, mensaje: null };
         if (data && data.en_break) {
             const endTime = new Date(data.break_end_time);
             if (endTime > new Date()) {
@@ -397,7 +401,9 @@ async function verificarDiaLaboralFecha(fecha = new Date()) {
             .from('configuracion_negocio')
             .select('dias_operacion')
             .eq('negocio_id', negocioId)
-            .single();
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
         if (error) return true; // Permitir por defecto si no hay config
         if (!data || !Array.isArray(data.dias_operacion) || data.dias_operacion.length === 0) return false;
         const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -621,6 +627,7 @@ function simpleSentimentAnalysis(text) {
 window.addEventListener('DOMContentLoaded', async () => {
     registrarServiceWorker(); // Registrar el service worker al cargar la página
     if (!negocioId) return;
+    await ensureSupabase();
     await obtenerConfig();
     await cargarServiciosActivos();
     const btnTomarTurno = document.querySelector('button[onclick*="modal"]');

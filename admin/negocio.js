@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -20,7 +20,8 @@ let breakActivo = false;
 let breakEndTime = null;
 let breakInterval = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await ensureSupabase();
     if (!negocioId) return;
 
     initThemeToggle();
@@ -230,6 +231,8 @@ async function cargarConfiguracion() {
             .from('configuracion_negocio')
             .select('*')
             .eq('negocio_id', negocioId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
         if (error) throw error;
         if (data) {
@@ -314,8 +317,9 @@ async function verificarEstadoBreak() {
             .from('estado_negocio')
             .select('*')
             .eq('negocio_id', negocioId)
-            .single();
-        if (error && error.code !== 'PGRST116') throw error;
+            .limit(1)
+            .maybeSingle();
+        if (error) throw error;
         if (data && data.en_break) {
             const endTime = new Date(data.break_end_time);
             if (endTime > new Date()) {

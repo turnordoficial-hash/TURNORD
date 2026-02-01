@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
 
 let atencionInterval = null; // Timer para el turno en atención
 let serviciosCache = {}; // Cache para duraciones de servicios
@@ -192,6 +192,7 @@ function actualizarTurnoEnAtencion(turnosHoy) {
 
 // Inicialización de la página.
 window.addEventListener('DOMContentLoaded', async () => {
+  await ensureSupabase();
   if (!negocioId) return; // Detener si no hay ID de negocio
 
   await cargarServicios();

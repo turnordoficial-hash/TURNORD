@@ -1,4 +1,4 @@
-import { supabase } from './database.js';
+import { ensureSupabase } from './database.js';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -9,7 +9,8 @@ function getNegocioId() {
 }
 
 (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const client = await ensureSupabase();
+    const { data: { session } } = await client.auth.getSession();
 
     if (!session) {
         // No hay sesión activa, redirigir a la página de login correspondiente.

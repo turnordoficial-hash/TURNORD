@@ -1,4 +1,4 @@
-import { supabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
 
 function getNegocioId() {
     const id = document.body.dataset.negocioId;
@@ -81,6 +81,7 @@ function suscribirseAComentarios() {
 
 window.addEventListener('DOMContentLoaded', async () => {
     if (!negocioId) return;
+    await ensureSupabase();
     await cargarComentarios();
     suscribirseAComentarios();
 });

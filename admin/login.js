@@ -1,6 +1,6 @@
 // Se importa el cliente de Supabase desde el archivo de configuración central (database.js).
 // Esto asegura que toda la aplicación utiliza la misma conexión segura.
-import { supabase } from '../database.js';
+import { ensureSupabase } from '../database.js';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -19,7 +19,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const negocioId = getNegocioId();
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const client = await ensureSupabase();
+    const { data, error } = await client.auth.signInWithPassword({
       email,
       password,
     });
@@ -31,7 +32,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     // Si estamos en un contexto de negocio específico (ej. login_barberia005.html),
     // se actualiza el metadata del usuario para asociarlo con ese negocio.
     if (data.user && negocioId) {
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await client.auth.updateUser({
         data: { negocio_id: negocioId }
       });
       

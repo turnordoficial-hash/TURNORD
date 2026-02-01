@@ -8,14 +8,16 @@
 <!-- Base dinámico -->
 <script>
   const isGitHub = location.hostname.includes('github.io');
-  let baseHref = '/';
+  let baseHref;
   if (isGitHub) {
-    // Pathname on GitHub Pages is /<repo-name>/...
     const pathParts = location.pathname.split('/');
-    // The repo name is the first part of the path after the initial slash
     if (pathParts.length > 1 && pathParts[1]) {
       baseHref = `/${pathParts[1]}/`;
+    } else {
+      baseHref = '/';
     }
+  } else {
+    baseHref = location.pathname.replace(/[^/]*$/, '');
   }
   const base = document.createElement('base');
   base.href = baseHref;
@@ -101,8 +103,8 @@
           </select>
         </div>
 
-        <div class="flex justify-between items-center pt-4">
-          <span id="estadoRegistro" class="text-green-600 dark:text-green-400 text-sm">Servicios</span>
+        <div class="flex justify-between items-center pt-4">                                                
+          <span id="estadoRegistro" class="text-green-600 dark:text-green-400 text-sm"></span>
           <button type="submit" class="bg-blue-900 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 dark:hover:bg-blue-600 transition">
             Registrar
           </button>
