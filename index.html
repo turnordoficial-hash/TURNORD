@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bienvenido a TurnoRD</title>
+<title>JBarber - Estilo y Precisión</title>
 
 <!-- Base dinámico -->
 <script>
@@ -49,10 +49,10 @@ inicializarModoOscuro();
 
 </head>
 
-<body class="bg-blue-600 dark:bg-gray-900 text-white min-h-screen flex items-center justify-center px-4">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
 
   <!-- Botón modo oscuro -->
-  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-3 rounded-full bg-white/90 dark:bg-gray-800/90 shadow-lg backdrop-blur-sm text-gray-800 dark:text-gray-200 hover:scale-110 transition-transform">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
@@ -61,14 +61,74 @@ inicializarModoOscuro();
     </svg>
   </button>
 
-  <section class="text-center w-full max-w-md p-6 bg-blue-700 dark:bg-blue-800 rounded-xl shadow-xl">
-    <h1 class="text-3xl sm:text-4xl font-bold mb-4">¡Bienvenido a TurnoRD!</h1>
-    <p class="text-base sm:text-lg mb-2"><strong>(Nombre de tu Negocio) </strong></p>
-    <p class="text-base sm:text-lg mb-6">Gestiona tus turnos de manera fácil y rápida.</p>
+  <!-- Hero Section -->
+  <div class="relative min-h-screen flex flex-col justify-center items-center overflow-hidden">
+    <!-- Background Image with Overlay -->
+    <div class="absolute inset-0 z-0">
+      <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?q=80&w=2074&auto=format&fit=crop" alt="Barber Shop Background" class="w-full h-full object-cover opacity-20 dark:opacity-10">
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50 dark:to-gray-900"></div>
+    </div>
 
-    <a href="usuario_barberia005.html" class="bg-white dark:bg-gray-200 text-blue-900 dark:text-blue-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:bg-gray-100 dark:hover:bg-gray-300 transition block w-full sm:w-auto mx-auto">
-  Ver turnos
-</a>
+    <div class="relative z-10 text-center px-4 max-w-4xl mx-auto">
+      <!-- Logo / Brand -->
+      <div class="mb-6 animate-fade-in-down">
+        <span class="inline-block p-3 rounded-full bg-amber-500/10 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-amber-600 dark:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+          </svg>
+        </span>
+        <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-2">
+          J<span class="text-amber-600 dark:text-amber-500">Barber</span>
+        </h1>
+        <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-300 font-light tracking-wide">
+          Más que un corte, una experiencia.
+        </p>
+      </div>
+
+      <!-- Call to Actions -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8 animate-fade-in-up">
+        
+        <!-- Botón Principal: Login/Registro -->
+        <a href="login_cliente.html" class="group relative w-full sm:w-auto px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3">
+          <span>Reservar Turno</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </a>
+
+        <!-- Botón Secundario: Descargar App -->
+        <button id="btn-install-app" class="hidden w-full sm:w-auto px-8 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold rounded-xl border-2 border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 flex items-center justify-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Descargar App</span>
+        </button>
+
+      </div>
+
+      <!-- Live Status -->
+      <div class="mt-12 p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm max-w-sm mx-auto">
+        <div class="flex items-center justify-between mb-2">
+          <span class="flex h-3 w-3 relative">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+          </span>
+          <span class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Estado Actual</span>
+        </div>
+        <p class="text-gray-800 dark:text-gray-200 font-medium">
+          La barbería está <span class="text-green-600 dark:text-green-400 font-bold">Abierta</span>
+        </p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Ingresa para ver la fila en tiempo real.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="absolute bottom-4 text-center w-full text-xs text-gray-400 dark:text-gray-600">
+      &copy; 2025 JBarber • TurnoRD
+    </div>
+  </div>
 
   <!-- Script modo oscuro -->
   <script>
@@ -77,6 +137,26 @@ inicializarModoOscuro();
       toggleButton.addEventListener('click', () => {
         const isDarkMode = document.documentElement.classList.toggle('dark');
         localStorage.setItem('modoOscuro', isDarkMode);
+      });
+
+      // Lógica del botón de instalación PWA
+      let deferredPrompt;
+      const installBtn = document.getElementById('btn-install-app');
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.classList.remove('hidden'); // Mostrar botón solo si es instalable
+      });
+
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`Resultado instalación: ${outcome}`);
+          deferredPrompt = null;
+          if(outcome === 'accepted') installBtn.classList.add('hidden');
+        }
       });
     });
   </script>

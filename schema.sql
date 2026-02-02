@@ -318,4 +318,32 @@ BEGIN
 END;
 $$;
 
+-- ==============================================================================
+-- 9) Tabla: Clientes (Perfil y Auth Personalizado)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.clientes (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  telefono TEXT,
+  email TEXT,
+  documento_identidad TEXT NOT NULL, -- Cédula o Código 6 dígitos
+  password TEXT NOT NULL, -- Nota: En producción usar hashing o Supabase Auth
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad)
+);
+
+-- RLS para Clientes
+ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir todo a clientes" ON public.clientes;
+CREATE POLICY "Permitir todo a clientes" ON public.clientes FOR ALL USING (true) WITH CHECK (true);
+
+-- Trigger update timestamp
+CREATE TRIGGER trg_set_timestamp_updated_at_clientes
+BEFORE UPDATE ON public.clientes
+FOR EACH ROW EXECUTE FUNCTION public.set_timestamp_updated_at();
+
 COMMIT;

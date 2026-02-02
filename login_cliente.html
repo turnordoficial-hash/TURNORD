@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso Clientes - TurnoRD</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class', theme: { extend: { colors: { amber: { 450: '#F59E0B' } } } } }
+  </script>
+  <style>
+    body { background-image: url('https://images.unsplash.com/photo-1503951914875-452162b7f30a?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; }
+    .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+    .dark .glass { background: rgba(17, 24, 39, 0.95); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+  <div class="glass p-8 rounded-2xl shadow-2xl w-full max-w-md transform transition-all hover:scale-[1.01]">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">J<span class="text-amber-600">Barber</span></h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-widest">Powered by TurnoRD</p>
+    </div>
+
+    <!-- Formulario Login -->
+    <form id="loginForm" class="space-y-6">
+      <div>
+        <label for="usuario_login" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario (Cédula o Código)</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+          </div>
+          <input type="text" id="usuario_login" required placeholder="Ingresa tu ID" 
+            class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label for="password_login" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+          </div>
+          <input type="password" id="password_login" required placeholder="••••••••" 
+            class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors outline-none">
+        </div>
+      </div>
+
+      <button type="submit" id="btnSubmit" class="w-full bg-gray-900 dark:bg-amber-600 hover:bg-gray-800 dark:hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex justify-center items-center">
+        <span>Ingresar</span>
+      </button>
+    </form>
+    
+    <div class="mt-6 text-center">
+      <p class="text-sm text-gray-600 dark:text-gray-400">¿No tienes cuenta?</p>
+      <button onclick="abrirModalRegistro()" class="mt-2 text-amber-600 dark:text-amber-500 font-bold hover:underline">
+        ¡Soy Nuevo! Crear Cuenta
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Registro -->
+  <div id="modalRegistro" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 px-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+      <button onclick="cerrarModalRegistro()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 text-2xl">&times;</button>
+      <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Crear Perfil Cliente</h2>
+      <form id="formRegistro" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1 dark:text-gray-300">Nombre Completo</label>
+            <input type="text" id="reg_nombre" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 dark:text-gray-300">Teléfono</label>
+            <input type="tel" id="reg_telefono" required pattern="[0-9]{8,15}" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1 dark:text-gray-300">Correo Electrónico</label>
+          <input type="email" id="reg_email" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1 dark:text-gray-300">Usuario (Cédula o Código 6 dígitos)</label>
+          <input type="text" id="reg_documento" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Ej: 40212345678">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1 dark:text-gray-300">Contraseña</label>
+          <input type="password" id="reg_password" required minlength="4" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        </div>
+        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl transition-colors">
+          Registrarme
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase } from './database.js';
+    const negocioId = 'barberia005';
+
+    // Funciones Modal
+    window.abrirModalRegistro = () => document.getElementById('modalRegistro').classList.remove('hidden');
+    window.cerrarModalRegistro = () => document.getElementById('modalRegistro').classList.add('hidden');
+    window.abrirModalRegistro = () => {
+        document.getElementById('modalRegistro').classList.remove('hidden');
+        document.getElementById('modalRegistro').classList.add('flex');
+    };
+    window.cerrarModalRegistro = () => {
+        document.getElementById('modalRegistro').classList.add('hidden');
+        document.getElementById('modalRegistro').classList.remove('flex');
+    };
+
+    // Login
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const usuario = document.getElementById('usuario_login').value.trim();
+      const pass = document.getElementById('password_login').value.trim();
+      const btn = document.getElementById('btnSubmit');
+
+      btn.disabled = true;
+      btn.innerHTML = 'Verificando...';
+
+      try {
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('negocio_id', negocioId)
+          .eq('documento_identidad', usuario)
+          .eq('password', pass) // Nota: En producción usar hash
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error('Credenciales incorrectas');
+
+        // Guardar sesión cliente
+        localStorage.setItem(`cliente_id_${negocioId}`, data.id);
+        localStorage.setItem(`cliente_nombre_${negocioId}`, data.nombre);
+        localStorage.setItem(`cliente_telefono_${negocioId}`, data.telefono);
+        localStorage.setItem(`cliente_avatar_${negocioId}`, data.avatar_url || '');
+
+        // Redirigir al nuevo panel
+        window.location.href = 'panel_cliente.html';
+
+      } catch (error) {
+        alert(error.message || 'Error al iniciar sesión');
+        btn.disabled = false;
+        btn.innerHTML = 'Ingresar';
+      }
+    });
+
+    // Registro
+    document.getElementById('formRegistro').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('reg_nombre').value.trim();
+      const telefono = document.getElementById('reg_telefono').value.trim();
+      const email = document.getElementById('reg_email').value.trim();
+      const documento = document.getElementById('reg_documento').value.trim();
+      const password = document.getElementById('reg_password').value.trim();
+
+      try {
+        const { data, error } = await supabase
+          .from('clientes')
+          .insert([{
+            negocio_id: negocioId,
+            nombre, telefono, email, 
+            documento_identidad: documento, 
+            password
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        alert('¡Registro exitoso! Ahora puedes iniciar sesión.');
+        cerrarModalRegistro();
+        document.getElementById('formRegistro').reset();
+      } catch (error) {
+        alert('Error al registrar: ' + (error.message.includes('unique') ? 'El usuario ya existe' : error.message));
+      }
+    });
+  </script>
+</body>
+</html>
