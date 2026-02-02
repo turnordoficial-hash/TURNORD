@@ -176,12 +176,15 @@ CREATE INDEX IF NOT EXISTS idx_comentarios_turno_id ON public.comentarios(turno_
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
-    user_id TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL,
     subscription JSONB NOT NULL,
     negocio_id VARCHAR(255) NOT NULL
 );
 
 COMMENT ON TABLE push_subscriptions IS 'Almacena las suscripciones de notificaciones push de los usuarios para un negocio específico.';
+
+ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_key;
+ALTER TABLE public.push_subscriptions ADD CONSTRAINT ux_push_subscriptions_user_negocio UNIQUE (user_id, negocio_id);
 
 -- ==============================================================================
 -- 6) Modificaciones a Tabla: turnos
@@ -281,6 +284,10 @@ CREATE POLICY "Permitir inserción a todos" ON public.comentarios FOR INSERT WIT
 -- --- Políticas Push Subscriptions ---
 DROP POLICY IF EXISTS "Public-insert" ON public.push_subscriptions;
 CREATE POLICY "Public-insert" ON public.push_subscriptions FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public-update" ON public.push_subscriptions;
+CREATE POLICY "Public-update" ON public.push_subscriptions FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public-select" ON public.push_subscriptions;
+CREATE POLICY "Public-select" ON public.push_subscriptions FOR SELECT USING (true);
 
 -- --- Políticas Turnos ---
 DROP POLICY IF EXISTS turnos_select ON public.turnos;
@@ -291,5 +298,24 @@ CREATE POLICY turnos_insert ON public.turnos FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS turnos_update ON public.turnos;
 CREATE POLICY turnos_update ON public.turnos FOR UPDATE USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- 8) Funciones RPC (Remote Procedure Calls)
+-- ==============================================================================
+
+-- Función para reordenar turnos masivamente de forma atómica
+CREATE OR REPLACE FUNCTION public.reordenar_turnos(updates jsonb)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  item jsonb;
+BEGIN
+  FOR item IN SELECT * FROM jsonb_array_elements(updates)
+  LOOP
+    UPDATE public.turnos
+    SET orden = (item->>'orden')::int
+    WHERE id = (item->>'id')::bigint;
+  END LOOP;
+END;
+$$;
 
 COMMIT;

@@ -2,6 +2,8 @@ import { supabase, ensureSupabase } from '../database.js';
 
 let atencionInterval = null; // Timer para el turno en atención
 let serviciosCache = {}; // Cache para duraciones de servicios
+let refreshTimer = null; // Timer para debounce
+let currentAtencionId = null; // Para evitar reiniciar timer si es el mismo turno
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -20,6 +22,15 @@ function getNegocioId() {
 // Obtener el ID del negocio al inicio y usarlo globalmente en este script.
 const negocioId = getNegocioId();
 
+function handleAuthError(err) {
+  if (err && err.code === 'PGRST303') {
+    supabase.auth.signOut().finally(() => {
+      const loginUrl = negocioId ? `login_${negocioId}.html` : 'login.html';
+      window.location.replace(loginUrl);
+    });
+  }
+}
+
 // Cargar la duración de los servicios para el cálculo de los timers.
 async function cargarServicios() {
   if (!negocioId) return;
@@ -35,6 +46,7 @@ async function cargarServicios() {
     }, {});
   } catch (error) {
     console.error("Error cargando la duración de los servicios:", error);
+    handleAuthError(error);
   }
 }
 
@@ -92,8 +104,18 @@ async function cargarDatos() {
 
   } catch (err) {
     console.error('Error al cargar datos del panel:', err);
+    handleAuthError(err);
     document.getElementById('tablaHistorial').innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos.</td></tr>`;
   }
+}
+
+// Función optimizada para evitar saturación (Debounce)
+function solicitarActualizacion() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    cargarDatos();
+    refreshTimer = null;
+  }, 500); // Espera 500ms antes de recargar
 }
 
 // Limpia el historial de turnos que ya no están activos.
@@ -140,7 +162,7 @@ function suscribirseTurnos() {
       },
       payload => {
         console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
-        cargarDatos();
+        solicitarActualizacion();
       }
     )
     .subscribe();
@@ -154,12 +176,15 @@ function actualizarTurnoEnAtencion(turnosHoy) {
   const card = document.getElementById('turno-en-atencion-card');
   if (!card) return;
 
-  if (atencionInterval) {
-    clearInterval(atencionInterval);
-    atencionInterval = null;
-  }
-
   if (enAtencion) {
+    // Optimización: Si es el mismo turno, no reiniciamos el intervalo, solo actualizamos textos si cambiaron
+    if (currentAtencionId === enAtencion.id && atencionInterval) {
+        return; 
+    }
+    
+    if (atencionInterval) clearInterval(atencionInterval);
+    currentAtencionId = enAtencion.id;
+
     card.classList.remove('hidden');
     document.getElementById('atencion-turno').textContent = enAtencion.turno;
     document.getElementById('atencion-cliente').textContent = enAtencion.nombre;
@@ -186,6 +211,8 @@ function actualizarTurnoEnAtencion(turnosHoy) {
       timerEl.textContent = '--:--';
     }
   } else {
+    if (atencionInterval) clearInterval(atencionInterval);
+    currentAtencionId = null;
     card.classList.add('hidden');
   }
 }
@@ -198,7 +225,35 @@ window.addEventListener('DOMContentLoaded', async () => {
   await cargarServicios();
   await cargarDatos();
   suscribirseTurnos();
+  setupSidebar();
 
   // Exponer la función de limpiar historial al objeto window para que el HTML la pueda llamar.
   window.limpiarHistorialTurnos = limpiarHistorialTurnos;
 });
+
+function setupSidebar() {
+    const btn = document.getElementById('mobile-menu-button');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (!sidebar) return;
+
+    const toggle = () => {
+        if (window.innerWidth < 1024) {
+            sidebar.classList.toggle('-translate-x-full');
+            if (overlay) {
+                overlay.classList.toggle('opacity-0');
+                overlay.classList.toggle('pointer-events-none');
+            }
+        } else {
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-20');
+            sidebar.querySelectorAll('span:not(.icon-only)').forEach(el => el.classList.toggle('hidden'));
+        }
+    };
+
+    if (btn) btn.addEventListener('click', toggle);
+    if (toggleBtn) toggleBtn.addEventListener('click', toggle);
+    if (overlay) overlay.addEventListener('click', toggle);
+}

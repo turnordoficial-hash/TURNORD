@@ -71,19 +71,27 @@ function actualizarFechaHora() {
 
 function setupMobileMenu() {
     const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    if (mobileMenuButton && sidebar && overlay) {
+    if (sidebar && overlay) {
         const toggle = () => toggleMobileMenu(sidebar, overlay);
-        mobileMenuButton.addEventListener('click', toggle);
+        if (mobileMenuButton) mobileMenuButton.addEventListener('click', toggle);
+        if (toggleBtn) toggleBtn.addEventListener('click', toggle);
         overlay.addEventListener('click', toggle);
     }
 }
 
 function toggleMobileMenu(sidebar, overlay) {
-    sidebar.classList.toggle('-translate-x-full');
-    overlay.classList.toggle('opacity-0');
-    overlay.classList.toggle('pointer-events-none');
+    if (window.innerWidth < 1024) {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('opacity-0');
+        overlay.classList.toggle('pointer-events-none');
+    } else {
+        sidebar.classList.toggle('w-64');
+        sidebar.classList.toggle('w-20');
+        sidebar.querySelectorAll('span:not(.icon-only)').forEach(el => el.classList.toggle('hidden'));
+    }
 }
 
 function initDayButtons() {

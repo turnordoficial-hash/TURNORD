@@ -36,4 +36,18 @@ async function ensureSupabase() {
   return supabase;
 }
 
+// Función para inyectar Favicon en todas las páginas automáticamente
+function injectFavicon() {
+  if (!document.querySelector("link[rel*='icon']")) {
+    const link = document.createElement('link');
+    link.type = 'image/png';
+    link.rel = 'shortcut icon';
+    link.href = 'imegenlogin/favicon-32x32.png'; // Asegúrate que esta ruta sea correcta relativa a tu estructura
+    document.getElementsByTagName('head')[0].appendChild(link);
+  }
+}
+
+if (document.readyState !== 'loading') injectFavicon();
+else document.addEventListener('DOMContentLoaded', injectFavicon);
+
 export { supabase, ensureSupabase };

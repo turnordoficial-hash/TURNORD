@@ -11,18 +11,30 @@ function getNegocioId() {
 (async () => {
     const client = await ensureSupabase();
     const { data: { session } } = await client.auth.getSession();
+    const negocioId = getNegocioId();
+    const loginUrl = negocioId ? `login_${negocioId}.html` : 'login.html';
+    const redirectToLogin = () => { window.location.replace(loginUrl); };
 
     if (!session) {
-        // No hay sesión activa, redirigir a la página de login correspondiente.
-        const negocioId = getNegocioId();
-        const loginUrl = negocioId ? `login_${negocioId}.html` : 'login.html';
-
-        console.log(`Usuario no autenticado. Redirigiendo a ${loginUrl}`);
-        window.location.replace(loginUrl);
+        redirectToLogin();
         return;
     }
 
-    // El usuario está autenticado.
-    // La sesión es manejada por las librerías de Supabase, no es necesario hacer nada más aquí.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expSec = session.expires_at || 0;
+    if (expSec - 30 <= nowSec) {
+        const { data, error } = await client.auth.refreshSession();
+        if (error || !data?.session) {
+            await client.auth.signOut();
+            redirectToLogin();
+            return;
+        }
+    }
+
+    client.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') {
+            redirectToLogin();
+        }
+    });
     console.log('Acceso autorizado para:', session.user.email);
 })();

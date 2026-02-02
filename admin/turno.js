@@ -9,6 +9,7 @@ let chart = null;
 let ALLOWED_DAYS = [1, 2, 3, 4, 5, 6];
 let activeTurnIntervals = {};
 let serviciosCache = {};
+let isRefreshing = false; // Bandera para evitar ejecuciones simultáneas
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -61,12 +62,28 @@ function iniciarTimerParaTurno(turno) {
 
 let __refreshTimer = null;
 function refrescarUI() {
+    // Si ya se está ejecutando una carga, o hay un timer pendiente, controlamos la saturación
     if (__refreshTimer) return;
+    
     __refreshTimer = setTimeout(async () => {
-        __refreshTimer = null;
-        await cargarTurnos();
-        await cargarEstadisticas();
-    }, 300);
+        if (isRefreshing) {
+            // Si ya está cargando datos, reprogramamos el intento para después
+            __refreshTimer = null;
+            refrescarUI(); 
+            return;
+        }
+        
+        isRefreshing = true;
+        try {
+            await cargarTurnos();
+            await cargarEstadisticas();
+        } catch (error) {
+            console.error("Error en refrescarUI:", error);
+        } finally {
+            isRefreshing = false;
+            __refreshTimer = null;
+        }
+    }, 500); // Aumentado a 500ms para mayor estabilidad
 }
 
 async function cargarServicios() {
@@ -128,8 +145,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         mostrarNotificacion('Turnos actualizados', 'success');
     });
     const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
     const sidebar = document.getElementById('sidebar');
     const listaEspera = document.getElementById('listaEspera');
+    const overlay = document.getElementById('sidebar-overlay');
+    const mainContent = document.querySelector('.flex-1'); // Contenedor principal
+
+    // Lógica unificada del Sidebar (Móvil y Escritorio)
+    function toggleSidebar() {
+        // Móvil
+        if (window.innerWidth < 1024) {
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('opacity-0');
+            overlay.classList.toggle('pointer-events-none');
+        } else {
+            // Escritorio (Colapsar/Expandir)
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-20');
+            // Ocultar textos en modo colapsado
+            const texts = sidebar.querySelectorAll('span:not(.icon-only)');
+            texts.forEach(t => t.classList.toggle('hidden'));
+        }
+    }
+
+    mobileMenuButton?.addEventListener('click', toggleSidebar);
+    toggleBtn?.addEventListener('click', toggleSidebar);
+    overlay?.addEventListener('click', toggleSidebar);
+
     if (listaEspera) {
         listaEspera.addEventListener('dblclick', handleDoubleClickDelete);
         listaEspera.addEventListener('dragstart', handleDragStart);
@@ -144,14 +186,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     document.getElementById('formPago')?.addEventListener('submit', guardarPago);
-    const overlay = document.getElementById('sidebar-overlay');
-    mobileMenuButton?.addEventListener('click', toggleMobileMenu);
-    overlay?.addEventListener('click', toggleMobileMenu);
-    function toggleMobileMenu() {
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('opacity-0');
-        overlay.classList.toggle('pointer-events-none');
-    }
     suscribirseTurnos();
     iniciarActualizadorMinutos();
     supabase
@@ -201,39 +235,58 @@ async function handleDrop(event) {
     event.preventDefault();
     if (!draggedItem) return;
 
-    draggedItem.classList.remove('opacity-50');
+    const item = draggedItem;
+    item.classList.remove('opacity-50');
+    draggedItem = null; // Limpiar referencia global inmediatamente
+
     const container = document.getElementById('listaEspera');
     const cards = Array.from(container.querySelectorAll('.turn-card-espera'));
+    
+    // Guardar estado anterior para rollback en caso de error
+    const previousDataRender = [...dataRender];
+
     const turnUpdates = cards.map((card, index) => ({
         id: card.dataset.id,
         orden: index
     }));
 
-    // Optimistically update UI
+    // Actualización Optimista de la UI (Optimistic UI Update)
     dataRender = turnUpdates.map(update => {
-        const originalTurn = dataRender.find(t => t.id == update.id);
-        return { ...originalTurn, orden: update.orden };
-    }).sort((a, b) => a.orden - b.orden);
-
-    // Update database
-    const updates = turnUpdates.map(update =>
-        supabase.from('turnos').update({ orden: update.orden }).eq('id', update.id)
-    );
+        const originalTurn = previousDataRender.find(t => t.id == update.id);
+        return originalTurn ? { ...originalTurn, orden: update.orden } : null;
+    }).filter(Boolean).sort((a, b) => a.orden - b.orden);
 
     try {
-        const results = await Promise.all(updates);
-        const hasError = results.some(res => res.error);
-        if (hasError) {
-            throw new Error('Una o más actualizaciones de turnos fallaron.');
+        // 1. Verificar sesión antes de escribir
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            throw new Error('AUTH_JWT_EXPIRED');
         }
+
+        // 2. Ejecutar actualización atómica vía RPC
+        const { error: rpcError } = await supabase.rpc('reordenar_turnos', {
+            updates: turnUpdates
+        });
+        
+        if (rpcError) {
+            throw rpcError;
+        }
+
         mostrarNotificacion('Turnos reordenados con éxito.', 'success');
     } catch (error) {
         console.error('Error al reordenar turnos:', error);
-        mostrarNotificacion('Error al guardar el nuevo orden de los turnos.', 'error');
-        // Revert UI if DB update fails
-        await refrescarUI();
-    } finally {
-        draggedItem = null;
+        
+        // Revertir estado local (Rollback)
+        dataRender = previousDataRender;
+        
+        // Manejo específico de errores de autenticación
+        if (error.message === 'AUTH_JWT_EXPIRED' || (error.message && error.message.includes('JWT'))) {
+            mostrarNotificacion('Tu sesión ha expirado. Recargando...', 'error');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            mostrarNotificacion('No se pudo guardar el orden. Revertiendo...', 'error');
+            await refrescarUI(); // Sincronizar con servidor
+        }
     }
 }
 
@@ -342,6 +395,17 @@ async function tomarTurno(event) {
     }
     const servicio = document.getElementById('servicio').value;
     const fechaHoy = new Date().toISOString().slice(0, 10);
+    
+    // 9. Campo orden al crear turno: Calcular nuevo orden
+    const { data: ultimo } = await supabase
+        .from('turnos')
+        .select('orden')
+        .eq('negocio_id', negocioId)
+        .eq('fecha', fechaHoy)
+        .order('orden', { ascending: false })
+        .limit(1);
+    const nuevoOrden = (ultimo?.[0]?.orden || 0) + 1;
+
     const { count: totalHoy, error: countError } = await supabase
         .from('turnos')
         .select('id', { count: 'exact', head: true })
@@ -383,7 +447,8 @@ async function tomarTurno(event) {
         servicio: servicio,
         estado: 'En espera',
         hora: horaStr,
-        fecha: hoy
+        fecha: hoy,
+        orden: nuevoOrden
     }]);
     if (error) {
         mostrarNotificacion('Error al guardar turno: ' + error.message, 'error');
@@ -483,9 +548,13 @@ async function generarNuevoTurno() {
 }
 
 async function cargarTurnos() {
-    Object.values(activeTurnIntervals).forEach(clearInterval);
-    activeTurnIntervals = {};
+    // 8. Limpieza al recargar turnos
+    if (__elapsedTimer) clearInterval(__elapsedTimer);
+    iniciarActualizadorMinutos();
+
     const hoy = new Date().toISOString().slice(0, 10);
+    
+    // Carga de datos
     const { data: enAtencion } = await supabase
         .from('turnos')
         .select('*')
@@ -505,6 +574,11 @@ async function cargarTurnos() {
         mostrarNotificacion('Error al cargar turnos', 'error');
         return;
     }
+
+    // Limpiar intervalos SOLO cuando tenemos los datos nuevos listos para evitar parpadeos vacíos
+    Object.values(activeTurnIntervals).forEach(clearInterval);
+    activeTurnIntervals = {};
+
     const listaOriginal = data || [];
     const seenTurnos = new Set();
     dataRender = [];
@@ -515,6 +589,7 @@ async function cargarTurnos() {
             dataRender.push(t);
         }
     }
+
     const lista = document.getElementById('listaEspera');
     const sinTurnos = document.getElementById('sin-turnos');
     const contadorEspera = document.getElementById('contador-espera');
@@ -536,6 +611,23 @@ async function cargarTurnos() {
     } else if (sinTurnos) {
         sinTurnos.classList.add('hidden');
     }
+
+    // 3. Optimización grande: Calcular tiempos en memoria (evita N+1 consultas)
+    let tiempoBase = 0;
+    if (enAtencion && enAtencion.length > 0) {
+        // Usamos el primero en atención para calcular el remanente, similar a calcularTiempoEstimadoTotal
+        const current = enAtencion[0]; 
+        const duracion = serviciosCache[current.servicio] || 25;
+        const inicio = current.started_at ? new Date(current.started_at) : null;
+        if (inicio) {
+            const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
+            tiempoBase = Math.max(duracion - transcurrido, 0);
+        } else {
+            tiempoBase = duracion;
+        }
+    }
+    let acumuladoEspera = 0;
+
     for (let index = 0; index < dataRender.length; index++) {
         const t = dataRender[index];
         const div = document.createElement('div');
@@ -547,7 +639,11 @@ async function cargarTurnos() {
         const horaCreacion = new Date(`${t.fecha}T${t.hora}`);
         const ahora = new Date();
         const minutosEsperaReal = Math.floor((ahora - horaCreacion) / 60000);
-        const tiempoEstimadoHasta = await calcularTiempoEstimadoTotal(t.turno);
+        
+        // Cálculo optimizado
+        const tiempoEstimadoHasta = tiempoBase + acumuladoEspera;
+        acumuladoEspera += (serviciosCache[t.servicio] || 25);
+
         div.innerHTML = `
       <div class="flex justify-between items-start">
         <span class="text-2xl font-bold text-blue-700 dark:text-blue-400">${t.turno}</span>
@@ -584,7 +680,8 @@ async function cargarTurnos() {
         });
     }
     const turnoActualDisplay = (enAtencion && enAtencion.length > 0) ? enAtencion[enAtencion.length - 1] : null;
-    turnoActual = (dataRender.length > 0) ? dataRender[0] : null;
+    // 4. Bug oculto: turnoActual puede ser incorrecto (priorizar el que está en atención)
+    turnoActual = turnoActualDisplay || ((dataRender.length > 0) ? dataRender[0] : null);
     document.getElementById('turnoActual').textContent = turnoActualDisplay ? turnoActualDisplay.turno : (turnoActual ? turnoActual.turno : '--');
     const clienteActual = document.getElementById('cliente-actual');
     if (clienteActual) {
@@ -627,121 +724,100 @@ async function cargarTurnos() {
 async function cargarEstadisticas() {
     if (!negocioId) return;
     const hoy = new Date().toISOString().slice(0, 10);
-    const { data: turnosAtendidos, error: errorAtendidos } = await supabase
-        .from('turnos')
-        .select('*')
-        .eq('estado', 'Atendido')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy);
-    if (errorAtendidos) {
-        console.error('Error al cargar estadísticas:', errorAtendidos.message);
-        return;
-    }
-    const { data: turnosDevueltos, error: errorDevueltos } = await supabase
-        .from('turnos')
-        .select('*')
-        .eq('estado', 'Devuelto')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy);
-    if (errorDevueltos) {
-        console.error('Error al cargar estadísticas de turnos devueltos:', errorDevueltos.message);
-        return;
-    }
-    const turnosAtendidosElement = document.getElementById('turnos-atendidos');
-    if (turnosAtendidosElement) {
-        turnosAtendidosElement.textContent = turnosAtendidos.length;
-    }
-    const ingresos = turnosAtendidos.reduce((total, turno) => total + (turno.monto_cobrado || 0), 0);
-    const ingresosHoy = document.getElementById('ingresos-hoy');
-    if (ingresosHoy) {
-        ingresosHoy.textContent = `RD$${ingresos.toFixed(2)}`;
-    }
-    const promedioCobro = document.getElementById('promedio-cobro');
-    if (promedioCobro && turnosAtendidos.length > 0) {
-        const promedio = ingresos / turnosAtendidos.length;
-        promedioCobro.textContent = `RD$${promedio.toFixed(2)}`;
-    }
-    const ctx = document.getElementById('estadisticasChart');
-    if (!ctx) return;
-    const turnosPorHora = {};
-    const horasDelDia = [];
-    for (let i = 8; i <= 20; i++) {
-        const hora = i < 10 ? `0${i}:00` : `${i}:00`;
-        horasDelDia.push(hora);
-        turnosPorHora[hora] = { atendidos: 0, devueltos: 0, espera: 0 };
-    }
-    turnosAtendidos.forEach(turno => {
-        const hora = turno.hora.slice(0, 5);
-        const horaRedondeada = `${hora.slice(0, 2)}:00`;
-        if (turnosPorHora[horaRedondeada]) {
-            turnosPorHora[horaRedondeada].atendidos++;
+    
+    try {
+        // Cargar datos en paralelo para eficiencia
+        const [resAtendidos, resDevueltos, resEspera] = await Promise.all([
+            supabase.from('turnos').select('*').eq('estado', 'Atendido').eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('*').eq('estado', 'Devuelto').eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('*').eq('estado', 'En espera').eq('negocio_id', negocioId).eq('fecha', hoy)
+        ]);
+
+        if (resAtendidos.error) throw resAtendidos.error;
+        if (resDevueltos.error) throw resDevueltos.error;
+        if (resEspera.error) throw resEspera.error;
+
+        const turnosAtendidos = resAtendidos.data || [];
+        const turnosDevueltos = resDevueltos.data || [];
+        const turnosEspera = resEspera.data || [];
+
+        // Actualizar UI de contadores
+        const turnosAtendidosElement = document.getElementById('turnos-atendidos');
+        if (turnosAtendidosElement) turnosAtendidosElement.textContent = turnosAtendidos.length;
+
+        const ingresos = turnosAtendidos.reduce((total, turno) => total + (turno.monto_cobrado || 0), 0);
+        const ingresosHoy = document.getElementById('ingresos-hoy');
+        if (ingresosHoy) ingresosHoy.textContent = `RD$${ingresos.toFixed(2)}`;
+
+        const promedioCobro = document.getElementById('promedio-cobro');
+        if (promedioCobro && turnosAtendidos.length > 0) {
+            const promedio = ingresos / turnosAtendidos.length;
+            promedioCobro.textContent = `RD$${promedio.toFixed(2)}`;
         }
-    });
-    turnosDevueltos.forEach(turno => {
-        const hora = turno.hora.slice(0, 5);
-        const horaRedondeada = `${hora.slice(0, 2)}:00`;
-        if (turnosPorHora[horaRedondeada]) {
-            turnosPorHora[horaRedondeada].devueltos++;
+
+        // Preparar datos para el gráfico
+        const ctx = document.getElementById('estadisticasChart');
+        if (!ctx) return;
+
+        const turnosPorHora = {};
+        const horasDelDia = [];
+        for (let i = 8; i <= 20; i++) {
+            const hora = i < 10 ? `0${i}:00` : `${i}:00`;
+            horasDelDia.push(hora);
+            turnosPorHora[hora] = { atendidos: 0, devueltos: 0, espera: 0 };
         }
-    });
-    const { data: turnosEspera, error: errorEspera } = await supabase
-        .from('turnos')
-        .select('*')
-        .eq('estado', 'En espera')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy);
-    if (!errorEspera && turnosEspera) {
-        turnosEspera.forEach(turno => {
-            const hora = turno.hora.slice(0, 5);
-            const horaRedondeada = `${hora.slice(0, 2)}:00`;
-            if (turnosPorHora[horaRedondeada]) {
-                turnosPorHora[horaRedondeada].espera++;
+
+        const procesarTurnos = (lista, tipo) => {
+            lista.forEach(turno => {
+                const hora = turno.hora.slice(0, 5);
+                const horaRedondeada = `${hora.slice(0, 2)}:00`;
+                if (turnosPorHora[horaRedondeada]) {
+                    turnosPorHora[horaRedondeada][tipo]++;
+                }
+            });
+        };
+
+        procesarTurnos(turnosAtendidos, 'atendidos');
+        procesarTurnos(turnosDevueltos, 'devueltos');
+        procesarTurnos(turnosEspera, 'espera');
+
+        const datosAtendidos = horasDelDia.map(hora => turnosPorHora[hora].atendidos);
+        const datosDevueltos = horasDelDia.map(hora => turnosPorHora[hora].devueltos);
+        const datosEspera = horasDelDia.map(hora => turnosPorHora[hora].espera);
+
+        if (chart) chart.destroy();
+        
+        chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: horasDelDia,
+                datasets: [
+                    { label: 'Atendidos', data: datosAtendidos, backgroundColor: 'rgba(34, 197, 94, 0.5)', borderColor: 'rgb(34, 197, 94)', borderWidth: 1 },
+                    { label: 'Devueltos', data: datosDevueltos, backgroundColor: 'rgba(239, 68, 68, 0.5)', borderColor: 'rgb(239, 68, 68)', borderWidth: 1 },
+                    { label: 'En Espera', data: datosEspera, backgroundColor: 'rgba(245, 158, 11, 0.5)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151' } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } },
+                    y: { beginAtZero: true, ticks: { precision: 0, color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } }
+                }
             }
         });
-    }
-    const datosAtendidos = horasDelDia.map(hora => turnosPorHora[hora].atendidos);
-    const datosDevueltos = horasDelDia.map(hora => turnosPorHora[hora].devueltos);
-    const datosEspera = horasDelDia.map(hora => turnosPorHora[hora].espera);
-    if (chart) {
-        chart.destroy();
-    }
-    chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: horasDelDia,
-            datasets: [{
-                label: 'Atendidos',
-                data: datosAtendidos,
-                backgroundColor: 'rgba(34, 197, 94, 0.5)',
-                borderColor: 'rgb(34, 197, 94)',
-                borderWidth: 1
-            }, {
-                label: 'Devueltos',
-                data: datosDevueltos,
-                backgroundColor: 'rgba(239, 68, 68, 0.5)',
-                borderColor: 'rgb(239, 68, 68)',
-                borderWidth: 1
-            }, {
-                label: 'En Espera',
-                data: datosEspera,
-                backgroundColor: 'rgba(245, 158, 11, 0.5)',
-                borderColor: 'rgb(245, 158, 11)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'top', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151' } },
-                tooltip: { mode: 'index', intersect: false }
-            },
-            scales: {
-                x: { ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } },
-                y: { beginAtZero: true, ticks: { precision: 0, color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } }
-            }
+
+    } catch (error) {
+        console.error('Error al cargar estadísticas:', error.message);
+        // Evitar spam de alertas si es error de JWT, solo loguear
+        if (error.message && (error.message.includes('JWT') || error.code === '401')) {
+            console.warn('Sesión expirada en estadísticas, esperando recarga...');
         }
-    });
+    }
 }
 
 let canalTurnos = null;
@@ -802,8 +878,7 @@ async function notificarAvanceFila() {
     }
 
     // Notificar a todos los clientes en espera sobre el avance
-    for (let i = 0; i < turnosEnEspera.length; i++) {
-        const turno = turnosEnEspera[i];
+    const promesas = turnosEnEspera.map(async (turno, i) => {
         const posicionEnFila = i + 1;
         const turnosDelante = i;
         
@@ -842,7 +917,9 @@ async function notificarAvanceFila() {
         } catch (error) {
             console.error(`Error al notificar a ${turno.nombre}:`, error);
         }
-    }
+    });
+
+    await Promise.all(promesas);
     
     mostrarNotificacion(`Notificaciones de avance enviadas a ${turnosEnEspera.length} clientes.`, 'info');
 }
@@ -936,8 +1013,13 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
 }
 
 async function atenderAhora() {
+    // 5. Seguridad: Evitar doble clic en "Atender"
+    if (window.__atendiendo) return;
+    window.__atendiendo = true;
+
     if (!turnoActual) {
         mostrarNotificacion('No hay turno en espera.', 'warning');
+        window.__atendiendo = false;
         return;
     }
     const { error } = await supabase
@@ -947,6 +1029,7 @@ async function atenderAhora() {
         .eq('estado', 'En espera');
     if (error) {
         mostrarNotificacion('Error al atender: ' + error.message, 'error');
+        window.__atendiendo = false;
         return;
     }
     mostrarNotificacion(`Atendiendo turno ${turnoActual.turno}`, 'success');
@@ -955,13 +1038,30 @@ async function atenderAhora() {
     await notificarAvanceFila();
 
     refrescarUI();
+    window.__atendiendo = false;
 }
 
 async function guardarPago(event) {
     event.preventDefault();
     if (!activeTurnIdForPayment) return;
-    const monto = parseFloat(document.getElementById('montoCobrado').value);
-    const metodoPago = document.querySelector('input[name="metodo_pago"]:checked').value;
+    
+    // 1. Error potencial: metodo_pago no existe en memoria inicial
+    const metodoSeleccionado = document.querySelector('input[name="metodo_pago"]:checked');
+    if (!metodoSeleccionado) {
+       mostrarNotificacion('Seleccione un método de pago.', 'warning');
+       return;
+    }
+    const metodoPago = metodoSeleccionado.value;
+
+    // 2. Evitar NaN en monto cobrado
+    const montoInput = document.getElementById('montoCobrado').value;
+    const monto = parseFloat(montoInput);
+
+    if (isNaN(monto) || monto < 0) {
+       mostrarNotificacion('Ingrese un monto válido.', 'warning');
+       return;
+    }
+
     const { error } = await supabase
         .from('turnos')
         .update({
@@ -1094,6 +1194,11 @@ function iniciarReconocimientoVoz() {
         } else {
             mostrarNotificacion('Error en el reconocimiento de voz: ' + event.error, 'error');
         }
+    };
+
+    // 7. Protección de reconocimiento de voz
+    recognition.onnomatch = () => {
+       mostrarNotificacion('No se entendió el audio.', 'warning');
     };
 
     recognition.onresult = (event) => {

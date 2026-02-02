@@ -1,120 +1,103 @@
--- secure_rls_policies.sql
--- This script updates the Row Level Security policies for all tables to be secure.
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import * as webpush from 'https://deno.land/x/web_push@0.3.0/mod.ts';
 
--- Helper function to get negocio_id from user's metadata
-CREATE OR REPLACE FUNCTION auth.get_negocio_id()
-RETURNS TEXT AS $$
-BEGIN
-  RETURN auth.jwt()->'user_metadata'->>'negocio_id';
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+// Define CORS headers to be used in all responses.
+// For production, it's more secure to specify the exact origin instead of '*'.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
--- =============================
--- Table: turnos
--- =============================
-ALTER TABLE public.turnos ENABLE ROW LEVEL SECURITY;
+// VAPID keys should be stored as environment variables in your Supabase project.
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')!;
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!;
 
-DROP POLICY IF EXISTS turnos_select ON public.turnos;
-CREATE POLICY turnos_select ON public.turnos
-  FOR SELECT USING (negocio_id = auth.get_negocio_id());
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  console.error('VAPID keys are not set in environment variables.');
+}
 
-DROP POLICY IF EXISTS turnos_insert ON public.turnos;
-CREATE POLICY turnos_insert ON public.turnos
-  FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
+const VAPID_MAILTO = Deno.env.get('VAPID_MAILTO');
+if (!VAPID_MAILTO) {
+  console.error('VAPID_MAILTO is not set in environment variables.');
+}
 
-DROP POLICY IF EXISTS turnos_update ON public.turnos;
-CREATE POLICY turnos_update ON public.turnos
-  FOR UPDATE USING (negocio_id = auth.get_negocio_id());
+webpush.setVapidDetails(
+  `mailto:${VAPID_MAILTO}`,
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
-DROP POLICY IF EXISTS turnos_delete ON public.turnos;
-CREATE POLICY turnos_delete ON public.turnos
-  FOR DELETE USING (negocio_id = auth.get_negocio_id());
+serve(async (req) => {
+  // Handle CORS preflight requests.
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
--- =============================
--- Table: servicios
--- =============================
-ALTER TABLE public.servicios ENABLE ROW LEVEL SECURITY;
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', // Use service_role key for admin access
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
 
-DROP POLICY IF EXISTS servicios_select ON public.servicios;
-CREATE POLICY servicios_select ON public.servicios
-  FOR SELECT USING (negocio_id = auth.get_negocio_id());
+    const { telefono, negocio_id, message } = await req.json();
 
-DROP POLICY IF EXISTS servicios_insert ON public.servicios;
-CREATE POLICY servicios_insert ON public.servicios
-  FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
+    if (!telefono || !negocio_id) {
+      return new Response(
+        JSON.stringify({ error: 'Missing telefono or negocio_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-DROP POLICY IF EXISTS servicios_update ON public.servicios;
-CREATE POLICY servicios_update ON public.servicios
-  FOR UPDATE USING (negocio_id = auth.get_negocio_id());
+    const { data: subscriptionData, error: fetchError } = await supabaseClient
+      .from('push_subscriptions')
+      .select('subscription')
+      .eq('user_id', telefono)
+      .eq('negocio_id', negocio_id)
+      .single();
 
-DROP POLICY IF EXISTS servicios_delete ON public.servicios;
-CREATE POLICY servicios_delete ON public.servicios
-  FOR DELETE USING (negocio_id = auth.get_negocio_id());
+    if (fetchError || !subscriptionData) {
+      return new Response(
+        JSON.stringify({ error: 'Subscription not found', details: fetchError?.message }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const payload = JSON.stringify({
+      title: message.title || '¡Es tu turno!',
+      body: message.body || 'Un barbero te está esperando. ¡Dirígete al local!',
+      icon: 'imegenlogin/android-chrome-192x192.png',
+      url: `/usuario_barberia005.html`
+    });
 
--- =============================
--- Table: cierres_caja
--- =============================
-ALTER TABLE public.cierres_caja ENABLE ROW LEVEL SECURITY;
+    await webpush.sendNotification(subscriptionData.subscription, payload);
 
-DROP POLICY IF EXISTS cierres_select ON public.cierres_caja;
-CREATE POLICY cierres_select ON public.cierres_caja
-  FOR SELECT USING (negocio_id = auth.get_negocio_id());
+    return new Response(
+      JSON.stringify({ success: true, message: 'Push notification sent successfully.' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
-DROP POLICY IF EXISTS cierres_insert ON public.cierres_caja;
-CREATE POLICY cierres_insert ON public.cierres_caja
-  FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
+  } catch (error) {
+    // Handle potential errors, such as an expired subscription (410 Gone).
+    if (error.statusCode === 410) {
+      const { telefono, negocio_id } = await req.json();
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      await supabaseClient
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', telefono)
+        .eq('negocio_id', negocio_id);
+      console.log(`Deleted expired subscription for ${telefono}`);
+    }
 
-DROP POLICY IF EXISTS cierres_update ON public.cierres_caja;
-CREATE POLICY cierres_update ON public.cierres_caja
-  FOR UPDATE USING (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS cierres_delete ON public.cierres_caja;
-CREATE POLICY cierres_delete ON public.cierres_caja
-  FOR DELETE USING (negocio_id = auth.get_negocio_id());
-
-
--- =============================
--- Table: negocio_config
--- =============================
-ALTER TABLE public.negocio_config ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Enable all operations for negocio_config" ON public.negocio_config;
-
-DROP POLICY IF EXISTS negocio_config_select ON public.negocio_config;
-CREATE POLICY negocio_config_select ON public.negocio_config
-  FOR SELECT USING (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS negocio_config_insert ON public.negocio_config;
-CREATE POLICY negocio_config_insert ON public.negocio_config
-  FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS negocio_config_update ON public.negocio_config;
-CREATE POLICY negocio_config_update ON public.negocio_config
-  FOR UPDATE USING (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS negocio_config_delete ON public.negocio_config;
-CREATE POLICY negocio_config_delete ON public.negocio_config
-  FOR DELETE USING (negocio_id = auth.get_negocio_id());
-
-
--- =============================
--- Table: estado_negocio
--- =============================
-ALTER TABLE public.estado_negocio ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS estado_negocio_select ON public.estado_negocio;
-CREATE POLICY estado_negocio_select ON public.estado_negocio
-  FOR SELECT USING (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS estado_negocio_insert ON public.estado_negocio;
-CREATE POLICY estado_negocio_insert ON public.estado_negocio
-  FOR INSERT WITH CHECK (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS estado_negocio_update ON public.estado_negocio;
-CREATE POLICY estado_negocio_update ON public.estado_negocio
-  FOR UPDATE USING (negocio_id = auth.get_negocio_id());
-
-DROP POLICY IF EXISTS estado_negocio_delete ON public.estado_negocio;
-CREATE POLICY estado_negocio_delete ON public.estado_negocio
-  FOR DELETE USING (negocio_id = auth.get_negocio_id());
+    return new Response(
+      JSON.stringify({ error: 'Failed to send push notification', details: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
