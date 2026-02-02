@@ -227,23 +227,6 @@
     }
   });
 </script>
-
-<script>
-  // Lógica para el menú móvil
-  const mobileMenuButton = document.getElementById('mobile-menu-button');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-
-  function toggleMobileMenu() {
-    sidebar.classList.toggle('-translate-x-full');
-    overlay.classList.toggle('opacity-0');
-    overlay.classList.toggle('pointer-events-none');
-  }
-
-  mobileMenuButton.addEventListener('click', toggleMobileMenu);
-  overlay.addEventListener('click', toggleMobileMenu);
-</script>
-
   <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
   © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
 </footer>

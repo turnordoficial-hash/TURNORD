@@ -586,5 +586,23 @@
       }
     });
   </script>
+  <script>
+    // Lógica para el menú móvil
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (mobileMenuButton && sidebar) {
+      const toggle = () => {
+        sidebar.classList.toggle('-translate-x-full');
+        if (overlay) {
+          overlay.classList.toggle('opacity-0');
+          overlay.classList.toggle('pointer-events-none');
+        }
+      };
+      mobileMenuButton.addEventListener('click', toggle);
+      if (overlay) overlay.addEventListener('click', toggle);
+    }
+  </script>
 </body>
 </html>

@@ -103,8 +103,28 @@ function setupThemePage() {
     });
 }
 
+function setupSidebar() {
+    const btn = document.getElementById('mobile-menu-button');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (!sidebar || !btn) return;
+
+    const toggle = () => {
+        sidebar.classList.toggle('-translate-x-full');
+        if (overlay) {
+            overlay.classList.toggle('opacity-0');
+            overlay.classList.toggle('pointer-events-none');
+        }
+    };
+
+    btn.addEventListener('click', toggle);
+    if (overlay) overlay.addEventListener('click', toggle);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (!negocioId) return;
     setupThemePage();
     loadThemeFromDB();
+    setupSidebar();
 });
