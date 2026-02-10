@@ -7,89 +7,130 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { darkMode: 'class', theme: { extend: { colors: { amber: { 450: '#F59E0B' } } } } }
+    tailwind.config = { 
+      darkMode: 'class', 
+      theme: { 
+        extend: { 
+          colors: { 
+            barberBlack: '#0B0B0B',
+            barberRed: '#C1121F',
+            amber: { 450: '#F59E0B' } 
+          } 
+        } 
+      } 
+    }
   </script>
   <style>
-    body { background-image: url('https://images.unsplash.com/photo-1503951914875-452162b7f30a?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; }
-    .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-    .dark .glass { background: rgba(17, 24, 39, 0.95); }
+    /* Fondo moderno negro */
+    body { background: radial-gradient(circle at top center, #1f2937 0%, #0B0B0B 80%); }
+    
+    .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.2); }
+    .dark .glass { background: rgba(20, 20, 20, 0.6); border: 1px solid rgba(255,255,255,0.05); backdrop-filter: blur(12px); }
+
+    /* Animaciones Premium */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-card { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    
+    @keyframes modalIn {
+        from { opacity: 0; transform: scale(0.95) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-modal { animation: modalIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+    /* Efecto texto JBarber */
+    .jbarber-text {
+      text-shadow: 2px 2px 0px #C1121F;
+    }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
 
-  <div class="glass p-8 rounded-2xl shadow-2xl w-full max-w-md transform transition-all hover:scale-[1.01]">
+  <!-- Decoración de fondo -->
+  <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-20 -left-20 w-96 h-96 bg-barberRed rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse"></div>
+    <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-900 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" style="animation-delay: 2s"></div>
+  </div>
+
+  <div class="glass p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md transform transition-all animate-card relative z-10 border-t border-white/20">
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">J<span class="text-amber-600">Barber</span></h1>
-      <p class="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-widest">Powered by TurnoRD</p>
+      <h1 class="text-5xl font-black text-black dark:text-white mb-2 tracking-tighter jbarber-text transform hover:scale-105 transition-transform duration-300 cursor-default">JBarber<span class="text-barberRed">.</span></h1>
+      <p class="text-sm text-gray-600 dark:text-gray-400 font-medium tracking-wide">Acceso Premium</p>
     </div>
 
     <!-- Formulario Login -->
     <form id="loginForm" class="space-y-6">
       <div>
-        <label for="usuario_login" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario (Cédula o Código)</label>
+        <label for="usuario_login" class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 ml-1">Usuario</label>
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
           </div>
-          <input type="text" id="usuario_login" required placeholder="Ingresa tu ID" 
-            class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors outline-none">
+          <input type="text" id="usuario_login" required placeholder="Cédula o código" autocomplete="username"
+            class="w-full pl-10 pr-4 py-4 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-barberRed focus:border-transparent bg-gray-50 dark:bg-gray-900/80 text-gray-900 dark:text-white transition-all outline-none placeholder-gray-400 shadow-inner">
         </div>
       </div>
 
-      <div>
-        <label for="password_login" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
+      <div class="relative">
+        <label for="password_login" class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 ml-1">Contraseña</label>
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           </div>
-          <input type="password" id="password_login" required placeholder="••••••••" 
-            class="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors outline-none">
+          <input type="password" id="password_login" required placeholder="••••••••" autocomplete="current-password"
+            class="w-full pl-10 pr-4 py-4 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-barberRed focus:border-transparent bg-gray-50 dark:bg-gray-900/80 text-gray-900 dark:text-white transition-all outline-none placeholder-gray-400 shadow-inner">
         </div>
       </div>
 
-      <button type="submit" id="btnSubmit" class="w-full bg-gray-900 dark:bg-amber-600 hover:bg-gray-800 dark:hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex justify-center items-center">
-        <span>Ingresar</span>
+      <button type="submit" id="btnSubmit" class="w-full bg-barberBlack hover:bg-gray-900 text-white font-bold py-4 px-4 rounded-xl shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 flex justify-center items-center gap-2 border border-gray-800">
+        <span id="btnText">Ingresar</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
       </button>
     </form>
     
     <div class="mt-6 text-center">
-      <p class="text-sm text-gray-600 dark:text-gray-400">¿No tienes cuenta?</p>
-      <button onclick="abrirModalRegistro()" class="mt-2 text-amber-600 dark:text-amber-500 font-bold hover:underline">
-        ¡Soy Nuevo! Crear Cuenta
+      <p class="text-sm text-gray-500 dark:text-gray-400">¿Primera vez aquí?</p>
+      <button onclick="abrirModalRegistro()" class="mt-2 text-barberRed font-bold hover:text-red-700 transition-colors uppercase text-sm tracking-wide">
+        Crear Cuenta Nueva
       </button>
     </div>
   </div>
 
   <!-- Modal Registro -->
-  <div id="modalRegistro" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 px-4">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+  <div id="modalRegistro" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 px-4 transition-all duration-300">
+    <div class="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-lg p-8 relative shadow-2xl border border-gray-200 dark:border-zinc-800 animate-modal max-h-[90vh] overflow-y-auto">
       <button onclick="cerrarModalRegistro()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 text-2xl">&times;</button>
-      <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Crear Perfil Cliente</h2>
+      
+      <h2 class="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Crea tu perfil en segundos</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Guarda tus datos y evita filas innecesarias.</p>
+
       <form id="formRegistro" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1 dark:text-gray-300">Nombre Completo</label>
-            <input type="text" id="reg_nombre" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <input type="text" id="reg_nombre" required class="w-full p-3 border rounded-xl dark:bg-zinc-800 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1 dark:text-gray-300">Teléfono</label>
-            <input type="tel" id="reg_telefono" required pattern="[0-9]{8,15}" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <input type="tel" id="reg_telefono" required pattern="[0-9]{8,15}" class="w-full p-3 border rounded-xl dark:bg-zinc-800 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none">
           </div>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1 dark:text-gray-300">Correo Electrónico</label>
-          <input type="email" id="reg_email" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+          <input type="email" id="reg_email" required class="w-full p-3 border rounded-xl dark:bg-zinc-800 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none">
         </div>
         <div>
           <label class="block text-sm font-medium mb-1 dark:text-gray-300">Usuario (Cédula o Código 6 dígitos)</label>
-          <input type="text" id="reg_documento" required class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Ej: 40212345678">
+          <input type="text" id="reg_documento" required class="w-full p-3 border rounded-xl dark:bg-zinc-800 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none" placeholder="Ej: 40212345678">
         </div>
         <div>
           <label class="block text-sm font-medium mb-1 dark:text-gray-300">Contraseña</label>
-          <input type="password" id="reg_password" required minlength="4" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+          <input type="password" id="reg_password" required minlength="4" class="w-full p-3 border rounded-xl dark:bg-zinc-800 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none">
         </div>
-        <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl transition-colors">
-          Registrarme
+        <button type="submit" id="btnRegSubmit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-amber-500/20">
+          <span id="btnRegText">Crear Cuenta</span>
         </button>
       </form>
     </div>
@@ -100,15 +141,14 @@
     const negocioId = 'barberia005';
 
     // Funciones Modal
-    window.abrirModalRegistro = () => document.getElementById('modalRegistro').classList.remove('hidden');
-    window.cerrarModalRegistro = () => document.getElementById('modalRegistro').classList.add('hidden');
+    const modal = document.getElementById('modalRegistro');
     window.abrirModalRegistro = () => {
-        document.getElementById('modalRegistro').classList.remove('hidden');
-        document.getElementById('modalRegistro').classList.add('flex');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
     };
     window.cerrarModalRegistro = () => {
-        document.getElementById('modalRegistro').classList.add('hidden');
-        document.getElementById('modalRegistro').classList.remove('flex');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
     };
 
     // Login
@@ -117,9 +157,11 @@
       const usuario = document.getElementById('usuario_login').value.trim();
       const pass = document.getElementById('password_login').value.trim();
       const btn = document.getElementById('btnSubmit');
+      const btnText = document.getElementById('btnText');
 
       btn.disabled = true;
-      btn.innerHTML = 'Verificando...';
+      btn.classList.add('opacity-70', 'cursor-not-allowed');
+      btnText.textContent = 'Verificando...';
 
       try {
         const { data, error } = await supabase
@@ -145,7 +187,8 @@
       } catch (error) {
         alert(error.message || 'Error al iniciar sesión');
         btn.disabled = false;
-        btn.innerHTML = 'Ingresar';
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        btnText.textContent = 'Ingresar';
       }
     });
 
@@ -157,6 +200,11 @@
       const email = document.getElementById('reg_email').value.trim();
       const documento = document.getElementById('reg_documento').value.trim();
       const password = document.getElementById('reg_password').value.trim();
+      const btn = document.getElementById('btnRegSubmit');
+      const btnText = document.getElementById('btnRegText');
+
+      btn.disabled = true;
+      btnText.textContent = 'Creando perfil...';
 
       try {
         const { data, error } = await supabase
@@ -177,6 +225,9 @@
         document.getElementById('formRegistro').reset();
       } catch (error) {
         alert('Error al registrar: ' + (error.message.includes('unique') ? 'El usuario ya existe' : error.message));
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Crear Cuenta';
       }
     });
   </script>

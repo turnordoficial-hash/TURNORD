@@ -8,7 +8,7 @@ self.addEventListener("push", (event) => {
     title: "TurnoRD",
     body: "Hay una nueva notificación para ti.",
     icon: "/android-chrome-192x192.png",
-    url: "/usuario_barberia005.html"
+    url: "/panel_cliente.html"
   };
 
   if (event.data) {
@@ -25,7 +25,7 @@ self.addEventListener("push", (event) => {
     badge: "/favicon-32x32.png",
     vibrate: [100, 50, 100],
     data: {
-      url: payload.url || "/usuario_barberia005.html"
+      url: payload.url || "/panel_cliente.html"
     },
     actions: [
       {

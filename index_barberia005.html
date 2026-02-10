@@ -37,12 +37,36 @@
 <script>
   tailwind.config = { darkMode: 'class', theme: { extend: {} } };
 </script>
+<style>
+  /* Animaciones y Efectos 3D */
+  .perspective-1000 { perspective: 1000px; }
+  .card-3d {
+    transition: transform 0.5s ease, box-shadow 0.5s ease;
+    transform-style: preserve-3d;
+  }
+  .card-3d:hover {
+    transform: translateY(-10px) rotateX(5deg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  .text-shadow { text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+  .gold-gradient { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+  
+  /* Scroll suave */
+  html { scroll-behavior: smooth; }
+  
+  /* Fade In Animations */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up { animation: fadeInUp 0.8s ease-out forwards; }
+</style>
 
 <!-- Inicializar modo oscuro -->
 <script>
 function inicializarModoOscuro() {
-  const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
-  document.documentElement.classList.toggle('dark', modoOscuro);
+  // Forzar modo oscuro por defecto para estilo premium, o respetar preferencia
+  document.documentElement.classList.add('dark');
 }
 inicializarModoOscuro();
 </script>

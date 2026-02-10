@@ -84,4 +84,30 @@ window.addEventListener('DOMContentLoaded', async () => {
     await ensureSupabase();
     await cargarComentarios();
     suscribirseAComentarios();
+    setupSidebar();
 });
+
+function setupSidebar() {
+    const btn = document.getElementById('mobile-menu-button');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (!sidebar) return;
+
+    if (btn) btn.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+        if (overlay) overlay.classList.toggle('opacity-0');
+        if (overlay) overlay.classList.toggle('pointer-events-none');
+    });
+    if (overlay) overlay.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('opacity-0');
+        overlay.classList.toggle('pointer-events-none');
+    });
+    if (toggleBtn) toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('w-64');
+        sidebar.classList.toggle('w-20');
+        sidebar.querySelectorAll('.sidebar-text').forEach(el => el.classList.toggle('hidden'));
+    });
+}

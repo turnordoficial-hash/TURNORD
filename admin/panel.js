@@ -118,6 +118,23 @@ function solicitarActualizacion() {
   }, 500); // Espera 500ms antes de recargar
 }
 
+// Helper para notificaciones visuales
+function mostrarNotificacion(mensaje, icono = 'info') {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: icono,
+      title: mensaje,
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true
+    });
+  } else {
+    console.log(`[${icono.toUpperCase()}] ${mensaje}`);
+  }
+}
+
 // Limpia el historial de turnos que ya no están activos.
 async function limpiarHistorialTurnos() {
   if (!negocioId) return;
@@ -162,7 +179,37 @@ function suscribirseTurnos() {
       },
       payload => {
         console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
+        
+        if (payload.eventType === 'INSERT') {
+            mostrarNotificacion(`Nuevo turno: ${payload.new.turno} - ${payload.new.nombre}`, 'info');
+        }
+        
         solicitarActualizacion();
+      }
+    )
+    .subscribe();
+
+  return channel;
+}
+
+// Configura la suscripción a cambios en la tabla de citas en tiempo real.
+function suscribirseCitas() {
+  if (!negocioId) return;
+
+  const channel = supabase
+    .channel(`citas-negocio-${negocioId}`)
+    .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'citas',
+        filter: `negocio_id=eq.${negocioId}`,
+      },
+      payload => {
+        if (payload.eventType === 'INSERT') {
+            const fecha = new Date(payload.new.start_at);
+            const hora = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            mostrarNotificacion(`Nueva cita agendada: ${hora}`, 'success');
+        }
       }
     )
     .subscribe();
@@ -225,6 +272,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await cargarServicios();
   await cargarDatos();
   suscribirseTurnos();
+  suscribirseCitas();
   setupSidebar();
 
   // Exponer la función de limpiar historial al objeto window para que el HTML la pueda llamar.
@@ -239,21 +287,23 @@ function setupSidebar() {
     
     if (!sidebar) return;
 
-    const toggle = () => {
+    const toggleMobile = () => {
         if (window.innerWidth < 1024) {
             sidebar.classList.toggle('-translate-x-full');
             if (overlay) {
                 overlay.classList.toggle('opacity-0');
                 overlay.classList.toggle('pointer-events-none');
             }
-        } else {
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-20');
-            sidebar.querySelectorAll('span:not(.icon-only)').forEach(el => el.classList.toggle('hidden'));
         }
     };
 
-    if (btn) btn.addEventListener('click', toggle);
-    if (toggleBtn) toggleBtn.addEventListener('click', toggle);
-    if (overlay) overlay.addEventListener('click', toggle);
+    const toggleDesktop = () => {
+        sidebar.classList.toggle('w-64');
+        sidebar.classList.toggle('w-20');
+        sidebar.querySelectorAll('.sidebar-text').forEach(el => el.classList.toggle('hidden'));
+    };
+
+    if (btn) btn.addEventListener('click', toggleMobile);
+    if (overlay) overlay.addEventListener('click', toggleMobile);
+    if (toggleBtn) toggleBtn.addEventListener('click', toggleDesktop);
 }

@@ -10,6 +10,10 @@ let ALLOWED_DAYS = [1, 2, 3, 4, 5, 6];
 let activeTurnIntervals = {};
 let serviciosCache = {};
 let isRefreshing = false; // Bandera para evitar ejecuciones simultáneas
+let citasHoy = [];
+let citasFuturas = [];
+let barberosMap = {};
+let __pushSubsCount = 0;
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -131,6 +135,27 @@ async function cargarHoraLimite() {
     }
 }
 
+async function cargarBarberosMap() {
+    const { data } = await supabase
+        .from('barberos')
+        .select('id,nombre,usuario')
+        .eq('negocio_id', negocioId);
+    barberosMap = {};
+    (data || []).forEach(b => { barberosMap[b.id] = b.nombre || b.usuario; });
+}
+
+async function cargarPushSubsCount() {
+    try {
+        const { count } = await supabase
+            .from('push_subscriptions')
+            .select('*', { count: 'exact', head: true })
+            .eq('negocio_id', negocioId);
+        __pushSubsCount = count || 0;
+    } catch (e) {
+        __pushSubsCount = 0;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     await ensureSupabase();
     if (!negocioId) return;
@@ -139,6 +164,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(actualizarFechaHora, 60000);
     await cargarHoraLimite();
     await cargarServicios();
+    await cargarBarberosMap();
+    await cargarPushSubsCount();
     refrescarUI();
     document.getElementById('refrescar-turnos')?.addEventListener('click', () => {
         refrescarUI();
@@ -151,26 +178,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const overlay = document.getElementById('sidebar-overlay');
     const mainContent = document.querySelector('.flex-1'); // Contenedor principal
 
-    // Lógica unificada del Sidebar (Móvil y Escritorio)
-    function toggleSidebar() {
-        // Móvil
-        if (window.innerWidth < 1024) {
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('opacity-0');
-            overlay.classList.toggle('pointer-events-none');
-        } else {
-            // Escritorio (Colapsar/Expandir)
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-20');
-            // Ocultar textos en modo colapsado
-            const texts = sidebar.querySelectorAll('span:not(.icon-only)');
-            texts.forEach(t => t.classList.toggle('hidden'));
-        }
+    function toggleMobile() {
+        sidebar.classList.toggle('-translate-x-full');
+        overlay.classList.toggle('opacity-0');
+        overlay.classList.toggle('pointer-events-none');
     }
 
-    mobileMenuButton?.addEventListener('click', toggleSidebar);
-    toggleBtn?.addEventListener('click', toggleSidebar);
-    overlay?.addEventListener('click', toggleSidebar);
+    function toggleDesktop() {
+        sidebar.classList.toggle('w-64');
+        sidebar.classList.toggle('w-20');
+        // Ocultar textos en modo colapsado
+        const texts = sidebar.querySelectorAll('.sidebar-text');
+        texts.forEach(t => t.classList.toggle('hidden'));
+    }
+
+    mobileMenuButton?.addEventListener('click', toggleMobile);
+    overlay?.addEventListener('click', toggleMobile);
+    toggleBtn?.addEventListener('click', toggleDesktop);
 
     if (listaEspera) {
         listaEspera.addEventListener('dblclick', handleDoubleClickDelete);
@@ -187,6 +211,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('formPago')?.addEventListener('submit', guardarPago);
     suscribirseTurnos();
+    suscribirseCitas();
+    // Suscripción a cambios de push_subscriptions para mantener el conteo actualizado
+    supabase
+        .channel(`push-subs-${negocioId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'push_subscriptions', filter: `negocio_id=eq.${negocioId}` },
+            async () => { await cargarPushSubsCount(); }
+        )
+        .subscribe();
     iniciarActualizadorMinutos();
     supabase
         .channel('config-turno-admin')
@@ -555,25 +587,95 @@ async function cargarTurnos() {
     const hoy = new Date().toISOString().slice(0, 10);
     
     // Carga de datos
-    const { data: enAtencion } = await supabase
-        .from('turnos')
-        .select('*')
-        .eq('estado', 'En atención')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .order('started_at', { ascending: true });
-    const { data, error } = await supabase
-        .from('turnos')
-        .select('*')
-        .eq('estado', 'En espera')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .order('orden', { ascending: true })
-        .order('created_at', { ascending: true });
+    // Robustez: Fallback si faltan columnas (started_at, orden) o tabla citas
+    let enAtencion = [];
+    try {
+        const resAtencion = await supabase
+            .from('turnos')
+            .select('*')
+            .eq('estado', 'En atención')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy)
+            .order('started_at', { ascending: true });
+        
+        if (resAtencion.error) throw resAtencion.error;
+        enAtencion = resAtencion.data || [];
+    } catch (e) {
+        // Fallback sin ordenar por started_at
+        const resAtencionFallback = await supabase
+            .from('turnos')
+            .select('*')
+            .eq('estado', 'En atención')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy);
+        enAtencion = resAtencionFallback.data || [];
+    }
+
+    let data = [], error = null;
+    try {
+        const resEspera = await supabase
+            .from('turnos')
+            .select('*')
+            .eq('estado', 'En espera')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy)
+            .order('orden', { ascending: true })
+            .order('created_at', { ascending: true });
+        
+        if (resEspera.error) throw resEspera.error;
+        data = resEspera.data || [];
+    } catch (e) {
+        console.warn('Fallo carga ordenada (posible falta de columna "orden"), reintentando simple...', e);
+        const resEsperaFallback = await supabase
+            .from('turnos')
+            .select('*')
+            .eq('estado', 'En espera')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy)
+            .order('created_at', { ascending: true });
+        
+        data = resEsperaFallback.data || [];
+        error = resEsperaFallback.error;
+    }
+
     if (error) {
         mostrarNotificacion('Error al cargar turnos', 'error');
         return;
     }
+
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0,0,0,0);
+    const finHoy = new Date();
+    finHoy.setHours(23,59,59,999);
+    
+    let citasDia = [], citasRes = [];
+    try {
+        const resCitas = await supabase
+            .from('citas')
+            .select('*')
+            .eq('negocio_id', negocioId)
+            .gte('start_at', inicioHoy.toISOString())
+            .lte('start_at', finHoy.toISOString())
+            .order('start_at', { ascending: true });
+        
+        if (resCitas.error) throw resCitas.error;
+        citasDia = resCitas.data || [];
+
+        const resCitasFut = await supabase
+            .from('citas')
+            .select('*')
+            .eq('negocio_id', negocioId)
+            .gt('start_at', finHoy.toISOString())
+            .order('start_at', { ascending: true });
+        
+        if (resCitasFut.error) throw resCitasFut.error;
+        citasRes = resCitasFut.data || [];
+    } catch (e) {
+        console.warn('No se pudo cargar citas (tabla inexistente o error):', e);
+    }
+
+    citasHoy = citasDia;
+    citasFuturas = citasRes;
 
     // Limpiar intervalos SOLO cuando tenemos los datos nuevos listos para evitar parpadeos vacíos
     Object.values(activeTurnIntervals).forEach(clearInterval);
@@ -719,6 +821,74 @@ async function cargarTurnos() {
             tiempoPromedio.textContent = `${Math.round(promedio)} min`;
         }
     }
+    renderCitas();
+    renderPorBarbero(enAtencion || [], dataRender || [], citasHoy || []);
+}
+
+function renderPorBarbero(enAtencionList, enEsperaList, citasHoyList) {
+    const cont = document.getElementById('barberos-contenedor');
+    if (!cont) return;
+    cont.innerHTML = '';
+    const ids = Object.keys(barberosMap);
+    ids.forEach(idStr => {
+        const id = Number(idStr);
+        const nombre = barberosMap[id];
+        const misAtencion = (enAtencionList || []).filter(t => t.barber_id === id);
+        const misEspera = (enEsperaList || []).filter(t => t.barber_id === id);
+        const misCitasHoy = (citasHoyList || []).filter(c => c.barber_id === id);
+        const card = document.createElement('div');
+        card.className = 'bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md border border-gray-200 dark:border-gray-700';
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-semibold">${nombre}</h3>
+            <span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full text-gray-600 dark:text-gray-300">
+              Turnos: ${misEspera.length + misAtencion.length} · Citas: ${misCitasHoy.length}
+            </span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">En atención</p>
+              <div class="space-y-2">
+                ${(misAtencion.length ? misAtencion : []).map(t => `
+                  <div class="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded-lg border border-green-100 dark:border-green-800">
+                    <span class="font-bold text-green-700 dark:text-green-300">${t.turno}</span>
+                    <span class="ml-2 text-gray-600 dark:text-gray-300">${t.nombre || ''}</span>
+                  </div>
+                `).join('')}
+                ${misAtencion.length === 0 ? '<div class="text-xs text-gray-500">Sin turnos</div>' : ''}
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">En espera</p>
+              <div class="space-y-2">
+                ${(misEspera.length ? misEspera : []).map(t => `
+                  <div class="text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                    <span class="font-bold text-blue-700 dark:text-blue-300">${t.turno}</span>
+                    <span class="ml-2 text-gray-600 dark:text-gray-300">${t.nombre || ''}</span>
+                  </div>
+                `).join('')}
+                ${misEspera.length === 0 ? '<div class="text-xs text-gray-500">Sin turnos</div>' : ''}
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Citas de hoy</p>
+              <div class="space-y-2">
+                ${(misCitasHoy.length ? misCitasHoy : []).map(c => {
+                    const start = new Date(c.start_at);
+                    const end = new Date(c.end_at);
+                    return `
+                      <div class="text-sm bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                        <span class="font-bold text-emerald-700 dark:text-emerald-300">${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                        <span class="ml-2 text-gray-600 dark:text-gray-300">hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                      </div>`;
+                }).join('')}
+                ${misCitasHoy.length === 0 ? '<div class="text-xs text-gray-500">Sin citas</div>' : ''}
+              </div>
+            </div>
+          </div>
+        `;
+        cont.appendChild(card);
+    });
 }
 
 async function cargarEstadisticas() {
@@ -833,6 +1003,19 @@ function suscribirseTurnos() {
         .subscribe();
 }
 
+let canalCitas = null;
+function suscribirseCitas() {
+    if (canalCitas) {
+        supabase.removeChannel(canalCitas);
+    }
+    canalCitas = supabase
+        .channel(`citas-admin-${negocioId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` },
+            () => { refrescarUI(); }
+        )
+        .subscribe();
+}
+
 function abrirModal() {
     document.getElementById('modal').classList.remove('hidden');
     document.getElementById('modal').classList.add('flex');
@@ -870,6 +1053,7 @@ function cerrarModalPago() {
  * Notifica a todos los clientes en espera cuando avanza la fila
  */
 async function notificarAvanceFila() {
+    if (__pushSubsCount === 0) return;
     const turnosEnEspera = dataRender.filter(turno => turno.estado === 'En espera');
     
     if (turnosEnEspera.length === 0) {
@@ -925,6 +1109,7 @@ async function notificarAvanceFila() {
 }
 
 async function notificarSiguienteEnCola() {
+    if (__pushSubsCount === 0) return;
     // dataRender es el array de turnos en espera, ya ordenado.
     // El turno que se acaba de llamar estaba en el índice 0. El siguiente es el del índice 1.
     const siguienteTurno = dataRender.length > 1 ? dataRender[1] : null;
@@ -977,6 +1162,7 @@ async function notificarSiguienteEnCola() {
  * @param {string} turno - Número de turno
  */
 async function notificarTurnoTomado(telefono, nombre, turno) {
+    if (__pushSubsCount === 0) return;
     if (!telefono) {
         console.log('No se puede notificar: teléfono no disponible');
         return;
@@ -1022,9 +1208,75 @@ async function atenderAhora() {
         window.__atendiendo = false;
         return;
     }
+    let barberId = null;
+    try {
+        const { data } = await supabase
+            .from('barberos')
+            .select('id,nombre,usuario,activo')
+            .eq('negocio_id', negocioId)
+            .eq('activo', true)
+            .order('nombre', { ascending: true });
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+        const box = document.createElement('div');
+        box.className = 'bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-md';
+        box.innerHTML = `
+          <h3 class="text-lg font-bold mb-4">Seleccionar Barbero</h3>
+          <select id="selBarberoAtencion" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
+            ${(data || []).map(b => `<option value="${b.id}">${b.nombre || b.usuario}</option>`).join('')}
+          </select>
+          <div class="flex gap-3 justify-end">
+            <button id="confirmBarbero" class="px-4 py-2 bg-gray-900 text-white rounded">Confirmar</button>
+            <button id="cancelBarbero" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded">Cancelar</button>
+          </div>
+        `;
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        await new Promise((resolve, reject) => {
+            document.getElementById('confirmBarbero').addEventListener('click', () => {
+                const sel = document.getElementById('selBarberoAtencion');
+                barberId = Number(sel.value);
+                document.body.removeChild(overlay);
+                resolve();
+            });
+            document.getElementById('cancelBarbero').addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                resolve();
+            });
+        });
+    } catch {}
+    const ahora = new Date();
+    const ventanaMin = 10;
+    let citaPrioritaria = null;
+    if (barberId) {
+        citaPrioritaria = (citasHoy || []).find(c => {
+            const start = new Date(c.start_at);
+            const end = new Date(c.end_at);
+            const inicioVentana = new Date(start.getTime() - ventanaMin * 60000);
+            return c.barber_id === barberId && ahora >= inicioVentana && ahora <= end && (c.estado === 'Programada' || !c.estado);
+        });
+    }
+    if (citaPrioritaria) {
+        const { error } = await supabase
+            .from('citas')
+            .update({ estado: 'En atención', updated_at: new Date().toISOString() })
+            .eq('id', citaPrioritaria.id)
+            .eq('estado', 'Programada');
+        if (error) {
+            mostrarNotificacion('Error al atender cita: ' + error.message, 'error');
+            window.__atendiendo = false;
+            return;
+        }
+        mostrarNotificacion('Atendiendo cita programada', 'success');
+        refrescarUI();
+        window.__atendiendo = false;
+        return;
+    }
+    const payloadUpdate = { estado: 'En atención', started_at: new Date().toISOString() };
+    if (barberId) payloadUpdate.barber_id = barberId;
     const { error } = await supabase
         .from('turnos')
-        .update({ estado: 'En atención', started_at: new Date().toISOString() })
+        .update(payloadUpdate)
         .eq('id', turnoActual.id)
         .eq('estado', 'En espera');
     if (error) {
@@ -1039,6 +1291,54 @@ async function atenderAhora() {
 
     refrescarUI();
     window.__atendiendo = false;
+}
+
+function renderCitas() {
+    const contHoy = document.getElementById('listaCitasHoy');
+    const contFut = document.getElementById('listaCitasFuturas');
+    const cntHoy = document.getElementById('contador-citas-hoy');
+    const cntFut = document.getElementById('contador-citas-futuras');
+    if (cntHoy) cntHoy.textContent = `${(citasHoy || []).length} citas`;
+    if (cntFut) cntFut.textContent = `${(citasFuturas || []).length} citas`;
+    if (contHoy) {
+        contHoy.innerHTML = '';
+        (citasHoy || []).forEach(c => {
+            const start = new Date(c.start_at);
+            const end = new Date(c.end_at);
+            const dur = Math.max(0, Math.round((end - start) / 60000));
+            const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
+            const card = document.createElement('div');
+            card.className = 'bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800 transition-all';
+            card.innerHTML = `
+              <div class="flex justify-between items-start">
+                <span class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-xs bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full">${bName}</span>
+              </div>
+              <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${c.cliente_telefono || ''}</p>
+              <div class="flex justify-between items-center mt-3">
+                <span class="text-xs text-gray-500 dark:text-gray-400">Hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">${dur} min</span>
+              </div>`;
+            contHoy.appendChild(card);
+        });
+    }
+    if (contFut) {
+        contFut.innerHTML = '';
+        (citasFuturas || []).forEach(c => {
+            const start = new Date(c.start_at);
+            const end = new Date(c.end_at);
+            const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
+            const card = document.createElement('div');
+            card.className = 'bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg shadow-sm border border-violet-100 dark:border-violet-800 transition-all';
+            card.innerHTML = `
+              <div class="flex justify-between items-start">
+                <span class="text-2xl font-bold text-violet-700 dark:text-violet-400">${start.toLocaleDateString('es-ES')} ${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-xs bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200 px-2 py-0.5 rounded-full">${bName}</span>
+              </div>
+              <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${c.cliente_telefono || ''}</p>`;
+            contFut.appendChild(card);
+        });
+    }
 }
 
 async function guardarPago(event) {
@@ -1067,7 +1367,8 @@ async function guardarPago(event) {
         .update({
             estado: 'Atendido',
             monto_cobrado: monto,
-            metodo_pago: metodoPago
+            metodo_pago: metodoPago,
+            ended_at: new Date().toISOString()
         })
         .eq('id', activeTurnIdForPayment);
     if (error) {

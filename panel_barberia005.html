@@ -43,6 +43,8 @@
   <script src="assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
     // Inicializar modo oscuro
     function inicializarModoOscuro() {
@@ -70,9 +72,11 @@
   img, canvas, svg, video { max-width: 100%; height: auto; }
   /* Contenedor responsive utilitario */
   .responsive-container { max-width: 1280px; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+  
+  .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000000 70%); background-attachment: fixed; }
 </style>
 </head>
-<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" data-negocio-id="barberia005">
+<body class="bg-gray-50 text-gray-800 dark:text-gray-200 font-sans antialiased transition-colors duration-300" data-negocio-id="barberia005">
   <!-- Botón modo oscuro -->
   <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,83 +99,97 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-gray-900 text-gray-300 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 shadow-2xl border-r border-gray-800">
-      <div class="p-6 flex items-center justify-between border-b border-gray-800">
-        <div class="flex items-center gap-3">
-           <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white font-bold">J</div>
-           <h2 class="text-xl font-bold text-white tracking-wide">JBarber<span class="text-amber-500">.</span></h2>
+    <aside id="sidebar" class="w-64 bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 shadow-2xl border-r border-gray-200 dark:border-white/5">
+      <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200 dark:border-white/5">
+        <div class="flex items-center gap-3 overflow-hidden">
+           <div class="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-amber-500/20">J</div>
+           <h2 class="text-xl font-bold text-gray-900 dark:text-white tracking-wide whitespace-nowrap sidebar-text">JBarber<span class="text-amber-500">.</span></h2>
         </div>
+        <button id="sidebar-toggle-btn" class="hidden md:flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+        </button>
       </div>
       
       <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 text-white bg-gray-800 rounded-xl shadow-sm transition-all border-l-4 border-amber-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          <span class="font-medium">Inicio</span>
+        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 rounded-xl shadow-sm transition-all border-l-4 border-amber-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Inicio</span>
         </a>
-        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span class="font-medium">Turnos</span>
+        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Turnos</span>
         </a>
-        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          <span class="font-medium">Mi Negocio</span>
+        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Mi Negocio</span>
         </a>
-        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-          <span class="font-medium">Comentarios</span>
+        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Comentarios</span>
         </a>
-        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          <span class="font-medium">Configuración</span>
+        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Configuración</span>
         </a>
       </nav>
       
-      <div class="p-4 border-t border-gray-800">
-        <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-xl transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          <span class="font-medium">Cerrar sesión</span>
+      <div class="p-4 border-t border-gray-200 dark:border-white/5">
+        <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          <span class="font-medium ml-3 sidebar-text">Cerrar sesión</span>
         </a>
       </div>
     </aside>
 
     <!-- Contenido principal -->
     <main class="flex-1 md:ml-0 p-4 sm:p-6 responsive-container w-full">
-      <h1 class="text-2xl font-bold mb-6">Bienvenido, Administrador</h1>
+      <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Panel de Control</h1>
 
       <!-- Resumen -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos en espera</h3>
-          <p id="turnosEspera" class="text-3xl font-bold text-blue-700 dark:text-blue-400 mt-2">0</p>
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
+          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos en espera</h3>
+          <p id="turnosEspera" class="text-4xl font-black text-blue-600 dark:text-blue-400 mt-2">0</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos atendidos</h3>
-          <p id="turnosAtendidos" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">0</p>
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
+          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos atendidos</h3>
+          <p id="turnosAtendidos" class="text-4xl font-black text-green-600 dark:text-green-400 mt-2">0</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow">
-          <h3 class="text-lg font-semibold dark:text-gray-200">Turnos del día</h3>
-          <p id="turnosDia" class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">0</p>
+        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
+          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos del día</h3>
+          <p id="turnosDia" class="text-4xl font-black text-purple-600 dark:text-purple-400 mt-2">0</p>
+        </div>
+      </div>
+
+      <!-- Gráfico de Estadísticas -->
+      <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-6 mb-8">
+        <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Actividad de Hoy</h2>
+        <div class="relative h-80 w-full">
+          <canvas id="dashboardChart"></canvas>
         </div>
       </div>
 
       <!-- Turno en Atención -->
-      <div id="turno-en-atencion-card" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500 hidden mb-8">
+      <div id="turno-en-atencion-card" class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden hidden mb-8">
+        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-green-400 to-green-600"></div>
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Turno en Atención</h2>
-          <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-100 dark:bg-red-900/50 px-3 py-1 rounded-lg">--:--</div>
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white">Turno en Atención</h2>
+          <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-4 py-1 rounded-xl border border-red-100 dark:border-red-800">--:--</div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Turno</p>
-            <p id="atencion-turno" class="text-2xl font-bold text-green-600 dark:text-green-400">--</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Turno</p>
+            <p id="atencion-turno" class="text-4xl font-black text-green-600 dark:text-green-400 tracking-tight">--</p>
           </div>
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Cliente</p>
-            <p id="atencion-cliente" class="text-lg font-semibold">--</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Cliente</p>
+            <p id="atencion-cliente" class="text-xl font-bold text-gray-900 dark:text-white">--</p>
           </div>
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Servicio</p>
-            <p id="atencion-servicio" class="text-lg font-semibold">--</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Servicio</p>
+            <p id="atencion-servicio" class="text-xl font-bold text-gray-900 dark:text-white">--</p>
           </div>
         </div>
       </div>
@@ -179,24 +197,24 @@
 
       <!-- Botón limpiar historial -->
       <div class="flex justify-end mb-4">
-        <button id="btnLimpiarHistorial" onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded">
+        <button id="btnLimpiarHistorial" onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg transition-all hover:scale-105">
           Limpiar historial
         </button>
       </div>
 
       <!-- Tabla de turnos -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 overflow-x-auto">
-        <h2 class="text-lg font-bold mb-4 dark:text-gray-200">Historial de turnos</h2>
+      <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-6 overflow-x-auto">
+        <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Historial de turnos</h2>
         <table class="min-w-full text-left">
           <thead>
             <tr>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Turno</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Cliente</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Hora</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Estado</th>
+              <th class="py-3 px-4 border-b border-gray-100 dark:border-white/10 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase">Turno</th>
+              <th class="py-3 px-4 border-b border-gray-100 dark:border-white/10 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase">Cliente</th>
+              <th class="py-3 px-4 border-b border-gray-100 dark:border-white/10 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase">Hora</th>
+              <th class="py-3 px-4 border-b border-gray-100 dark:border-white/10 text-gray-500 dark:text-gray-400 font-semibold text-sm uppercase">Estado</th>
             </tr>
           </thead>
-          <tbody id="tablaHistorial" class="dark:text-gray-300">
+          <tbody id="tablaHistorial" class="text-gray-700 dark:text-gray-300">
             <!-- Las filas dinámicas se insertan desde panel.js -->
           </tbody>
         </table>
@@ -222,20 +240,138 @@
   </div>
 
   <script type="module" src="admin/panel.js"></script>
+  <script type="module">
+    import { supabase } from './database.js';
+    
+    const negocioId = document.body.dataset.negocioId;
+
+    async function initChart() {
+        const ctx = document.getElementById('dashboardChart');
+        if(!ctx) return;
+
+        // Fetch data for today
+        const hoy = new Date().toISOString().slice(0, 10);
+        const { data: turnos } = await supabase
+            .from('turnos')
+            .select('hora, estado')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy);
+
+        // Process data: Turns per hour
+        const hours = Array.from({length: 13}, (_, i) => i + 8); // 8:00 to 20:00
+        const labels = hours.map(h => `${h}:00`);
+        const dataAtendidos = new Array(hours.length).fill(0);
+        const dataEspera = new Array(hours.length).fill(0);
+
+        if(turnos) {
+            turnos.forEach(t => {
+                const h = parseInt(t.hora.split(':')[0]);
+                const idx = hours.indexOf(h);
+                if(idx !== -1) {
+                    if(t.estado === 'Atendido') dataAtendidos[idx]++;
+                    else if(t.estado === 'En espera' || t.estado === 'En atención') dataEspera[idx]++;
+                }
+            });
+        }
+
+        // Gradient setup
+        const chartCtx = ctx.getContext('2d');
+        const gradientAtendidos = chartCtx.createLinearGradient(0, 0, 0, 400);
+        gradientAtendidos.addColorStop(0, 'rgba(34, 197, 94, 0.5)'); // Green 500
+        gradientAtendidos.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
+
+        const gradientEspera = chartCtx.createLinearGradient(0, 0, 0, 400);
+        gradientEspera.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Blue 500
+        gradientEspera.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Atendidos',
+                        data: dataAtendidos,
+                        borderColor: '#22c55e',
+                        backgroundColor: gradientAtendidos,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#22c55e',
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'En Espera',
+                        data: dataEspera,
+                        borderColor: '#3b82f6',
+                        backgroundColor: gradientEspera,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#3b82f6',
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151', usePointStyle: true, font: { family: "'Inter', sans-serif", size: 12 } }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#6b7280', font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderDash: [5, 5] },
+                        ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#6b7280', stepSize: 1, font: { size: 11 } },
+                        beginAtZero: true
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+    }
+
+    // Initialize
+    initChart();
+  </script>
   <!-- Script de validación eliminado ya que los campos están comentados -->
   <!-- Script de validación de entrada eliminado ya que los campos están comentados -->
 <script>
   // Esto busca todos los enlaces del sidebar y resalta el que coincide con la URL
   document.querySelectorAll('aside nav a').forEach(link => {
     if (window.location.pathname.endsWith(link.getAttribute('href'))) {
-      link.classList.add('bg-white', 'text-gray-900', 'font-semibold', 'shadow');
+      link.classList.add('bg-gray-100', 'dark:bg-white/10', 'text-gray-900', 'dark:text-white', 'font-bold', 'shadow-sm');
     } else {
-      link.classList.remove('bg-white', 'text-gray-900', 'font-semibold', 'shadow');
+      link.classList.remove('bg-gray-100', 'dark:bg-white/10', 'text-gray-900', 'dark:text-white', 'font-bold', 'shadow-sm');
     }
   });
 </script>
   <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
-  © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
+  © 2025 TurnoRD Todos los derechos reservados • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
 </footer>
 
 <script>
@@ -248,22 +384,7 @@
 
 <!-- Script Global para Sidebar (Funciona en todas las páginas) -->
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('mobile-menu-button');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
-
-    if (btn && sidebar && overlay) {
-      const toggleSidebar = () => {
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('opacity-0');
-        overlay.classList.toggle('pointer-events-none');
-      };
-
-      btn.addEventListener('click', toggleSidebar);
-      overlay.addEventListener('click', toggleSidebar);
-    }
-  });
+  // La lógica del sidebar ahora se maneja en admin/panel.js y otros scripts específicos
 </script>
 </body>
 </html>

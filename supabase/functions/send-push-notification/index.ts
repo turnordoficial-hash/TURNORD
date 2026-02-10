@@ -59,7 +59,7 @@ serve(async (req) => {
       title: title || "¡Es tu turno!",
       body: body || "Un barbero te está esperando",
       icon: "/android-chrome-192x192.png",
-      url: "/usuario_barberia005.html",
+      url: "/panel_cliente.html",
     });
 
     await webpush.sendNotification(data.subscription, payload);

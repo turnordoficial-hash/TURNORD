@@ -144,6 +144,8 @@ CREATE TABLE IF NOT EXISTS public.estado_negocio (
     break_message TEXT,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.estado_negocio
+  ADD COLUMN IF NOT EXISTS weekly_breaks JSONB DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_estado_negocio_negocio_id ON public.estado_negocio(negocio_id);
 
@@ -184,6 +186,7 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
 COMMENT ON TABLE push_subscriptions IS 'Almacena las suscripciones de notificaciones push de los usuarios para un negocio específico.';
 
 ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_key;
+ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS ux_push_subscriptions_user_negocio;
 ALTER TABLE public.push_subscriptions ADD CONSTRAINT ux_push_subscriptions_user_negocio UNIQUE (user_id, negocio_id);
 
 -- ==============================================================================
@@ -318,6 +321,91 @@ BEGIN
 END;
 $$;
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+CREATE TABLE IF NOT EXISTS public.barberos (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  nombre TEXT,
+  usuario TEXT NOT NULL,
+  password TEXT NOT NULL,
+  avatar_url TEXT,
+  activo BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ux_barberos_neg_usuario UNIQUE (negocio_id, usuario)
+);
+
+ALTER TABLE public.barberos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS barberos_select ON public.barberos;
+CREATE POLICY barberos_select ON public.barberos FOR SELECT USING (true);
+DROP POLICY IF EXISTS barberos_insert ON public.barberos;
+CREATE POLICY barberos_insert ON public.barberos FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS barberos_update ON public.barberos;
+CREATE POLICY barberos_update ON public.barberos FOR UPDATE USING (true) WITH CHECK (true);
+
+ALTER TABLE public.turnos
+  ADD COLUMN IF NOT EXISTS barber_id BIGINT REFERENCES public.barberos(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS public.citas (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  barber_id BIGINT REFERENCES public.barberos(id) ON DELETE CASCADE,
+  cliente_telefono TEXT,
+  start_at TIMESTAMPTZ NOT NULL,
+  end_at TIMESTAMPTZ NOT NULL,
+  estado TEXT DEFAULT 'Programada',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.citas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS citas_select ON public.citas;
+CREATE POLICY citas_select ON public.citas FOR SELECT USING (true);
+DROP POLICY IF EXISTS citas_insert ON public.citas;
+CREATE POLICY citas_insert ON public.citas FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS citas_update ON public.citas;
+CREATE POLICY citas_update ON public.citas FOR UPDATE USING (true) WITH CHECK (true);
+
+ALTER TABLE public.citas DROP CONSTRAINT IF EXISTS citas_no_overlap;
+ALTER TABLE public.citas
+  ADD CONSTRAINT citas_no_overlap EXCLUDE USING gist (
+    barber_id WITH =,
+    tstzrange(start_at, end_at, '[]') WITH &&
+  );
+
+CREATE OR REPLACE FUNCTION public.programar_cita(
+  p_negocio_id TEXT,
+  p_barber_id BIGINT,
+  p_cliente_telefono TEXT,
+  p_start TIMESTAMPTZ,
+  p_end TIMESTAMPTZ
+) RETURNS public.citas AS $$
+DECLARE
+  conflicto_turno INTEGER;
+  nueva public.citas;
+BEGIN
+  SELECT COUNT(*) INTO conflicto_turno
+  FROM public.turnos t
+  WHERE t.negocio_id = p_negocio_id
+    AND t.barber_id = p_barber_id
+    AND t.estado = 'En atención'
+    AND t.started_at IS NOT NULL
+    AND t.started_at < p_end
+    AND (t.ended_at IS NULL OR t.ended_at > p_start);
+
+  IF conflicto_turno > 0 THEN
+    RAISE EXCEPTION 'Conflicto con turno en atención para el barbero en el intervalo seleccionado';
+  END IF;
+
+  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at)
+  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end)
+  RETURNING * INTO nueva;
+
+  RETURN nueva;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ==============================================================================
 -- 9) Tabla: Clientes (Perfil y Auth Personalizado)
 -- ==============================================================================
@@ -342,8 +430,27 @@ DROP POLICY IF EXISTS "Permitir todo a clientes" ON public.clientes;
 CREATE POLICY "Permitir todo a clientes" ON public.clientes FOR ALL USING (true) WITH CHECK (true);
 
 -- Trigger update timestamp
+DROP TRIGGER IF EXISTS trg_set_timestamp_updated_at_clientes ON public.clientes;
 CREATE TRIGGER trg_set_timestamp_updated_at_clientes
 BEFORE UPDATE ON public.clientes
 FOR EACH ROW EXECUTE FUNCTION public.set_timestamp_updated_at();
 
 COMMIT;
+
+
+-- Agrega las columnas faltantes para el ordenamiento y tiempos
+ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS orden INTEGER DEFAULT 0;
+ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
+
+-- Crea la tabla de citas si no existe
+CREATE TABLE IF NOT EXISTS public.citas (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  barber_id BIGINT,
+  cliente_telefono TEXT,
+  start_at TIMESTAMPTZ NOT NULL,
+  end_at TIMESTAMPTZ NOT NULL,
+  estado TEXT DEFAULT 'Programada',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

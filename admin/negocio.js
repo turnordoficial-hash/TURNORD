@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inicializarGrafico();
     initBreakControl();
     verificarEstadoBreak();
+    initServiciosExtras();
 
     const btnExport = document.getElementById('exportExcel');
     if (btnExport) btnExport.addEventListener('click', exportarAExcel);
@@ -75,23 +76,22 @@ function setupMobileMenu() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (sidebar && overlay) {
-        const toggle = () => toggleMobileMenu(sidebar, overlay);
-        if (mobileMenuButton) mobileMenuButton.addEventListener('click', toggle);
-        if (toggleBtn) toggleBtn.addEventListener('click', toggle);
-        overlay.addEventListener('click', toggle);
+        if (mobileMenuButton) mobileMenuButton.addEventListener('click', () => toggleMobileMenu(sidebar, overlay));
+        if (overlay) overlay.addEventListener('click', () => toggleMobileMenu(sidebar, overlay));
+        if (toggleBtn) toggleBtn.addEventListener('click', () => toggleDesktopMenu(sidebar));
     }
 }
 
 function toggleMobileMenu(sidebar, overlay) {
-    if (window.innerWidth < 1024) {
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('opacity-0');
-        overlay.classList.toggle('pointer-events-none');
-    } else {
-        sidebar.classList.toggle('w-64');
-        sidebar.classList.toggle('w-20');
-        sidebar.querySelectorAll('span:not(.icon-only)').forEach(el => el.classList.toggle('hidden'));
-    }
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('opacity-0');
+    overlay.classList.toggle('pointer-events-none');
+}
+
+function toggleDesktopMenu(sidebar) {
+    sidebar.classList.toggle('w-64');
+    sidebar.classList.toggle('w-20');
+    sidebar.querySelectorAll('.sidebar-text').forEach(el => el.classList.toggle('hidden'));
 }
 
 function initDayButtons() {
@@ -444,6 +444,113 @@ function iniciarTemporizador() {
     }, 1000);
 }
 
+function initServiciosExtras() {
+    const filter = document.getElementById('servicios-filter');
+    if (filter) {
+        filter.addEventListener('input', () => {
+            const term = filter.value.toLowerCase();
+            const rows = document.querySelectorAll('#tabla-servicios tr');
+            rows.forEach(r => {
+                const nameInput = r.querySelector('.svc-nombre');
+                const name = nameInput ? nameInput.value.toLowerCase() : '';
+                r.style.display = name.includes(term) ? '' : 'none';
+            });
+        });
+    }
+    calcularUsoServicios();
+    setInterval(calcularUsoServicios, 60000);
+}
+
+async function calcularUsoServicios() {
+    try {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const { data } = await supabase
+            .from('turnos')
+            .select('servicio')
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy);
+        const conteo = {};
+        (data || []).forEach(t => {
+            const k = t.servicio || 'N/A';
+            conteo[k] = (conteo[k] || 0) + 1;
+        });
+        const top = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0];
+        const topEl = document.getElementById('svc-mas-usado');
+        if (topEl) topEl.textContent = top ? `${top[0]} (${top[1]})` : '--';
+        renderServiciosChart(conteo);
+    } catch {}
+}
+
+let serviciosChart;
+function renderServiciosChart(conteo) {
+    const canvas = document.getElementById('servicios-uso-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const labels = Object.keys(conteo);
+    const data = Object.values(conteo);
+    if (serviciosChart) serviciosChart.destroy();
+    serviciosChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Uso de servicios',
+                data,
+                backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'top' } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+document.getElementById('btnGuardarBreakSemanal')?.addEventListener('click', async () => {
+    const weekly = [];
+    for (const d of [1,2,3,4,5,6,0]) {
+        const s = document.getElementById(`brk-${d}-start`)?.value || null;
+        const e = document.getElementById(`brk-${d}-end`)?.value || null;
+        if (s && e) weekly.push({ day: d, start: s, end: e });
+    }
+    try {
+        const { error } = await supabase
+            .from('estado_negocio')
+            .upsert({ negocio_id: negocioId, weekly_breaks: weekly, updated_at: new Date().toISOString() }, { onConflict: 'negocio_id' });
+        if (error) throw error;
+        mostrarNotificacion('Éxito', 'Break semanal guardado', 'success');
+    } catch (e) {
+        mostrarNotificacion('Error', 'No se pudo guardar break semanal', 'error');
+    }
+});
+
+setInterval(async () => {
+    try {
+        const now = new Date();
+        const day = now.getDay();
+        const { data } = await supabase
+            .from('estado_negocio')
+            .select('weekly_breaks,en_break')
+            .eq('negocio_id', negocioId)
+            .maybeSingle();
+        const wb = data?.weekly_breaks || [];
+        const item = wb.find(x => x.day === day);
+        if (!item) return;
+        const parseTime = (t) => { const [h,m] = t.split(':').map(Number); const d = new Date(); d.setHours(h,m,0,0); return d; };
+        const start = parseTime(item.start);
+        const end = parseTime(item.end);
+        if (now >= start && now <= end && !data.en_break) {
+            await iniciarBreak();
+        }
+        if ((now > end) && data.en_break) {
+            await finalizarBreak();
+        }
+    } catch {}
+}, 60000);
 window.exportarAExcel = exportarAExcel;
 window.mostrarTotales = mostrarTotales;
 window.guardarConfiguracion = guardarConfiguracion;
