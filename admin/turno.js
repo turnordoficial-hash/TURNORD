@@ -1,7 +1,7 @@
 import { supabase, ensureSupabase } from '../database.js';
 
-let turnoActual = null;
 let dataRender = []; // Cache of waiting list turns for reordering
+let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
 let HORA_APERTURA = "08:00";
 let HORA_LIMITE_TURNOS = "23:00";
 let LIMITE_TURNOS = 50;
@@ -13,12 +13,17 @@ let isRefreshing = false; // Bandera para evitar ejecuciones simultáneas
 let citasHoy = [];
 let citasFuturas = [];
 let barberosMap = {};
+let clientesMap = {};
+let barberosActivosList = []; // Cache para lógica de disponibilidad
 let __pushSubsCount = 0;
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
  * @returns {string|null} El ID del negocio o null si no está presente.
  */
+
+
+
 function getNegocioId() {
     const id = document.body.dataset.negocioId;
     if (!id) {
@@ -29,6 +34,14 @@ function getNegocioId() {
 }
 
 const negocioId = getNegocioId();
+
+/**
+ * Obtiene el siguiente turno en espera de forma segura.
+ * Reemplaza a la variable global propensa a errores 'turnoActual'.
+ */
+function getSiguienteTurno() {
+    return dataRender.find(t => t.estado === 'En espera') || null;
+}
 
 function iniciarTimerParaTurno(turno) {
     const timerEl = document.getElementById(`timer-${turno.id}`);
@@ -79,6 +92,7 @@ function refrescarUI() {
         
         isRefreshing = true;
         try {
+            await cargarClientesMap();
             await cargarTurnos();
             await cargarEstadisticas();
         } catch (error) {
@@ -138,10 +152,28 @@ async function cargarHoraLimite() {
 async function cargarBarberosMap() {
     const { data } = await supabase
         .from('barberos')
-        .select('id,nombre,usuario')
+        .select('id,nombre,usuario,activo')
         .eq('negocio_id', negocioId);
     barberosMap = {};
-    (data || []).forEach(b => { barberosMap[b.id] = b.nombre || b.usuario; });
+    barberosActivosList = [];
+    (data || []).forEach(b => { 
+        barberosMap[b.id] = b.nombre || b.usuario; 
+        if(b.activo) barberosActivosList.push(b);
+    });
+}
+
+async function cargarClientesMap() {
+    if (!negocioId) return;
+    try {
+        const { data } = await supabase
+            .from('clientes')
+            .select('telefono, nombre')
+            .eq('negocio_id', negocioId);
+        clientesMap = {};
+        (data || []).forEach(c => { if (c.telefono) clientesMap[c.telefono] = c.nombre; });
+    } catch (e) {
+        console.warn('Error cargando mapa de clientes:', e);
+    }
 }
 
 async function cargarPushSubsCount() {
@@ -165,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await cargarHoraLimite();
     await cargarServicios();
     await cargarBarberosMap();
+    await cargarClientesMap();
     await cargarPushSubsCount();
     refrescarUI();
     document.getElementById('refrescar-turnos')?.addEventListener('click', () => {
@@ -499,6 +532,8 @@ async function tomarTurno(event) {
 async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     const hoy = new Date().toISOString().slice(0, 10);
     let tiempoTotal = 0;
+    
+    // Calcular carga actual en minutos (Turnos en atención + Cola de espera)
     try {
         const { data: enAtencion } = await supabase
             .from('turnos')
@@ -506,18 +541,19 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
             .eq('estado', 'En atención')
-            .order('started_at', { ascending: true })
-            .limit(1);
-        if (enAtencion && enAtencion.length) {
-            const servicio = enAtencion[0].servicio;
-            const duracionTotal = serviciosCache[servicio] || 25;
-            const inicio = enAtencion[0].started_at ? new Date(enAtencion[0].started_at) : null;
-            if (inicio) {
-                const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
-                tiempoTotal = Math.max(duracionTotal - transcurrido, 0);
-            } else {
-                tiempoTotal = duracionTotal;
-            }
+            
+        if (enAtencion && enAtencion.length > 0) {
+            enAtencion.forEach(t => {
+                const servicio = t.servicio;
+                const duracionTotal = serviciosCache[servicio] || 25;
+                const inicio = t.started_at ? new Date(t.started_at) : null;
+                if (inicio) {
+                    const transcurrido = Math.floor((Date.now() - inicio.getTime()) / 60000);
+                    tiempoTotal += Math.max(duracionTotal - transcurrido, 0);
+                } else {
+                    tiempoTotal += duracionTotal;
+                }
+            });
         }
     } catch (error) {
         console.warn('Error calculando tiempo de atención:', error);
@@ -543,7 +579,10 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     } catch (error) {
         console.warn('Error calculando tiempo de cola:', error);
     }
-    return tiempoTotal;
+    
+    // ETA Mejorado: Dividir carga entre barberos activos
+    const barberosActivos = Math.max(1, barberosActivosList.length);
+    return Math.ceil(tiempoTotal / barberosActivos);
 }
 
 function obtenerLetraDelDia() {
@@ -599,7 +638,8 @@ async function cargarTurnos() {
             .order('started_at', { ascending: true });
         
         if (resAtencion.error) throw resAtencion.error;
-        enAtencion = resAtencion.data || [];
+        enAtencionCache = resAtencion.data || []; // Actualizar cache global
+        enAtencion = enAtencionCache;
     } catch (e) {
         // Fallback sin ordenar por started_at
         const resAtencionFallback = await supabase
@@ -608,7 +648,8 @@ async function cargarTurnos() {
             .eq('estado', 'En atención')
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy);
-        enAtencion = resAtencionFallback.data || [];
+        enAtencionCache = resAtencionFallback.data || [];
+        enAtencion = enAtencionCache;
     }
 
     let data = [], error = null;
@@ -781,17 +822,18 @@ async function cargarTurnos() {
             iniciarTimerParaTurno(t);
         });
     }
-    const turnoActualDisplay = (enAtencion && enAtencion.length > 0) ? enAtencion[enAtencion.length - 1] : null;
-    // 4. Bug oculto: turnoActual puede ser incorrecto (priorizar el que está en atención)
-    turnoActual = turnoActualDisplay || ((dataRender.length > 0) ? dataRender[0] : null);
-    document.getElementById('turnoActual').textContent = turnoActualDisplay ? turnoActualDisplay.turno : (turnoActual ? turnoActual.turno : '--');
+    
+    // UI: El display muestra el último llamado o el siguiente si no hay nadie
+    const siguiente = getSiguienteTurno();
+    const displayTurno = (enAtencion && enAtencion.length > 0) ? enAtencion[enAtencion.length - 1] : siguiente;
+    document.getElementById('turnoActual').textContent = displayTurno ? displayTurno.turno : '--';
     const clienteActual = document.getElementById('cliente-actual');
     if (clienteActual) {
-        clienteActual.textContent = turnoActualDisplay ? turnoActualDisplay.nombre : (turnoActual ? turnoActual.nombre : '-');
+        clienteActual.textContent = displayTurno ? displayTurno.nombre : '-';
     }
     const tiempoEstimado = document.getElementById('tiempo-estimado');
     if (tiempoEstimado) {
-        const turnoParaEstimar = turnoActualDisplay || turnoActual;
+        const turnoParaEstimar = displayTurno;
         if (turnoParaEstimar) {
             if (turnoParaEstimar.estado === 'En atención') {
                 const inicio = turnoParaEstimar.started_at ? new Date(turnoParaEstimar.started_at) : null;
@@ -898,9 +940,9 @@ async function cargarEstadisticas() {
     try {
         // Cargar datos en paralelo para eficiencia
         const [resAtendidos, resDevueltos, resEspera] = await Promise.all([
-            supabase.from('turnos').select('*').eq('estado', 'Atendido').eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('*').eq('estado', 'Devuelto').eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('*').eq('estado', 'En espera').eq('negocio_id', negocioId).eq('fecha', hoy)
+            supabase.from('turnos').select('id, monto_cobrado, hora').eq('estado', 'Atendido').eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('id, hora').eq('estado', 'Devuelto').eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('id, hora').eq('estado', 'En espera').eq('negocio_id', negocioId).eq('fecha', hoy)
         ]);
 
         if (resAtendidos.error) throw resAtendidos.error;
@@ -1065,7 +1107,7 @@ async function notificarAvanceFila() {
     const promesas = turnosEnEspera.map(async (turno, i) => {
         const posicionEnFila = i + 1;
         const turnosDelante = i;
-        
+
         try {
             let mensaje = '';
             if (posicionEnFila === 1) {
@@ -1080,31 +1122,23 @@ async function notificarAvanceFila() {
                 body: {
                     telefono: turno.telefono,
                     negocio_id: negocioId,
-                    message: {
-                        title: `Turno ${turno.turno} - ${turno.nombre}`,
-                        body: mensaje,
-                        data: {
-                            url: '/usuario_barberia005.html',
-                            posicion: posicionEnFila,
-                            turno: turno.turno
-                        }
-                    }
+                    title: `Turno ${turno.turno} - ${turno.nombre}`,
+                    body: mensaje
                 }
             });
 
             if (error) {
                 console.error(`Error notificando a ${turno.nombre}:`, error.message);
-            } else if (data.success) {
+            } else if (data && data.success) {
                 console.log(`Notificación enviada a ${turno.nombre} (posición ${posicionEnFila})`);
             }
-
         } catch (error) {
             console.error(`Error al notificar a ${turno.nombre}:`, error);
         }
     });
 
     await Promise.all(promesas);
-    
+
     mostrarNotificacion(`Notificaciones de avance enviadas a ${turnosEnEspera.length} clientes.`, 'info');
 }
 
@@ -1126,14 +1160,8 @@ async function notificarSiguienteEnCola() {
             body: {
                 telefono: siguienteTurno.telefono,
                 negocio_id: negocioId,
-                message: {
-                    title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
-                    body: 'Dirígete al local ahora. Es tu momento.',
-                    data: {
-                        url: '/usuario_barberia005.html',
-                        turno: siguienteTurno.turno
-                    }
-                }
+                title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
+                body: 'Dirígete al local ahora. Es tu momento.'
             }
         });
 
@@ -1143,7 +1171,7 @@ async function notificarSiguienteEnCola() {
             return;
         }
 
-        if (data.success) {
+        if (data && data.success) {
             mostrarNotificacion(`Notificación push enviada a ${siguienteTurno.nombre}.`, 'info');
         } else {
              mostrarNotificacion(`Fallo al enviar notificación a ${siguienteTurno.nombre}: ${data.error}`, 'warning');
@@ -1175,10 +1203,8 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
             body: {
                 telefono: telefono,
                 negocio_id: negocioId,
-                message: {
-                    title: `¡Turno confirmado, ${nombre}!`,
-                    body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
-                }
+                title: `¡Turno confirmado, ${nombre}!`,
+                body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
             }
         });
 
@@ -1187,7 +1213,7 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
             return;
         }
 
-        if (data.success) {
+        if (data && data.success) {
             console.log(`Notificación de turno tomado enviada a ${nombre}`);
         } else {
             console.error(`Error al enviar notificación de turno tomado: ${data.error}`);
@@ -1198,24 +1224,47 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
     }
 }
 
+function barberoDisponible(barberId) {
+    // 1. Verificar si tiene turno en atención (usando cache actualizado en cargarTurnos)
+    const tieneTurnoActivo = enAtencionCache.some(t => t.barber_id === barberId);
+    if (tieneTurnoActivo) return false;
+    
+    // 2. Verificar si tiene cita en el momento actual
+    const ahora = new Date();
+    const conflictoCita = citasHoy.find(c => {
+        if (c.barber_id !== barberId) return false;
+        if (c.estado === 'Cancelada' || c.estado === 'Atendida') return false;
+        const start = new Date(c.start_at);
+        const end = new Date(c.end_at);
+        return (ahora >= start && ahora < end);
+    });
+    
+    return !conflictoCita;
+}
+
+function obtenerBarberoSugerido() {
+    // Busca el primer barbero activo que esté disponible
+    return barberosActivosList.find(b => barberoDisponible(b.id)) || null;
+}
+
 async function atenderAhora() {
     // 5. Seguridad: Evitar doble clic en "Atender"
     if (window.__atendiendo) return;
     window.__atendiendo = true;
 
-    if (!turnoActual) {
+    const turnoParaAtender = getSiguienteTurno();
+    if (!turnoParaAtender) {
         mostrarNotificacion('No hay turno en espera.', 'warning');
         window.__atendiendo = false;
         return;
     }
     let barberId = null;
+    
+    // Auto-asignación inteligente si hay un barbero libre sugerido
+    const barberoSugerido = obtenerBarberoSugerido();
+    
     try {
-        const { data } = await supabase
-            .from('barberos')
-            .select('id,nombre,usuario,activo')
-            .eq('negocio_id', negocioId)
-            .eq('activo', true)
-            .order('nombre', { ascending: true });
+        // Usamos la lista cacheada de barberos activos
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
         const box = document.createElement('div');
@@ -1223,7 +1272,13 @@ async function atenderAhora() {
         box.innerHTML = `
           <h3 class="text-lg font-bold mb-4">Seleccionar Barbero</h3>
           <select id="selBarberoAtencion" class="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
-            ${(data || []).map(b => `<option value="${b.id}">${b.nombre || b.usuario}</option>`).join('')}
+            <option value="">-- Seleccionar --</option>
+            ${barberosActivosList.map(b => {
+                const disponible = barberoDisponible(b.id);
+                const estadoStr = disponible ? '🟢 Disponible' : '🔴 Ocupado';
+                const selected = (barberoSugerido && b.id === barberoSugerido.id) ? 'selected' : '';
+                return `<option value="${b.id}" ${selected}>${b.nombre || b.usuario} (${estadoStr})</option>`;
+            }).join('')}
           </select>
           <div class="flex gap-3 justify-end">
             <button id="confirmBarbero" class="px-4 py-2 bg-gray-900 text-white rounded">Confirmar</button>
@@ -1245,6 +1300,14 @@ async function atenderAhora() {
             });
         });
     } catch {}
+    
+    // Validación de disponibilidad del barbero seleccionado
+    if (barberId && !barberoDisponible(barberId)) {
+        mostrarNotificacion('El barbero seleccionado tiene una cita en curso.', 'warning');
+        window.__atendiendo = false;
+        return;
+    }
+
     const ahora = new Date();
     const ventanaMin = 10;
     let citaPrioritaria = null;
@@ -1277,14 +1340,14 @@ async function atenderAhora() {
     const { error } = await supabase
         .from('turnos')
         .update(payloadUpdate)
-        .eq('id', turnoActual.id)
+        .eq('id', turnoParaAtender.id)
         .eq('estado', 'En espera');
     if (error) {
         mostrarNotificacion('Error al atender: ' + error.message, 'error');
         window.__atendiendo = false;
         return;
     }
-    mostrarNotificacion(`Atendiendo turno ${turnoActual.turno}`, 'success');
+    mostrarNotificacion(`Atendiendo turno ${turnoParaAtender.turno}`, 'success');
 
     // Notificar avance de fila a todos los clientes en espera
     await notificarAvanceFila();
@@ -1298,23 +1361,30 @@ function renderCitas() {
     const contFut = document.getElementById('listaCitasFuturas');
     const cntHoy = document.getElementById('contador-citas-hoy');
     const cntFut = document.getElementById('contador-citas-futuras');
-    if (cntHoy) cntHoy.textContent = `${(citasHoy || []).length} citas`;
-    if (cntFut) cntFut.textContent = `${(citasFuturas || []).length} citas`;
+
+    const citasHoyPendientes = (citasHoy || []).filter(c => !c.estado || c.estado === 'Programada');
+    const citasFuturasPendientes = (citasFuturas || []).filter(c => !c.estado || c.estado === 'Programada');
+
+    if (cntHoy) cntHoy.textContent = `${citasHoyPendientes.length} citas`;
+    if (cntFut) cntFut.textContent = `${citasFuturasPendientes.length} citas`;
     if (contHoy) {
         contHoy.innerHTML = '';
-        (citasHoy || []).forEach(c => {
+        citasHoyPendientes.forEach(c => {
             const start = new Date(c.start_at);
             const end = new Date(c.end_at);
             const dur = Math.max(0, Math.round((end - start) / 60000));
             const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
+            const clientName = clientesMap[c.cliente_telefono] || 'Cliente';
             const card = document.createElement('div');
-            card.className = 'bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800 transition-all';
+            card.className = 'bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800 transition-all cursor-pointer hover:shadow-md hover:scale-[1.02]';
+            card.ondblclick = () => abrirModalAccionesCita(c.id, `Cita: ${clientName} - ${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`);
             card.innerHTML = `
               <div class="flex justify-between items-start">
                 <span class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
                 <span class="text-xs bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full">${bName}</span>
               </div>
-              <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${c.cliente_telefono || ''}</p>
+              <p class="text-gray-900 dark:text-white font-bold mt-2 truncate">${clientName}</p>
+              <p class="text-gray-500 dark:text-gray-400 text-xs truncate">${c.cliente_telefono || ''}</p>
               <div class="flex justify-between items-center mt-3">
                 <span class="text-xs text-gray-500 dark:text-gray-400">Hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
                 <span class="text-xs text-gray-500 dark:text-gray-400">${dur} min</span>
@@ -1324,10 +1394,11 @@ function renderCitas() {
     }
     if (contFut) {
         contFut.innerHTML = '';
-        (citasFuturas || []).forEach(c => {
+        citasFuturasPendientes.forEach(c => {
             const start = new Date(c.start_at);
             const end = new Date(c.end_at);
             const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
+            const clientName = clientesMap[c.cliente_telefono] || 'Cliente';
             const card = document.createElement('div');
             card.className = 'bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg shadow-sm border border-violet-100 dark:border-violet-800 transition-all';
             card.innerHTML = `
@@ -1335,7 +1406,8 @@ function renderCitas() {
                 <span class="text-2xl font-bold text-violet-700 dark:text-violet-400">${start.toLocaleDateString('es-ES')} ${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
                 <span class="text-xs bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200 px-2 py-0.5 rounded-full">${bName}</span>
               </div>
-              <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${c.cliente_telefono || ''}</p>`;
+              <p class="text-gray-900 dark:text-white font-bold mt-2 truncate">${clientName}</p>
+              <p class="text-gray-500 dark:text-gray-400 text-xs truncate">${c.cliente_telefono || ''}</p>`;
             contFut.appendChild(card);
         });
     }
@@ -1385,11 +1457,12 @@ async function guardarPago(event) {
 }
 
 async function devolverTurno() {
-    if (!turnoActual) {
+    const turnoParaDevolver = getSiguienteTurno();
+    if (!turnoParaDevolver) {
         mostrarNotificacion('No hay turno que devolver.', 'warning');
         return;
     }
-    if (!confirm(`¿Enviar el turno ${turnoActual.turno} al final de la cola?`)) {
+    if (!confirm(`¿Enviar el turno ${turnoParaDevolver.turno} al final de la cola?`)) {
         return;
     }
     const hoy = new Date().toISOString().slice(0, 10);
@@ -1408,15 +1481,94 @@ async function devolverTurno() {
     const { error } = await supabase
         .from('turnos')
         .update({ orden: nextOrden })
-        .eq('id', turnoActual.id)
+        .eq('id', turnoParaDevolver.id)
         .eq('estado', 'En espera');
     if (error) {
         mostrarNotificacion('Error al devolver turno: ' + error.message, 'error');
         return;
     }
-    mostrarNotificacion(`Turno ${turnoActual.turno} enviado al final de la cola`, 'info');
+    mostrarNotificacion(`Turno ${turnoParaDevolver.turno} enviado al final de la cola`, 'info');
     refrescarUI();
 }
+
+// --- Lógica Modal Acciones Cita ---
+let selectedCitaId = null;
+
+function abrirModalAccionesCita(id, info) {
+    selectedCitaId = id;
+    const infoEl = document.getElementById('infoCitaModal');
+    if(infoEl) infoEl.textContent = info || 'Gestionar cita seleccionada';
+    const modal = document.getElementById('modalAccionesCita');
+    if(modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function cerrarModalAccionesCita() {
+    selectedCitaId = null;
+    const modal = document.getElementById('modalAccionesCita');
+    if(modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+async function confirmarAtenderCita() {
+    if (!selectedCitaId) return;
+    try {
+        // 1. Obtener datos de la cita
+        const { data: cita, error: errCita } = await supabase.from('citas').select('*').eq('id', selectedCitaId).single();
+        if (errCita) throw errCita;
+
+        // 2. Generar nuevo turno para que aparezca en "En Atención"
+        const nuevoTurno = await generarNuevoTurno();
+        
+        // 3. Insertar en turnos
+        const { error: errTurno } = await supabase.from('turnos').insert([{
+            negocio_id: negocioId,
+            turno: nuevoTurno,
+            nombre: cita.cliente_telefono || 'Cita Agendada',
+            telefono: cita.cliente_telefono,
+            servicio: 'Cita Programada',
+            estado: 'En atención',
+            fecha: new Date().toISOString().slice(0, 10),
+            hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+            barber_id: cita.barber_id,
+            started_at: new Date().toISOString()
+        }]);
+        if (errTurno) throw errTurno;
+
+        // 4. Actualizar cita a 'Atendida'
+        await supabase.from('citas').update({ estado: 'Atendida' }).eq('id', selectedCitaId);
+
+        mostrarNotificacion('Cita pasada a atención correctamente', 'success');
+        cerrarModalAccionesCita();
+        refrescarUI();
+    } catch (e) {
+        console.error(e);
+        mostrarNotificacion('Error al atender cita: ' + e.message, 'error');
+    }
+}
+
+async function confirmarCancelarCita() {
+    if (!selectedCitaId) return;
+    if (!confirm('¿Seguro que deseas cancelar esta cita?')) return;
+    try {
+        const { error } = await supabase.from('citas').update({ estado: 'Cancelada' }).eq('id', selectedCitaId);
+        if (error) throw error;
+        mostrarNotificacion('Cita cancelada', 'info');
+        cerrarModalAccionesCita();
+        refrescarUI();
+    } catch (e) {
+        mostrarNotificacion('Error al cancelar: ' + e.message, 'error');
+    }
+}
+
+window.abrirModalAccionesCita = abrirModalAccionesCita;
+window.cerrarModalAccionesCita = cerrarModalAccionesCita;
+window.confirmarAtenderCita = confirmarAtenderCita;
+window.confirmarCancelarCita = confirmarCancelarCita;
 
 function mostrarNotificacion(mensaje, tipo = 'info') {
     const iconos = { success: 'success', error: 'error', warning: 'warning', info: 'info' };
@@ -1547,8 +1699,9 @@ function procesarComandoVoz(transcript) {
     const comandosAtender = ['pasar turno', 'atender turno', 'pase el turno', 'siguiente', 'atender', 'pasar'];
 
     if (comandosSiguiente.some(cmd => transcript.includes(cmd))) {
-        if (turnoActual && turnoActual.nombre) {
-            const texto = `El siguiente turno es de ${turnoActual.nombre}.`;
+        const siguiente = getSiguienteTurno();
+        if (siguiente && siguiente.nombre) {
+            const texto = `El siguiente turno es de ${siguiente.nombre}.`;
             hablar(texto);
             mostrarNotificacion(texto, 'success');
         } else {
@@ -1557,8 +1710,9 @@ function procesarComandoVoz(transcript) {
             mostrarNotificacion(texto, 'warning');
         }
     } else if (comandosAtender.some(cmd => transcript.includes(cmd))) {
-        if (turnoActual) {
-            hablar(`Atendiendo a ${turnoActual.nombre}.`);
+        const siguiente = getSiguienteTurno();
+        if (siguiente) {
+            hablar(`Atendiendo a ${siguiente.nombre}.`);
             atenderAhora();
         } else {
             const texto = 'No hay turnos para atender.';
@@ -1597,12 +1751,12 @@ async function handleDoubleClickDelete(event) {
             try {
                 const { error } = await supabase
                     .from('turnos')
-                    .delete()
+                    .update({ estado: 'Cancelado' }) // Soft delete: Cambiar estado en lugar de borrar
                     .eq('id', turnId);
 
                 if (error) throw error;
 
-                mostrarNotificacion('Turno eliminado con éxito.', 'success');
+                mostrarNotificacion('Turno cancelado con éxito.', 'success');
                 refrescarUI();
             } catch (error) {
                 console.error('Error al eliminar turno:', error);

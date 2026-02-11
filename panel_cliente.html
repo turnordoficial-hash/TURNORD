@@ -375,9 +375,13 @@
     </div>
   </main>
 
+  <script>
+    // Variables globales
+    const negocioId = 'barberia005';
+  </script>
+
   <script type="module">
     import { supabase } from './database.js';
-    const negocioId = 'barberia005';
     const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
     let serviciosCache = {};
     let configCache = null;
@@ -602,15 +606,60 @@
       const hoy = new Date().toISOString().slice(0, 10);
       // Contar gente en espera
       const { count } = await supabase.from('turnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy)
+            .in('estado', ['En espera', 'En atención']);
+      
+      // Contar citas en atención
+      const { count: citasEnAtencion } = await supabase.from('citas')
         .select('*', { count: 'exact', head: true })
         .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .eq('estado', 'En espera');
+        .eq('estado', 'En atención')
+        .gte('start_at', hoy + 'T00:00:00')
+        .lte('start_at', hoy + 'T23:59:59');
       
-      const countVal = count || 0;
-      document.getElementById('personas-delante').textContent = countVal;
+      const totalEnEspera = (count || 0) + (citasEnAtencion || 0);
+      
+      if (totalEnEspera === 0) {
+          document.getElementById('personas-delante').textContent = '0';
+          const pdCita = document.getElementById('personas-delante-cita');
+          if(pdCita) pdCita.textContent = '0';
+
+          document.getElementById('tiempo-espera').textContent = 'Sin espera';
+          const teCita = document.getElementById('tiempo-espera-cita');
+          if(teCita) teCita.textContent = 'Sin espera';
+
+          document.getElementById('quick-espera').textContent = '0';
+          
+          const quickTiempo = document.getElementById('quick-tiempo');
+          quickTiempo.textContent = 'Disponible ahora';
+          quickTiempo.classList.remove('text-3xl');
+          quickTiempo.classList.add('text-xl');
+
+          const quickEstado = document.getElementById('quick-estado');
+          quickEstado.textContent = 'Pasa directamente';
+          quickEstado.className = "inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+
+          // Ocultar tarjeta de turno activo si existe
+          document.getElementById('card-turno-activo')?.classList.add('hidden');
+          
+          // Actualizar barberos activos para mantener consistencia
+          const { count: barberosActivos } = await supabase.from('barberos')
+            .select('*', { count: 'exact', head: true })
+            .eq('negocio_id', negocioId)
+            .eq('activo', true);
+          const activosVal = barberosActivos || 0;
+          document.getElementById('barberos-activos').textContent = activosVal;
+          const baCita = document.getElementById('barberos-activos-cita');
+          if(baCita) baCita.textContent = activosVal;
+
+          return;
+      }
+
+      document.getElementById('personas-delante').textContent = totalEnEspera;
       const pdCita = document.getElementById('personas-delante-cita');
-      if(pdCita) pdCita.textContent = countVal;
+      if(pdCita) pdCita.textContent = totalEnEspera;
 
       // Barberos activos
       const { count: barberosActivos } = await supabase.from('barberos')
@@ -628,28 +677,50 @@
       const duracion = (servicioSel && serviciosCache[servicioSel]) ? serviciosCache[servicioSel] : 30;
 
       // Tiempo estimado híbrido
-      const espera = count || 0;
+      const espera = totalEnEspera;
       const activos = Math.max(1, barberosActivos || 0);
-      const tiempoEstimado = Math.round((espera / activos) * duracion);
       
-      const tiempoVal = `${tiempoEstimado} min`;
+      let tiempoVal = '';
+      let estado = 'Fluida';
+      let badgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+
+      // Lógica inteligente de tiempos (Corrección solicitada)
+      if (espera === 0) {
+          tiempoVal = "¡Pasa directo!";
+          estado = 'Libre';
+      } else if (espera < activos) {
+          tiempoVal = "Atención inmediata";
+          estado = 'Fluida';
+      } else {
+          const tiempoEstimado = Math.round((espera / activos) * duracion);
+          tiempoVal = `${tiempoEstimado} min aprox`;
+          
+          if (espera >= 4 && espera <= 7) { estado = 'Media'; badgeClass = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'; }
+          if (espera >= 8) { estado = 'Alta'; badgeClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'; }
+      }
+      
       document.getElementById('tiempo-espera').textContent = tiempoVal;
       const teCita = document.getElementById('tiempo-espera-cita');
       if(teCita) teCita.textContent = tiempoVal;
 
-      // Estado de la barbería
-      let estado = 'Fluida';
-      let badgeClass = 'bg-green-100 text-green-700';
-      if (espera >= 4 && espera <= 7) { estado = 'Media'; badgeClass = 'bg-yellow-100 text-yellow-700'; }
-      if (espera >= 8) { estado = 'Alta'; badgeClass = 'bg-red-100 text-red-700'; }
-      
       const badge = document.getElementById('estado-barberia-badge');
       badge.textContent = estado;
       badge.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
       
       // Update Micro Dashboard
-      document.getElementById('quick-espera').textContent = countVal;
-      document.getElementById('quick-tiempo').textContent = tiempoVal;
+      document.getElementById('quick-espera').textContent = totalEnEspera;
+      
+      const quickTiempo = document.getElementById('quick-tiempo');
+      quickTiempo.textContent = tiempoVal;
+      // Ajustar tamaño de fuente si es texto largo
+      if (tiempoVal.length > 8) {
+          quickTiempo.classList.remove('text-3xl');
+          quickTiempo.classList.add('text-xl');
+      } else {
+          quickTiempo.classList.add('text-3xl');
+          quickTiempo.classList.remove('text-xl');
+      }
+
       const quickEstado = document.getElementById('quick-estado');
       quickEstado.textContent = estado;
       quickEstado.className = `inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold ${badgeClass}`;
@@ -753,6 +824,9 @@
 
     // Acciones
     window.tomarTurno = async () => {
+      // Solicitar permiso de notificación al interactuar (Mejor práctica UX)
+      if (Notification.permission === 'default') await solicitarPermisoNotificacion();
+
       const servicio = document.getElementById('select-servicio').value;
       if (!servicio) return alert('Selecciona un servicio');
       const barberSel = document.getElementById('select-barbero-turno').value;
@@ -1018,6 +1092,23 @@
         bs.setHours(s[0], s[1], 0, 0); be.setHours(e[0], e[1], 0, 0);
         breaks.push([bs.getTime(), be.getTime()]);
       }
+      
+      // Obtener turnos activos (En atención) para bloquear slots
+      const { data: turnosActivos } = await supabase
+          .from('turnos')
+          .select('started_at, hora, servicio')
+          .eq('negocio_id', negocioId)
+          .eq('barber_id', Number(barberSel))
+          .eq('estado', 'En atención')
+          .eq('fecha', dateStr);
+
+      (turnosActivos || []).forEach(t => {
+          const s = t.started_at ? new Date(t.started_at) : new Date(`${dateStr}T${t.hora}`);
+          const d = serviciosCache[t.servicio] || 30;
+          const e = new Date(s);
+          e.setMinutes(e.getMinutes() + d);
+          breaks.push([s.getTime(), e.getTime()]);
+      });
 
       // Generar slots cada 30 min (estándar)
       const step = 30; 
@@ -1032,6 +1123,11 @@
         // Validar si el slot está en el pasado (si es hoy)
         let isPast = false;
         if (currentSlot.getTime() < now.getTime()) isPast = true;
+
+        // Validar que el servicio cabe antes del cierre
+        const slotEnd = new Date(currentSlot);
+        slotEnd.setMinutes(slotEnd.getMinutes() + dur);
+        if (slotEnd > endDay) break;
 
         // Validar disponibilidad usando la duración del servicio
         const disponible = !isPast && slotDisponible(currentSlot, dur, citas || [], breaks);
@@ -1088,6 +1184,9 @@
     }
 
     async function confirmarReservaManual() {
+        // Solicitar permiso de notificación al interactuar
+        if (Notification.permission === 'default') await solicitarPermisoNotificacion();
+
         if (!window.__horaSeleccionada__) return;
         
         const date = window.__horaSeleccionada__;
@@ -1124,7 +1223,8 @@
                 renderSlotsForSelectedDate(); // Recargar slots
                 
             } catch (e) {
-                alert('No se pudo reservar: ' + e.message);
+                alert('Ese horario acaba de ocuparse o hubo un error. Por favor selecciona otro.');
+                renderSlotsForSelectedDate();
             }
         }
     }

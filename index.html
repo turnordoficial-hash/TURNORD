@@ -30,6 +30,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="imegenlogin/favicon-32x32.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="imegenlogin/apple-touch-icon.png">
 <link rel="manifest" href="imegenlogin/site.webmanifest">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -80,6 +81,31 @@
   }
   .animate-float { animation: float-y 3s ease-in-out infinite; }
   
+  /* Nuevas Micro-animaciones 2D Premium */
+  @keyframes pulse-soft {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(193, 18, 31, 0)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 5px rgba(193, 18, 31, 0.4)); }
+  }
+  .animate-pulse-soft { animation: pulse-soft 3s infinite ease-in-out; }
+
+  @keyframes float-phone {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float-phone { animation: float-phone 4s ease-in-out infinite; }
+
+  @keyframes snip-cut {
+    0%, 100% { transform: rotate(0deg); }
+    10% { transform: rotate(-25deg); }
+    20% { transform: rotate(0deg); }
+  }
+  .animate-snip-cut { animation: snip-cut 5s infinite ease-in-out; transform-origin: center; }
+
+  @keyframes shine-badge {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.1) rotate(3deg); }
+  }
+  .animate-shine { animation: shine-badge 4s infinite ease-in-out; }
 </style>
 
 <!-- Inicializar modo oscuro -->
@@ -93,7 +119,7 @@ inicializarModoOscuro();
 
 </head>
 
-<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
+<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-['Poppins'] transition-colors duration-300">
   <header class="fixed top-0 w-full z-50 bg-barberBlack text-white">
     <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3 font-extrabold text-lg">
@@ -132,7 +158,7 @@ inicializarModoOscuro();
     <div class="absolute inset-0 bg-gradient-to-r from-black/60 to-white/40"></div>
     <div class="relative z-10 max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-10 items-center">
       <div>
-        <h1 class="text-6xl md:text-7xl font-extrabold text-white leading-tight">
+        <h1 class="text-6xl md:text-7xl font-extrabold text-white leading-tight font-['Bebas_Neue'] tracking-wide">
           Estilo.<br>
           Precisión.<br>
           <span class="text-barberRed">JBarber.</span>
@@ -143,13 +169,13 @@ inicializarModoOscuro();
         </p>
         <div class="mt-6 flex flex-wrap gap-4">
           <a href="login_cliente.html" class="px-6 py-3 bg-barberRed text-white font-bold rounded hover:scale-105 transition">
-            Tomar turno
+            Tomar turno ahora 🔥
           </a>
           <a href="login_cliente.html" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
             Agendar cita
           </a>
           <button id="btn-install-hero" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
-            Descargar app
+            Llévate JBarber en tu bolsillo 📲
           </button>
         </div>
       </div>
@@ -167,44 +193,44 @@ inicializarModoOscuro();
 
       <div class="max-w-6xl mx-auto px-6 relative z-10">
         <div class="text-center mb-16 animate-fade-up">
-          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white">¿Por qué JBarber?</h2>
+          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">¿Por qué JBarber?</h2>
           <p class="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">No es solo un corte. Es una experiencia hecha para ti.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <!-- Card 1 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.1s;">
-            <div class="w-14 h-14 bg-barberRed/20 rounded-xl flex items-center justify-center mb-6 text-barberRed group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div class="w-14 h-14 bg-barberRed/20 rounded-xl flex items-center justify-center mb-6 text-barberRed transition-transform duration-300 group-hover:scale-110 group-hover:bg-barberRed group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-pulse-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Turnos en tiempo real</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Turnos en tiempo real</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Tu tiempo vale oro.</strong> Mira la fila en vivo y llega exactamente cuando te toca.</p>
           </div>
 
           <!-- Card 2 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.2s;">
-            <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 text-blue-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+            <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 text-blue-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-float-phone" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">App móvil</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">App móvil</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Todo JBarber en tu bolsillo.</strong> Notificaciones, historial y control total desde tu celular.</p>
           </div>
 
           <!-- Card 3 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.3s;">
-            <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 text-purple-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" /></svg>
+            <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 text-purple-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-snip-cut" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Barberos profesionales</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Barberos profesionales</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Manos expertas.</strong> Técnica, precisión y estilo en cada detalle. Resultados que se notan.</p>
           </div>
 
           <!-- Card 4 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.4s;">
-            <div class="w-14 h-14 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-6 text-yellow-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+            <div class="w-14 h-14 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-6 text-yellow-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-yellow-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-shine" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Atención premium</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Atención premium</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Se siente la diferencia.</strong> Una experiencia cómoda, rápida y pensada solo para ti.</p>
           </div>
         </div>
@@ -222,13 +248,13 @@ inicializarModoOscuro();
             </svg>
           </div>
           <div>
-            <h3 class="text-2xl font-bold text-white">¡Tu estilo te espera!</h3>
+            <h3 class="text-2xl font-bold text-white font-['Bebas_Neue'] tracking-wide">¡Tu estilo te espera!</h3>
             <p class="text-white/90">No esperes más, la silla está lista.</p>
           </div>
         </div>
         <a href="login_cliente.html" class="group relative px-8 py-4 bg-white text-barberRed font-extrabold rounded-full shadow-xl hover:shadow-2xl transition-all hover:scale-105 overflow-hidden">
           <span class="relative z-10 flex items-center gap-2">
-            TOMAR TURNO
+            TOMAR TURNO AHORA 🔥
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </span>
         </a>
@@ -240,7 +266,7 @@ inicializarModoOscuro();
       <div class="max-w-5xl mx-auto px-6">
         <div class="text-center mb-16 animate-fade-up">
           <span class="text-barberRed font-bold tracking-widest uppercase text-xs">Nuestro Menú</span>
-          <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mt-2">Servicios <span class="text-transparent bg-clip-text bg-gradient-to-r from-barberRed to-barberBlue dark:from-white dark:to-gray-500">Premium</span></h2>
+          <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mt-2 font-['Bebas_Neue'] tracking-wide">Servicios <span class="text-transparent bg-clip-text bg-gradient-to-r from-barberRed to-barberBlue dark:from-white dark:to-gray-500">Premium</span></h2>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -252,7 +278,7 @@ inicializarModoOscuro();
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">✂️</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Corte Clásico</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Corte Clásico</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Estilo atemporal con tijera y máquina, acabado perfecto.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -266,7 +292,7 @@ inicializarModoOscuro();
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberBlue rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">💈</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Fade / Degradado</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Fade / Degradado</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Transiciones perfectas y modernas para un look nítido.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -280,7 +306,7 @@ inicializarModoOscuro();
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">🧔</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Barba</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Barba</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Perfilado, toalla caliente y cuidado de la piel.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -294,7 +320,7 @@ inicializarModoOscuro();
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">👑</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Corte + Barba</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Corte + Barba</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">La experiencia completa para renovar tu imagen.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -307,8 +333,8 @@ inicializarModoOscuro();
     <section class="w-full py-24 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-white/5 transition-colors duration-500">
       <div class="max-w-5xl mx-auto px-6">
         <div class="text-center mb-16">
-          <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">¿Cómo funciona <span class="text-barberRed">TurnoRD</span>?</h2>
-          <p class="text-gray-600 dark:text-gray-400 mt-4">Tu corte en 3 simples pasos.</p>
+          <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">¿Cómo funciona <span class="text-barberRed">TurnoRD</span>?</h2>
+          <p class="text-gray-600 dark:text-gray-400 mt-4">Llega cuando te toca, no cuando te llaman.</p>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
@@ -322,7 +348,7 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">1. Regístrate</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">1. Regístrate</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Crea tu perfil en segundos desde tu celular.</p>
           </div>
 
@@ -333,7 +359,7 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">2. Reserva</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">2. Reserva</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Elige tu barbero y toma un turno o agenda cita.</p>
           </div>
 
@@ -344,13 +370,117 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">3. Relájate</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">3. Relájate</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Llega justo a tiempo y disfruta el servicio.</p>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Testimonios Reales -->
+    <section class="w-full py-24 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-white/5 transition-colors duration-500 relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-barberRed to-transparent opacity-50"></div>
+      <div class="max-w-6xl mx-auto px-6 relative z-10">
+        <div class="text-center mb-16 animate-fade-up">
+          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">Lo que dicen nuestros clientes</h2>
+          <p class="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Historias reales de cortes reales.</p>
+        </div>
+
+        <div class="relative max-w-4xl mx-auto bg-white dark:bg-white/5 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-12 border border-gray-100 dark:border-white/10">
+          <!-- Comillas decorativas -->
+          <div class="absolute top-8 left-8 text-6xl text-barberRed opacity-20 font-serif">“</div>
+          
+          <div id="testimonial-carousel" class="relative min-h-[200px] flex items-center justify-center">
+            <!-- Loading -->
+            <div class="animate-pulse flex flex-col items-center">
+              <div class="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+              <div class="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+
+          <!-- Controles -->
+          <div class="flex justify-center gap-4 mt-8">
+            <button id="prev-testimonio" class="p-3 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-barberRed hover:text-white transition-all duration-300 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 dark:text-gray-300 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <button id="next-testimonio" class="p-3 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-barberRed hover:text-white transition-all duration-300 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 dark:text-gray-300 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script type="module">
+      import { supabase } from './database.js';
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        const container = document.getElementById('testimonial-carousel');
+        const prevBtn = document.getElementById('prev-testimonio');
+        const nextBtn = document.getElementById('next-testimonio');
+        
+        let comentarios = [];
+        let currentIndex = 0;
+
+        const render = (idx) => {
+            if (comentarios.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">Aún no hay testimonios. ¡Sé el primero en visitarnos!</p>';
+                return;
+            }
+            const t = comentarios[idx];
+            const stars = '★'.repeat(t.calificacion) + '☆'.repeat(5 - t.calificacion);
+            container.innerHTML = `
+              <div class="flex flex-col items-center justify-center text-center transition-all duration-500 animate-fade-up px-4">
+                <div class="text-yellow-400 text-3xl mb-4 tracking-widest">${stars}</div>
+                <p class="text-xl md:text-2xl text-gray-800 dark:text-gray-200 italic mb-6 leading-relaxed">"${t.comentario}"</p>
+                <h4 class="font-bold text-barberRed text-2xl font-['Bebas_Neue'] tracking-wide">${t.nombre_cliente || 'Cliente Satisfecho'}</h4>
+                <span class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-1 font-bold">Cliente Verificado</span>
+              </div>
+            `;
+        };
+
+        try {
+          const { data } = await supabase
+            .from('comentarios')
+            .select('nombre_cliente, comentario, calificacion')
+            .eq('negocio_id', 'barberia005')
+            .gte('calificacion', 4) // Solo buenos comentarios
+            .order('created_at', { ascending: false })
+            .limit(10);
+            
+          if (data) comentarios = data;
+          render(0);
+
+          // Suscripción Realtime para nuevos comentarios
+          supabase.channel('comentarios-home')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comentarios', filter: "negocio_id=eq.barberia005" }, (payload) => {
+                const nuevo = payload.new;
+                // Solo agregar si es un buen comentario
+                if (nuevo.calificacion >= 4) {
+                    comentarios.unshift(nuevo);
+                    if (comentarios.length > 10) comentarios.pop(); // Mantener lista limpia
+                    currentIndex = 0; // Mostrar el nuevo inmediatamente
+                    render(currentIndex);
+                }
+            })
+            .subscribe();
+          
+          nextBtn.onclick = () => { 
+              if(comentarios.length > 0) {
+                  currentIndex = (currentIndex + 1) % comentarios.length; 
+                  render(currentIndex); 
+              }
+          };
+          prevBtn.onclick = () => { 
+              if(comentarios.length > 0) {
+                  currentIndex = (currentIndex - 1 + comentarios.length) % comentarios.length; 
+                  render(currentIndex); 
+              }
+          };
+          setInterval(() => { if(comentarios.length > 0) nextBtn.click(); }, 6000); // Auto-play
+        } catch (e) { console.error(e); }
+      });
+    </script>
     
 
     <!-- Footer -->
@@ -361,7 +491,16 @@ inicializarModoOscuro();
             <div class="w-8 h-8 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold">J</div>
             <span class="font-extrabold">JBarber</span>
           </div>
-          <p class="text-sm text-gray-300">Barbería premium. Estilo y precisión.</p>
+          <p class="text-sm text-gray-300">Más que un corte, una experiencia.</p>
+          <ul class="mt-4 space-y-2 text-sm text-gray-300">
+            <li>⚡ Sin filas eternas</li>
+            <li>📲 Turnos desde tu celular</li>
+            <li>⏱️ Llega justo a tiempo</li>
+          </ul>
+          <p class="text-xs text-gray-400 mt-4">
+            ⭐ Más de 1,000 clientes satisfechos
+          </p>
+          <p class="mt-6 text-sm text-gray-300 italic">“Tu tiempo vale más que una fila.”</p>
           <div class="mt-4 flex gap-3">
             <button id="btn-install-footer" class="px-5 py-2 bg-barberRed text-white font-bold rounded hover:opacity-90">Descargar App</button>
             <a href="login_cliente.html" class="px-5 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">Agendar cita</a>
@@ -379,8 +518,19 @@ inicializarModoOscuro();
           </ul>
         </div>
         <div>
-          <h4 class="font-bold mb-3">Redes</h4>
-          <p class="text-sm text-gray-300">Instagram • Facebook</p>
+          <h4 class="font-bold mb-3">Síguenos</h4>
+          <div class="flex gap-4">
+            <a href="#" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gradient-to-tr hover:from-yellow-400 hover:via-red-500 hover:to-purple-500 transition-all duration-300 group" aria-label="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+            </a>
+            <a href="https://wa.me/18295877564" target="_blank" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-[#25D366] transition-all duration-300" aria-label="WhatsApp">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
       <div class="text-center text-xs text-gray-500 mt-6">&copy; 2025 JBarber • TurnoRD</div>
@@ -454,16 +604,6 @@ inicializarModoOscuro();
           showSlide(current);
         }, 4000);
       }
-
-      const abejon = document.getElementById('abejon');
-      const carga = document.getElementById('abejon-carga');
-      let dir = 1, x = 0;
-      setInterval(() => {
-        x += dir * 4;
-        if (x > 260 || x < 0) dir *= -1;
-        abejon.style.transform = `translateX(${x}px) perspective(600px) rotateY(${10 * dir}deg)`;
-        carga.style.transform = `translateX(${x}px)`;
-      }, 60);
 
       // Lógica inteligente para botones "Tomar Turno" / "Agendar Cita"
       const negocioId = 'barberia005';

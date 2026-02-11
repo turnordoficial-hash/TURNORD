@@ -32,7 +32,35 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { telefono, negocio_id, title, body } = await req.json();
+    let bodyText;
+    try {
+      bodyText = await req.text();
+      if (!bodyText) {
+        return new Response(
+          JSON.stringify({ error: "Body vacío" }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: "Error leyendo body: " + e.message }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    let telefono, negocio_id, title, body;
+    try {
+      const data = JSON.parse(bodyText);
+      telefono = data.telefono;
+      negocio_id = data.negocio_id;
+      title = data.title;
+      body = data.body;
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: "JSON inválido: " + e.message + " - Body recibido: " + bodyText }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
     if (!telefono || !negocio_id) {
       return new Response(
@@ -45,10 +73,9 @@ serve(async (req) => {
       .from("push_subscriptions")
       .select("subscription")
       .eq("user_id", telefono)
-      .eq("negocio_id", negocio_id)
-      .single();
+      .eq("negocio_id", negocio_id);
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       return new Response(
         JSON.stringify({ error: "Suscripción no encontrada" }),
         { status: 404, headers: corsHeaders }
@@ -62,7 +89,22 @@ serve(async (req) => {
       url: "/panel_cliente.html",
     });
 
-    await webpush.sendNotification(data.subscription, payload);
+    // Iterar sobre todas las suscripciones encontradas para ese teléfono
+    for (const suscripcion of data) {
+      try {
+        await webpush.sendNotification(suscripcion.subscription, payload);
+      } catch (sendError) {
+        console.error("Error al enviar notificación a una suscripción:", sendError);
+        // Si la suscripción es inválida (e.g., 410 Gone), la eliminamos
+        if (sendError.statusCode === 410 || sendError.statusCode === 404) {
+          console.log("Eliminando suscripción inválida:", suscripcion.subscription.endpoint);
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('subscription', suscripcion.subscription);
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({ success: true }),
