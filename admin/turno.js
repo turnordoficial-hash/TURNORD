@@ -2,6 +2,7 @@ import { supabase, ensureSupabase } from '../database.js';
 
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
+let turnoEnAtencionActual = null; // Variable Global de Estado Maestro
 let HORA_APERTURA = "08:00";
 let HORA_LIMITE_TURNOS = "23:00";
 let LIMITE_TURNOS = 50;
@@ -35,12 +36,54 @@ function getNegocioId() {
 
 const negocioId = getNegocioId();
 
+// CONSTANTES DE ESTADO CENTRALIZADAS
+const ESTADOS = {
+    ESPERA: 'En espera',
+    ATENCION: 'En atención',
+    ATENDIDO: 'Atendido',
+    CANCELADO: 'Cancelado',
+    DEVUELTO: 'Devuelto',
+    CITA_PROGRAMADA: 'Programada',
+    CITA_CANCELADA: 'Cancelada',
+    CITA_ATENDIDA: 'Atendida'
+};
+
+// --- MÁQUINA DE ESTADOS CENTRALIZADA ---
+async function cambiarEstadoTurno(turnoId, nuevoEstado, extraData = {}) {
+    if (!turnoId) {
+        mostrarNotificacion("ID de turno inválido", "error");
+        return false;
+    }
+
+    const updateData = {
+        estado: nuevoEstado,
+        ...extraData
+    };
+
+    try {
+        const { error } = await supabase
+            .from("turnos")
+            .update(updateData)
+            .eq("id", turnoId);
+
+        if (error) throw error;
+
+        mostrarNotificacion(`Turno actualizado a: ${nuevoEstado}`, "success");
+        refrescarUI(); // Actualizar toda la interfaz
+        return true;
+    } catch (error) {
+        console.error("Error cambiando estado:", error);
+        mostrarNotificacion("Error al actualizar el turno: " + error.message, "error");
+        return false;
+    }
+}
+
 /**
  * Obtiene el siguiente turno en espera de forma segura.
  * Reemplaza a la variable global propensa a errores 'turnoActual'.
  */
 function getSiguienteTurno() {
-    return dataRender.find(t => t.estado === 'En espera') || null;
+    return dataRender.find(t => t.estado === ESTADOS.ESPERA) || null;
 }
 
 function iniciarTimerParaTurno(turno) {
@@ -92,9 +135,11 @@ function refrescarUI() {
         
         isRefreshing = true;
         try {
-            await cargarClientesMap();
-            await cargarTurnos();
-            await cargarEstadisticas();
+            await Promise.all([
+                cargarClientesMap(),
+                cargarTurnos(),
+                cargarEstadisticas()
+            ]);
         } catch (error) {
             console.error("Error en refrescarUI:", error);
         } finally {
@@ -245,7 +290,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnDevolver')?.addEventListener('click', devolverTurno);
     document.getElementById('btnAtender')?.addEventListener('click', atenderAhora);
     document.getElementById('btnTomarTurnoManual')?.addEventListener('click', abrirModal);
-    document.getElementById('voice-command-button')?.addEventListener('click', iniciarReconocimientoVoz);
     document.getElementById('formTurno')?.addEventListener('submit', tomarTurno);
 
     // 5. Limpieza de canales al salir (Evitar fugas de memoria)
@@ -452,6 +496,14 @@ function esDiaOperativo(date = new Date()) {
 
 async function tomarTurno(event) {
     event.preventDefault();
+    
+    // 3️⃣ Seguridad al Insertar Turno
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        mostrarNotificacion("Sesión expirada", "error");
+        return;
+    }
+
     await cargarHoraLimite();
     if (!esDiaOperativo(new Date())) {
         mostrarNotificacion('Hoy no es un día operacional.', 'error');
@@ -539,7 +591,7 @@ async function tomarTurno(event) {
         nombre: nombre,
         telefono: telefono,
         servicio: servicio,
-        estado: 'En espera',
+        estado: ESTADOS.ESPERA,
         hora: horaStr, // Se mantiene hora string para visualización
         fecha: hoy
         // orden: OMITIDO - El trigger DB lo asignará atómicamente
@@ -573,14 +625,14 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
             .select('barber_id, servicio, started_at')
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
-            .eq('estado', 'En atención');
+            .eq('estado', ESTADOS.ATENCION);
         enAtencion = resAtencion.data || [];
 
         const resCola = await supabase
             .from('turnos')
             .select('turno, servicio')
             .eq('negocio_id', negocioId)
-            .eq('estado', 'En espera')
+            .eq('estado', ESTADOS.ESPERA)
             .order('orden', { ascending: true })
             .order('created_at', { ascending: true });
         cola = resCola.data || [];
@@ -631,7 +683,7 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
                 // Buscar citas que bloqueen este intervalo
                 const citaBloqueante = citasHoy.find(c => {
                     if (c.barber_id !== barberId) return false;
-                    if (c.estado === 'Cancelada' || c.estado === 'Atendida' || c.estado === 'En atención') return false;
+                    if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
                     
                     const appStart = new Date(c.start_at);
                     const appEnd = new Date(c.end_at);
@@ -738,7 +790,7 @@ async function cargarTurnos() {
         const resAtencion = await supabase
             .from('turnos')
             .select('*')
-            .eq('estado', 'En atención')
+            .eq('estado', ESTADOS.ATENCION)
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
             .order('started_at', { ascending: true });
@@ -751,19 +803,33 @@ async function cargarTurnos() {
         const resAtencionFallback = await supabase
             .from('turnos')
             .select('*')
-            .eq('estado', 'En atención')
+            .eq('estado', ESTADOS.ATENCION)
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy);
         enAtencionCache = resAtencionFallback.data || [];
         enAtencion = enAtencionCache;
     }
 
+    // Actualizar estado maestro
+    turnoEnAtencionActual = enAtencion.length > 0 ? enAtencion[0] : null;
+
+    // --- CÁLCULO DE INGRESOS HOY ---
+    const { data: atendidosHoy } = await supabase
+        .from('turnos')
+        .select('monto_cobrado')
+        .eq('negocio_id', negocioId)
+        .eq('fecha', hoy)
+        .eq('estado', ESTADOS.ATENDIDO);
+    const totalIngresos = atendidosHoy?.reduce((sum, t) => sum + (t.monto_cobrado || 0), 0) || 0;
+    const indicadorIngresos = document.getElementById('total-ingresos-hoy');
+    if (indicadorIngresos) indicadorIngresos.textContent = `RD$ ${totalIngresos.toLocaleString('es-DO', {minimumFractionDigits: 2})}`;
+
     let data = [], error = null;
     try {
         const resEspera = await supabase
             .from('turnos')
             .select('*')
-            .eq('estado', 'En espera')
+            .eq('estado', ESTADOS.ESPERA)
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
             .order('orden', { ascending: true })
@@ -776,7 +842,7 @@ async function cargarTurnos() {
         const resEsperaFallback = await supabase
             .from('turnos')
             .select('*')
-            .eq('estado', 'En espera')
+            .eq('estado', ESTADOS.ESPERA)
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
             .order('created_at', { ascending: true });
@@ -868,9 +934,31 @@ async function cargarTurnos() {
     // Pre-calcular tiempo estimado para cada turno en la lista usando el modelo PRO
     // Esto es solo visual para la lista, el cálculo real se hace bajo demanda o en background si es costoso
     const tiempoTotalCola = await calcularTiempoEstimadoTotal(); // Calcula para el final de la cola
+    
+    // --- MODO CONCENTRACIÓN ---
+    const containerEspera = document.getElementById('contenedor-lista-espera');
+    const btnFinalizar = document.getElementById('btnFinalizarGlobal');
+    const btnAtender = document.getElementById('btnAtender');
 
-    for (let index = 0; index < dataRender.length; index++) {
-        const t = dataRender[index];
+    if (enAtencion.length > 0) {
+        // Hay turno activo: Ocultar espera, mostrar finalizar
+        if (containerEspera) containerEspera.style.display = 'none';
+        if (btnFinalizar) {
+            btnFinalizar.classList.remove('hidden');
+            btnFinalizar.onclick = () => abrirModalPago(enAtencion[0].id); // Asume single-flow por ahora
+        }
+        if (btnAtender) btnAtender.classList.add('hidden');
+    } else {
+        if (containerEspera) containerEspera.style.display = 'block';
+        if (btnFinalizar) btnFinalizar.classList.add('hidden');
+        if (btnAtender) btnAtender.classList.remove('hidden');
+    }
+
+    // Renderizar solo los primeros 20 (Optimización de rendimiento)
+    const turnosVisibles = dataRender.slice(0, 20);
+    const divisor = dataRender.length || 1; // Protección contra división por cero
+    for (let index = 0; index < turnosVisibles.length; index++) {
+        const t = turnosVisibles[index];
         const div = document.createElement('div');
         div.className = 'turn-card-espera bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md cursor-grab';
         div.dataset.id = t.id;
@@ -884,7 +972,7 @@ async function cargarTurnos() {
         // Nota: Para la lista individual, mostrar un estimado simple o llamar a calcularTiempoEstimadoTotal(t.turno)
         // Para rendimiento, aquí mostramos un aproximado simple basado en posición, 
         // pero el sistema global usa el cálculo PRO.
-        const tiempoAprox = Math.round(tiempoTotalCola * ((index + 1) / dataRender.length));
+        const tiempoAprox = Math.round(tiempoTotalCola * ((index + 1) / divisor));
 
         div.innerHTML = `
       <div class="flex justify-between items-start">
@@ -934,7 +1022,7 @@ async function cargarTurnos() {
     if (tiempoEstimado) {
         const turnoParaEstimar = displayTurno;
         if (turnoParaEstimar) {
-            if (turnoParaEstimar.estado === 'En atención') {
+            if (turnoParaEstimar.estado === ESTADOS.ATENCION) {
                 const inicio = turnoParaEstimar.started_at ? new Date(turnoParaEstimar.started_at) : null;
                 if (inicio) {
                     const trans = Math.max(0, Math.floor((Date.now() - inicio.getTime()) / 60000));
@@ -1038,9 +1126,9 @@ async function cargarEstadisticas() {
     try {
         // Cargar datos en paralelo para eficiencia
         const [resAtendidos, resDevueltos, resEspera] = await Promise.all([
-            supabase.from('turnos').select('id, monto_cobrado, hora').eq('estado', 'Atendido').eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('id, hora').eq('estado', 'Devuelto').eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('id, hora').eq('estado', 'En espera').eq('negocio_id', negocioId).eq('fecha', hoy)
+            supabase.from('turnos').select('id, monto_cobrado, hora').eq('estado', ESTADOS.ATENDIDO).eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('id, hora').eq('estado', ESTADOS.DEVUELTO).eq('negocio_id', negocioId).eq('fecha', hoy),
+            supabase.from('turnos').select('id, hora').eq('estado', ESTADOS.ESPERA).eq('negocio_id', negocioId).eq('fecha', hoy)
         ]);
 
         if (resAtendidos.error) throw resAtendidos.error;
@@ -1199,7 +1287,7 @@ function cerrarModalPago() {
 async function notificarAvanceFila() {
     if (__pushSubsCount === 0) return;
     // Optimización: Solo notificar a los primeros 5 de la fila para evitar rate limits y costos
-    const turnosEnEspera = dataRender.filter(turno => turno.estado === 'En espera').slice(0, 5);
+    const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 5);
     
     if (turnosEnEspera.length === 0) {
         console.log('No hay turnos en espera para notificar avance de fila');
@@ -1336,7 +1424,7 @@ function barberoDisponible(barberId) {
     const ahora = new Date();
     const conflictoCita = citasHoy.find(c => {
         if (c.barber_id !== barberId) return false;
-        if (c.estado === 'Cancelada' || c.estado === 'Atendida') return false;
+        if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA) return false;
         const start = new Date(c.start_at);
         const end = new Date(c.end_at);
         return (ahora >= start && ahora < end);
@@ -1357,7 +1445,7 @@ function barberoTieneTiempo(barberId, duracionMinutos) {
     // Buscar la próxima cita programada para este barbero hoy
     const proximaCita = citasHoy.find(c => {
         if (c.barber_id !== barberId) return false;
-        if (c.estado === 'Cancelada' || c.estado === 'Atendida' || c.estado === 'En atención') return false;
+        if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
         const start = new Date(c.start_at);
         return start > ahora;
     });
@@ -1466,7 +1554,7 @@ async function atenderAhora() {
             const start = new Date(c.start_at);
             const end = new Date(c.end_at);
             const inicioVentana = new Date(start.getTime() - ventanaMin * 60000);
-            return c.barber_id === barberId && ahora >= inicioVentana && ahora <= end && (c.estado === 'Programada' || !c.estado);
+            return c.barber_id === barberId && ahora >= inicioVentana && ahora <= end && (c.estado === ESTADOS.CITA_PROGRAMADA || !c.estado);
         });
     }
     if (citaPrioritaria) {
@@ -1490,15 +1578,13 @@ async function atenderAhora() {
         window.__atendiendo = false;
         return;
     }
-    const payloadUpdate = { estado: 'En atención', started_at: new Date().toISOString() };
+    
+    const payloadUpdate = { started_at: new Date().toISOString() };
     if (barberId) payloadUpdate.barber_id = barberId;
-    const { error } = await supabase
-        .from('turnos')
-        .update(payloadUpdate)
-        .eq('id', turnoParaAtender.id)
-        .eq('estado', 'En espera');
-    if (error) {
-        mostrarNotificacion('Error al atender: ' + error.message, 'error');
+    
+    const exito = await cambiarEstadoTurno(turnoParaAtender.id, ESTADOS.ATENCION, payloadUpdate);
+    
+    if (!exito) {
         window.__atendiendo = false;
         return;
     }
@@ -1507,7 +1593,6 @@ async function atenderAhora() {
     // Notificar avance de fila a todos los clientes en espera
     await notificarAvanceFila();
 
-    refrescarUI();
     window.__atendiendo = false;
 }
 
@@ -1517,8 +1602,8 @@ function renderCitas() {
     const cntHoy = document.getElementById('contador-citas-hoy');
     const cntFut = document.getElementById('contador-citas-futuras');
 
-    const citasHoyPendientes = (citasHoy || []).filter(c => !c.estado || c.estado === 'Programada');
-    const citasFuturasPendientes = (citasFuturas || []).filter(c => !c.estado || c.estado === 'Programada');
+    const citasHoyPendientes = (citasHoy || []).filter(c => !c.estado || c.estado === ESTADOS.CITA_PROGRAMADA);
+    const citasFuturasPendientes = (citasFuturas || []).filter(c => !c.estado || c.estado === ESTADOS.CITA_PROGRAMADA);
 
     if (cntHoy) cntHoy.textContent = `${citasHoyPendientes.length} citas`;
     if (cntFut) cntFut.textContent = `${citasFuturasPendientes.length} citas`;
@@ -1589,17 +1674,13 @@ async function guardarPago(event) {
        return;
     }
 
-    const { error } = await supabase
-        .from('turnos')
-        .update({
-            estado: 'Atendido',
-            monto_cobrado: monto,
-            metodo_pago: metodoPago,
-            ended_at: new Date().toISOString()
-        })
-        .eq('id', activeTurnIdForPayment);
-    if (error) {
-        mostrarNotificacion('Error al guardar el pago: ' + error.message, 'error');
+    const exito = await cambiarEstadoTurno(activeTurnIdForPayment, ESTADOS.ATENDIDO, {
+        monto_cobrado: monto,
+        metodo_pago: metodoPago,
+        ended_at: new Date().toISOString()
+    });
+
+    if (!exito) {
         return;
     }
     cerrarModalPago();
@@ -1607,8 +1688,6 @@ async function guardarPago(event) {
     
     // Notificar avance de fila después de completar un turno
     await notificarAvanceFila();
-    
-    refrescarUI();
 }
 
 async function devolverTurno() {
@@ -1685,7 +1764,7 @@ async function confirmarCancelarCita() {
     if (!selectedCitaId) return;
     if (!confirm('¿Seguro que deseas cancelar esta cita?')) return;
     try {
-        const { error } = await supabase.from('citas').update({ estado: 'Cancelada' }).eq('id', selectedCitaId);
+        const { error } = await supabase.from('citas').update({ estado: ESTADOS.CITA_CANCELADA }).eq('id', selectedCitaId);
         if (error) throw error;
         mostrarNotificacion('Cita cancelada', 'info');
         cerrarModalAccionesCita();
@@ -1881,7 +1960,7 @@ async function handleDoubleClickDelete(event) {
             try {
                 const { error } = await supabase
                     .from('turnos')
-                    .update({ estado: 'Cancelado' }) // Soft delete: Cambiar estado en lugar de borrar
+                    .update({ estado: ESTADOS.CANCELADO }) // Soft delete: Cambiar estado en lugar de borrar
                     .eq('id', turnId);
 
                 if (error) throw error;

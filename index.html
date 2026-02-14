@@ -4,6 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>JBarber • Barbería Premium</title>
+<meta name="description" content="Reserva tu turno en JBarber sin hacer filas. La mejor experiencia de barbería en República Dominicana. Cortes, barba y estilo premium.">
+<meta name="keywords" content="barbería, turnos, app, corte de pelo, república dominicana, jbarber, estilo">
+<meta name="author" content="JBarber">
+
+<!-- Open Graph / Facebook / WhatsApp -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tu-dominio.com/">
+<meta property="og:title" content="JBarber • Tu estilo, sin esperas">
+<meta property="og:description" content="Reserva tu turno en segundos y olvídate de las filas. Descarga la App hoy.">
+<meta property="og:image" content="jbarber/j1.jpg">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="https://tu-dominio.com/">
+<meta property="twitter:title" content="JBarber • Barbería Premium">
+<meta property="twitter:description" content="Reserva tu turno en segundos y olvídate de las filas.">
+<meta property="twitter:image" content="jbarber/j1.jpg">
 
 <!-- Base dinámico -->
 <script>
@@ -28,8 +45,9 @@
 <link rel="icon" type="image/png" href="jbarber/jjj.png" />
 <link rel="apple-touch-icon" href="jbarber/jjj.png" />
 <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
-<link rel="manifest" href="imegenlogin/site.webmanifest">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C1121F">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -156,6 +174,29 @@
   .gallery-card:hover .gallery-overlay span {
     transform: translateY(0);
   }
+
+  /* Barber Stripes Animation */
+  @keyframes barberpole {
+    from { background-position: 0 0; }
+    to { background-position: 40px 40px; }
+  }
+  .barber-stripes {
+    background-image: linear-gradient(45deg, 
+      #C1121F 25%, 
+      #ffffff 25%, 
+      #ffffff 50%, 
+      #003049 50%, 
+      #003049 75%, 
+      #ffffff 75%, 
+      #ffffff 100%
+    );
+    background-size: 40px 40px;
+    animation: barberpole 3s linear infinite;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  .dark .barber-stripes {
+      background-image: linear-gradient(45deg, #C1121F 25%, #18181b 25%, #18181b 50%, #003049 50%, #003049 75%, #18181b 75%, #18181b 100%);
+  }
 </style>
 
 <!-- Inicializar modo oscuro -->
@@ -169,25 +210,35 @@ inicializarModoOscuro();
 
 </head>
 
-<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-['Poppins'] transition-colors duration-300">
-  <header class="fixed top-0 w-full z-50 bg-barberBlack text-white">
+<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-['Outfit'] transition-colors duration-300">
+  <header class="fixed top-0 w-full z-50 bg-barberBlack/95 backdrop-blur-md text-white border-b border-white/10 transition-all duration-300">
     <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <!-- Logo -->
       <div class="flex items-center gap-3 font-extrabold text-lg">
-        <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded object-cover">
-        JBarber
+        <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded object-cover shadow-lg shadow-red-900/20">
+        <span class="tracking-tight">JBarber</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a href="login_cliente.html" class="px-4 py-2 bg-barberRed rounded font-bold hover:opacity-90">
-          Tomar turno
-        </a>
-        <a href="login_cliente.html" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Agendar cita
-        </a>
-        <a href="#servicios" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Servicios
-        </a>
-        <button id="btn-install-header" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Descargar app
+
+      <!-- Desktop Nav -->
+      <div class="hidden md:flex items-center gap-4">
+        <button class="install-trigger px-5 py-2 bg-barberRed rounded-full font-bold hover:bg-red-700 transition shadow-lg shadow-red-900/20 text-sm text-white">
+          📲 Descargar y Tomar Turno
+        </button>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button id="mobile-menu-btn" class="md:hidden p-2 text-white hover:text-barberRed transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu (Hidden by default) -->
+    <div id="mobile-menu" class="hidden md:hidden bg-barberBlack border-t border-white/10 absolute w-full left-0 top-16 shadow-2xl animate-fade-up">
+      <div class="flex flex-col p-6 space-y-4">
+        <button class="install-trigger block w-full text-center px-4 py-3 bg-barberRed rounded-xl font-bold hover:bg-red-700 transition text-white shadow-lg">
+          📲 Descargar y Tomar Turno
         </button>
       </div>
     </div>
@@ -205,28 +256,28 @@ inicializarModoOscuro();
 
   <section class="relative min-h-[90vh] pt-24">
     <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?q=80&w=2074&auto=format&fit=crop" alt="Barbería" class="absolute inset-0 w-full h-full object-cover">
-    <div class="absolute inset-0 bg-gradient-to-r from-black/60 to-white/40"></div>
+    <div class="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40"></div>
     <div class="relative z-10 max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-10 items-center">
       <div>
         <h1 class="text-6xl md:text-7xl font-extrabold text-white leading-tight font-['Bebas_Neue'] tracking-wide">
-          Estilo.<br>
-          Precisión.<br>
-          <span class="text-barberRed">JBarber.</span>
+          Tu estilo habla antes que tú.<br>
+          <span class="text-barberRed">Reserva sin esperar.</span>
         </h1>
         <p class="mt-4 text-barberWhite max-w-md">
-          Barbería moderna donde tu tiempo se respeta.
-          Turnos en vivo, citas rápidas y atención premium.
+          Descarga la app, mira la fila en tiempo real y llega justo cuando te toca.
         </p>
-        <div class="mt-6 flex flex-wrap gap-4">
-          <a href="login_cliente.html" class="px-6 py-3 bg-barberRed text-white font-bold rounded hover:scale-105 transition">
-            Tomar turno ahora 🔥
-          </a>
-          <a href="login_cliente.html" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
-            Agendar cita
-          </a>
-          <button id="btn-install-hero" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
-            Llévate JBarber en tu bolsillo 📲
+        <div class="mt-6 flex flex-col gap-3">
+          <div class="bg-barberRed text-white px-4 py-2 rounded-full text-sm inline-block animate-pulse">🔥 Disponible hoy • Sin filas</div>
+          <button class="install-trigger px-8 py-4 bg-white text-barberBlack font-extrabold rounded-full hover:scale-105 transition-all shadow-xl flex items-center justify-center gap-3">
+            📲 Descargar y Tomar Turno
           </button>
+          <p id="fila-live" class="text-sm text-yellow-300 mt-2 font-semibold flex items-center gap-2">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            Consultando disponibilidad...
+          </p>
+          <p class="text-sm text-white/80">
+            ✔ Sin registro complicado • ✔ Toma turno en menos de 30 segundos • ✔ 1,000+ clientes ya la usan
+          </p>
         </div>
       </div>
     </div>
@@ -324,7 +375,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="/TURNORD-main/jbarber/j1.jpg" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="jbarber/j1.jpg" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">✂️</div>
@@ -338,7 +389,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="/TURNORD-main/jbarber/j11.jpg" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="jbarber/j11.jpg" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberBlue rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">💈</div>
@@ -352,7 +403,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="/TURNORD-main/jbarber/j6.jpg" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="jbarber/j6.jpg" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">🧔</div>
@@ -366,7 +417,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="/TURNORD-main/jbarber/j2.jpg" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="jbarber/j2.jpg" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">👑</div>
@@ -393,74 +444,74 @@ inicializarModoOscuro();
 
             <div class="gallery-grid">
               <div class="gallery-card">
-                <img src="jbarber/j1.jpg" alt="Corte Premium" loading="lazy">
+                <img src="jbarber/j1.jpg" alt="Corte Premium" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Corte Premium</span>
                 </div>
               </div>
 
               <div class="gallery-card">
-                <img src="jbarber/j11.jpg" alt="Fade moderno" loading="lazy">
+                <img src="jbarber/j11.jpg" alt="Fade moderno" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Fade moderno</span>
                 </div>
               </div>
               
               <div class="gallery-card">
-                <img src="jbarber/j12.jpg" alt="Corte Premium" loading="lazy">
+                <img src="jbarber/j12.jpg" alt="Corte Premium" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Corte Premium</span>
                 </div>
               </div>
               <div class="gallery-card">
-                <img src="jbarber/j13.jpg" alt="Estilo Moderno" loading="lazy">
+                <img src="jbarber/j13.jpg" alt="Estilo Moderno" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Estilo Moderno</span>
                 </div>
               </div>
               <div class="gallery-card">
-                <img src="jbarber/j2.jpg" alt="Diseño exclusivo" loading="lazy">
+                <img src="jbarber/j2.jpg" alt="Diseño exclusivo" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Diseño exclusivo</span>
                 </div>
               </div>
               
               <div class="gallery-card">
-                <img src="jbarber/j6.jpg" alt="Barba premium" loading="lazy">
+                <img src="jbarber/j6.jpg" alt="Barba premium" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Barba premium</span>
                 </div>
               </div>
               <div class="gallery-card">
-                <img src="jbarber/j3.jpg" alt="Ambiente VIP" loading="lazy">
+                <img src="jbarber/j3.jpg" alt="Ambiente VIP" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Ambiente VIP</span>
                 </div>
               </div>
               <div class="gallery-card">
-                <img src="jbarber/j1.jpg" alt="Estilo Urbano" loading="lazy">
+                <img src="jbarber/j1.jpg" alt="Estilo Urbano" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay">
                   <span>Estilo Urbano</span>
                 </div>
               </div>
 
               <div class="gallery-card">
-                <img src="jbarber/j15.jpg" alt="Tendencia" loading="lazy">
+                <img src="jbarber/j15.jpg" alt="Tendencia" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay"><span>Tendencia</span></div>
               </div>
 
               <div class="gallery-card">
-                <img src="jbarber/j16.jpg" alt="Precisión" loading="lazy">
+                <img src="jbarber/j16.jpg" alt="Precisión" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay"><span>Precisión</span></div>
               </div>
 
               <div class="gallery-card">
-                <img src="jbarber/j17.jpg" alt="Arte" loading="lazy">
+                <img src="jbarber/j17.jpg" alt="Arte" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay"><span>Arte</span></div>
               </div>
 
                 <div class="gallery-card">
-                <img src="jbarber/j18.jpg" alt="Tendencia" loading="lazy">
+                <img src="jbarber/j18.jpg" alt="Tendencia" loading="lazy" onclick="openLightbox(this.src)">
                 <div class="gallery-overlay"><span>Tendencia</span></div>
               </div>
 
@@ -570,6 +621,11 @@ inicializarModoOscuro();
     <script type="module">
       import { supabase } from './database.js';
 
+      // Registrar Service Worker para PWA
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+      }
+
       document.addEventListener('DOMContentLoaded', async () => {
         const container = document.getElementById('testimonial-carousel');
         const prevBtn = document.getElementById('prev-testimonio');
@@ -621,6 +677,23 @@ inicializarModoOscuro();
         }
 
         render(0);
+        
+        // --- URGENCIA REALTIME (Fila Live) ---
+        const filaLive = document.getElementById("fila-live");
+        async function actualizarFila() {
+          const hoy = new Date().toISOString().slice(0, 10);
+          const { count, error } = await supabase
+            .from("turnos")
+            .select("id", { count: "exact", head: true })
+            .eq("negocio_id", "barberia005")
+            .eq("fecha", hoy)
+            .eq("estado", "En espera");
+
+          if (!error && filaLive) {
+             filaLive.innerHTML = `🔥 Ahora mismo hay <span class="text-white font-bold text-lg mx-1">${count || 0}</span> personas esperando`;
+          }
+        }
+        actualizarFila();
 
         // Suscripción Realtime para nuevos comentarios
         supabase.channel('comentarios-home')
@@ -633,6 +706,9 @@ inicializarModoOscuro();
                     currentIndex = 0; // Mostrar el nuevo inmediatamente
                     render(currentIndex);
                 }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: "negocio_id=eq.barberia005" }, () => {
+                actualizarFila();
             })
             .subscribe();
           nextBtn.onclick = () => { 
@@ -648,6 +724,20 @@ inicializarModoOscuro();
               }
           };
           if (comentarios.length > 1) setInterval(() => { nextBtn.click(); }, 6000); // Auto-play
+          
+          // --- LIGHTBOX LOGIC ---
+          window.openLightbox = (src) => {
+            const lb = document.getElementById('lightbox');
+            const img = document.getElementById('lightbox-img');
+            img.src = src;
+            lb.classList.remove('hidden');
+            setTimeout(() => lb.classList.remove('opacity-0'), 10);
+          }
+          window.closeLightbox = () => {
+            const lb = document.getElementById('lightbox');
+            lb.classList.add('opacity-0');
+            setTimeout(() => lb.classList.add('hidden'), 300);
+          }
       });
     </script>
     
@@ -671,9 +761,10 @@ inicializarModoOscuro();
           </p>
           <p class="mt-6 text-sm text-gray-300 italic">“Tu tiempo vale más que una fila.”</p>
           <div class="mt-4 flex gap-3">
-            <button id="btn-install-footer" class="px-5 py-2 bg-barberRed text-white font-bold rounded hover:opacity-90">Descargar App</button>
-            <a href="login_cliente.html" class="px-5 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">Agendar cita</a>
-            <a href="login_cliente.html" class="px-5 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">Tomar turno</a>
+            <button class="install-trigger px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-full hover:bg-white hover:text-barberBlack transition-all shadow-lg flex items-center gap-2 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              📲 Descargar y Tomar Turno
+            </button>
           </div>
         </div>
         <div>
@@ -703,8 +794,9 @@ inicializarModoOscuro();
         </div>
       </div>
       <div class="text-center text-xs text-gray-500 mt-6">&copy; 2025 JBarber • TurnoRD</div>
+    
     </footer>
-  </div>
+  
 
   <!-- WhatsApp Button -->
   <a href="https://wa.me/18295877564" target="_blank" class="fixed bottom-6 right-6 z-50 flex items-center justify-center w-16 h-16 bg-[#25D366] text-white rounded-full shadow-[0_0_20px_rgba(37,211,102,0.5)] hover:shadow-[0_0_30px_rgba(37,211,102,0.8)] hover:scale-110 transition-all duration-300 animate-bounce-in group">
@@ -715,6 +807,17 @@ inicializarModoOscuro();
     </span>
   </a>
 
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="fixed inset-0 z-[100] bg-black/95 hidden items-center justify-center p-4 opacity-0 transition-opacity duration-300 backdrop-blur-sm">
+    <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white text-5xl hover:text-barberRed transition-colors">&times;</button>
+    <div class="relative max-w-4xl w-full flex flex-col items-center">
+        <img id="lightbox-img" src="jbarber/jjj.png" class="w-full h-auto max-h-[70vh] object-contain rounded-lg shadow-2xl border border-white/10">
+        <a href="login_cliente.html" class="mt-8 px-10 py-4 bg-barberRed text-white font-bold rounded-full text-xl shadow-[0_0_30px_rgba(193,18,31,0.6)] hover:scale-105 transition-transform flex items-center gap-3 animate-bounce-in">
+            RESERVAR ESTE ESTILO 🔥
+        </a>
+    </div>
+  </div>
+
   <!-- Script modo oscuro -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -724,41 +827,7 @@ inicializarModoOscuro();
         localStorage.setItem('modoOscuro', isDarkMode);
       });
 
-      // Lógica del botón de instalación PWA
-      let deferredPrompt;
-      const installBtn = document.getElementById('btn-install-app');
-      const installBtnCta = document.getElementById('btn-install-app-cta');
-      const installBtnHeader = document.getElementById('btn-install-header');
-      const installBtnHero = document.getElementById('btn-install-hero');
-      const installBtnFooter = document.getElementById('btn-install-footer');
-      
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installBtn?.classList.remove('hidden');
-      });
-
-      installBtn?.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          console.log(`Resultado instalación: ${outcome}`);
-          deferredPrompt = null;
-          if(outcome === 'accepted') installBtn.classList.add('hidden');
-        }
-      });
-      const triggerInstall = async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          if(outcome === 'accepted') installBtn?.classList.add('hidden');
-        }
-      };
-      installBtnCta?.addEventListener('click', triggerInstall);
-      installBtnHeader?.addEventListener('click', triggerInstall);
-      installBtnHero?.addEventListener('click', triggerInstall);
-      installBtnFooter?.addEventListener('click', triggerInstall);
+      const negocioId = 'barberia005';
       const slides = document.querySelectorAll('#testimonialsCarousel .carousel-slide');
       const dots = document.querySelectorAll('#testimonialsCarousel .dot');
       if (slides.length) {
@@ -774,20 +843,59 @@ inicializarModoOscuro();
         }, 4000);
       }
 
-      // Lógica inteligente para botones "Tomar Turno" / "Agendar Cita"
-      const negocioId = 'barberia005';
-      const authLinks = document.querySelectorAll('a[href="login_cliente.html"]');
-      authLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
-          // Si ya existe sesión, ir directo al panel
-          window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
-        });
+      // --- LÓGICA DE INSTALACIÓN PWA (CORREGIDA) ---
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+      let deferredPrompt;
+      
+      // Escuchar el evento de instalación lo antes posible
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('App lista para instalar');
+      });
+
+      // Asignar acción a TODOS los botones de descarga/instalación
+      const installButtons = document.querySelectorAll('.install-trigger, a[download][href="login_cliente.html"]');
+      installButtons.forEach(btn => {
+          btn.addEventListener('click', async () => {
+              if (deferredPrompt) {
+                  // Si se puede instalar, mostramos el prompt nativo
+                  deferredPrompt.prompt();
+                  const { outcome } = await deferredPrompt.userChoice;
+                  deferredPrompt = null;
+              } else {
+                  // Si ya está instalada o no es compatible, redirigir a la App
+                  const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
+                  window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
+              }
+              const overlay = document.getElementById('downloadOverlay');
+              overlay?.classList.remove('hidden');
+              overlay?.classList.add('flex');
+              setTimeout(() => {
+                overlay?.classList.add('hidden');
+                overlay?.classList.remove('flex');
+              }, 3000);
+          });
       });
 
     });
   </script>
 
+  <div id="downloadOverlay" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm items-center justify-center p-6">
+    <div class="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-8 text-center shadow-2xl">
+      <img src="jbarber/jjj.png" alt="JBarber" class="w-16 h-16 rounded-lg mx-auto mb-4 shadow-lg shadow-red-500/30 object-cover">
+      <h3 class="text-white font-extrabold text-2xl tracking-tight">Se está descargando JBarber</h3>
+      <p class="text-white/80 text-sm mt-2">Mantén la ventana abierta mientras preparamos tu acceso.</p>
+      <div class="mt-4 flex items-center justify-center gap-2 text-white/80">
+        <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
+          <path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75"></path>
+        </svg>
+        <span class="text-sm">Descargando…</span>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
