@@ -284,23 +284,44 @@ CREATE POLICY "Permitir acceso de lectura a todos" ON public.comentarios FOR SEL
 DROP POLICY IF EXISTS "Permitir inserción a todos" ON public.comentarios;
 CREATE POLICY "Permitir inserción a todos" ON public.comentarios FOR INSERT WITH CHECK (true);
 
--- --- Políticas Push Subscriptions ---
-DROP POLICY IF EXISTS "Public-insert" ON public.push_subscriptions;
-CREATE POLICY "Public-insert" ON public.push_subscriptions FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Public-update" ON public.push_subscriptions;
-CREATE POLICY "Public-update" ON public.push_subscriptions FOR UPDATE USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "Public-select" ON public.push_subscriptions;
-CREATE POLICY "Public-select" ON public.push_subscriptions FOR SELECT USING (true);
-
 -- --- Políticas Turnos ---
 DROP POLICY IF EXISTS turnos_select ON public.turnos;
-CREATE POLICY turnos_select ON public.turnos FOR SELECT USING (true);
+CREATE POLICY turnos_select ON public.turnos 
+  FOR SELECT USING (true); -- Permitimos ver la cola general, pero limitaremos campos en la vista si es necesario
 
 DROP POLICY IF EXISTS turnos_insert ON public.turnos;
-CREATE POLICY turnos_insert ON public.turnos FOR INSERT WITH CHECK (true);
+CREATE POLICY turnos_insert ON public.turnos 
+  FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS turnos_update ON public.turnos;
-CREATE POLICY turnos_update ON public.turnos FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY turnos_update ON public.turnos 
+  FOR UPDATE USING (true) WITH CHECK (true);
+
+-- --- Políticas Push Subscriptions (Corregidas para push_subscriptions) ---
+DROP POLICY IF EXISTS "Public-insert" ON public.push_subscriptions;
+CREATE POLICY "Public-insert" ON public.push_subscriptions 
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public-update" ON public.push_subscriptions;
+CREATE POLICY "Public-update" ON public.push_subscriptions 
+  FOR UPDATE USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public-select" ON public.push_subscriptions;
+CREATE POLICY "Public-select" ON public.push_subscriptions 
+  FOR SELECT USING (true);
+
+-- --- Políticas Citas ---
+DROP POLICY IF EXISTS citas_select ON public.citas;
+CREATE POLICY citas_select ON public.citas 
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS citas_insert ON public.citas;
+CREATE POLICY citas_insert ON public.citas 
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS citas_update ON public.citas;
+CREATE POLICY citas_update ON public.citas 
+  FOR UPDATE USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- 8) Funciones RPC (Remote Procedure Calls)
@@ -360,12 +381,6 @@ CREATE TABLE IF NOT EXISTS public.citas (
 );
 
 ALTER TABLE public.citas ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS citas_select ON public.citas;
-CREATE POLICY citas_select ON public.citas FOR SELECT USING (true);
-DROP POLICY IF EXISTS citas_insert ON public.citas;
-CREATE POLICY citas_insert ON public.citas FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS citas_update ON public.citas;
-CREATE POLICY citas_update ON public.citas FOR UPDATE USING (true) WITH CHECK (true);
 
 ALTER TABLE public.citas DROP CONSTRAINT IF EXISTS citas_no_overlap;
 ALTER TABLE public.citas

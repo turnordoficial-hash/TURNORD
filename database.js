@@ -10,9 +10,20 @@ const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
 
 function initializeSupabase() {
   try {
+    // Verificar conexión a internet antes de intentar inicializar
+    if (!navigator.onLine) {
+      handleOfflineStatus(true);
+    }
+
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       const { createClient } = window.supabase;
-      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      });
       console.log("Supabase client initialized successfully.");
       supabaseReadyResolve && supabaseReadyResolve(supabase);
     } else {
@@ -20,9 +31,48 @@ function initializeSupabase() {
     }
   } catch (error) {
     console.error('Error initializing Supabase client:', error);
-    document.body.innerHTML = '<div style="color: red; padding: 20px;">Error Crítico: No se pudo inicializar la conexión con la base de datos. Verifique la consola para más detalles.</div>';
+    // Solo mostrar error crítico si no es un problema de red (que se maneja aparte)
+    if (navigator.onLine) {
+      document.body.innerHTML = '<div style="color: red; padding: 20px; text-align: center; font-family: sans-serif;">' +
+        '<h2 style="margin-bottom: 10px;">Error de Conexión</h2>' +
+        '<p>No se pudo establecer conexión con el servidor de base de datos.</p>' +
+        '<button onclick="location.reload()" style="margin-top: 15px; padding: 8px 16px; cursor: pointer;">Reintentar</button>' +
+        '</div>';
+    }
   }
 }
+
+// Manejo de estado Online/Offline
+function handleOfflineStatus(isOffline) {
+  let banner = document.getElementById('offline-banner');
+  
+  if (isOffline) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'offline-banner';
+      banner.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; background: #ea4335; color: white; text-align: center; padding: 10px; z-index: 9999; font-family: sans-serif; font-weight: bold;">
+          ⚠️ Sin conexión a Internet. Algunas funciones pueden no estar disponibles.
+        </div>
+      `;
+      document.body.prepend(banner);
+    }
+  } else {
+    if (banner) banner.remove();
+  }
+}
+
+window.addEventListener('online', () => {
+  handleOfflineStatus(false);
+  console.log('Conexión restaurada.');
+  // Si no se había inicializado, intentar de nuevo
+  if (!supabase) initializeSupabase();
+});
+
+window.addEventListener('offline', () => {
+  handleOfflineStatus(true);
+  console.warn('Conexión perdida.');
+});
 
 if (document.readyState !== 'loading') {
   initializeSupabase();

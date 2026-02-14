@@ -24,11 +24,9 @@
   document.head.appendChild(base);
 </script>
 
-  <link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
-  <link rel="icon" type="image/png" href="imegenlogin/favicon-16x16.png" sizes="16x16" />
-  <link rel="icon" type="image/png" href="imegenlogin/favicon-32x32.png" sizes="32x32" />
-  <link rel="apple-touch-icon" href="imegenlogin/apple-touch-icon.png" />
-  <link rel="shortcut icon" href="imegenlogin/favicon.ico" type="image/x-icon"/>
+  <link rel="icon" type="image/png" href="jbarber/jjj.png" />
+  <link rel="apple-touch-icon" href="jbarber/jjj.png" />
+  <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
 
 
 
@@ -44,13 +42,58 @@
   <script>
     // Habilitar modo oscuro por clase en Tailwind CDN
     window.tailwind = window.tailwind || {};
-    window.tailwind.config = { darkMode: 'class' };
+    window.tailwind.config = { 
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              300: '#fca5a5',
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+              800: '#991b1b',
+              900: '#7f1d1d',
+            }
+          }
+        }
+      }
+    };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media (min-width: 768px) {
+      #sidebar {
+        width: 4.5rem;
+        overflow: hidden;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #sidebar:hover {
+        width: 18rem;
+      }
+      #sidebar .tracking-wide,
+      #sidebar .tracking-tighter,
+      #sidebar span {
+        opacity: 0;
+        transition: opacity 0.2s;
+        white-space: nowrap;
+      }
+      #sidebar:hover .tracking-wide,
+      #sidebar:hover .tracking-tighter,
+      #sidebar:hover span {
+        opacity: 1;
+      }
+    }
+  </style>
   </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen">
-  <div class="flex min-h-screen relative">
+  <div class="flex flex-col min-h-screen">
+    <div class="flex flex-1 relative">
     <!-- Mobile menu button -->
     <button id="mobile-menu-button" class="md:hidden fixed top-4 left-4 z-50 bg-gray-900 text-white p-2 rounded-lg shadow-lg hover:bg-gray-800 transition-colors">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -62,60 +105,83 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-gray-900 text-gray-300 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 shadow-2xl border-r border-gray-800">
-      <div class="p-6 flex items-center justify-between border-b border-gray-800">
+    <aside id="sidebar" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+      <div class="p-6 flex items-center justify-between border-b border-white/5">
         <div class="flex items-center gap-3">
-           <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white font-bold">J</div>
-           <h2 class="text-xl font-bold text-white tracking-wide">JBarber<span class="text-amber-500">.</span></h2>
+          <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
+          <h2 class="text-xl font-black text-white tracking-tighter">JBarber<span class="text-red-500">.</span></h2>
         </div>
+        <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
       
-      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          <span class="font-medium">Inicio</span>
+      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-1">Inicio</span>
         </a>
-        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span class="font-medium">Turnos</span>
+
+        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-1">Turnos</span>
         </a>
-        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          <span class="font-medium">Mi Negocio</span>
+
+        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-1">Mi Negocio</span>
         </a>
-        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-          <span class="font-medium">Comentarios</span>
+
+        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-1">Comentarios</span>
         </a>
-        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 text-white bg-gray-800 rounded-xl shadow-sm transition-all border-l-4 border-amber-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z" /></svg>
-          <span class="font-medium">Configuración</span>
+
+        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-600/20 transition-all">
+          <div class="p-2 rounded-lg bg-white/20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3">Configuración</span>
         </a>
+
+        <div class="pt-4 mt-4 border-t border-white/5">
+          <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg bg-red-500/5 group-hover:bg-red-500/20 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-3">Cerrar sesión</span>
+          </a>
+        </div>
       </nav>
-      
-      <div class="p-4 border-t border-gray-800">
-        <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-xl transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          <span class="font-medium">Cerrar sesión</span>
-        </a>
-      </div>
     </aside>
 
     <!-- Contenido principal -->
-    <div class="flex-1 flex flex-col">
-      <!-- Eliminamos barra superior duplicada -->
+    <div class="flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
+      <!-- Icono de Barbería: Navaja -->
+      <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
+        <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12C20,14.4 18.9,16.5 17.2,18L15.8,16.6C17.1,15.4 18,13.8 18,12A6,6 0 0,0 12,6V4M12,8A4,4 0 0,1 16,12C16,13.2 15.5,14.3 14.6,15.1L13.2,13.7C13.7,13.3 14,12.7 14,12A2,2 0 0,0 12,10V8M10.8,16.1L12.2,17.5C10.5,18.5 8.4,18.5 6.8,17.5L8.2,16.1C9,16.5 10,16.5 10.8,16.1M6.2,13.9L4.8,12.5C4.8,10.4 5.8,8.5 7.5,7.5L8.9,8.9C7.8,9.6 7,10.7 7,12C7,12.7 7.3,13.3 7.8,13.7L6.2,13.9Z"/>
+        </svg>
+      </div>
 
-      <main class="flex-1 p-6 space-y-8">
-        <section class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow space-y-6" style="display: none;">
-          <h2 class="text-2xl font-bold">Apariencia del sitio</h2>
+      <main class="flex-1 p-6 space-y-8 w-full">
+        <div class="max-w-[1600px] mx-auto w-full space-y-8">
+          <section class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-all space-y-6" style="display: none;">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Apariencia del sitio</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label class="block font-medium mb-1 flex items-center gap-2">Color principal <span id="color-preview" class="inline-block w-4 h-4 rounded-full border border-white/50 shadow" title="Color seleccionado"></span></label>
-              <select id="theme-primary" class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 rounded-lg">
+              <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">Color principal <span id="color-preview" class="inline-block w-4 h-4 rounded-full border border-white/50 shadow" title="Color seleccionado"></span></label>
+              <select id="theme-primary" class="w-full bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition-all font-bold">
                 <option value="blue">Azul</option>
-                <option value="red">Rojo</option>
+                <option value="red" selected>Rojo</option>
                 <option value="orange">Naranja</option>
                 <option value="black">Negro</option>
                 <option value="green">Verde</option>
@@ -124,71 +190,103 @@
               </select>
             </div>
             <div>
-              <label class="block font-medium mb-1">Modo</label>
-              <select id="theme-mode" class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 rounded-lg">
+              <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Modo</label>
+              <select id="theme-mode" class="w-full bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition-all font-bold">
                 <option value="light">Claro</option>
                 <option value="dark">Oscuro</option>
               </select>
             </div>
           </div>
           <div class="flex gap-3">
-            <button id="btn-guardar" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg">Guardar</button>
+            <button id="btn-guardar" class="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-2xl font-black shadow-xl hover:scale-105 transition-all">Guardar</button>
             <span id="status" class="text-sm"></span>
           </div>
           <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Se aplica al “home” y al panel. Se guarda por negocio.</p>
         </section>
-        <section class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow space-y-6">
-          <h2 class="text-2xl font-bold">Perfil de Barberos</h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="space-y-4 md:col-span-1">
-              <div class="flex items-center gap-4">
-                <img id="barber-avatar-preview" src="" alt="" class="w-20 h-20 rounded-full object-cover bg-gray-200 dark:bg-gray-700">
-                <input type="file" id="barber-avatar" accept="image/*" class="block w-full text-sm">
+
+        <section class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-all space-y-8">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Perfil de Barberos</h2>
+            <div class="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-2xl">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div class="space-y-6 lg:col-span-1 bg-zinc-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-white/5">
+              <div class="flex flex-col items-center gap-4 mb-6">
+                <div class="relative group">
+                  <img id="barber-avatar-preview" src="" alt="" class="w-28 h-28 rounded-3xl object-cover bg-gray-200 dark:bg-zinc-800 shadow-lg border-2 border-white dark:border-zinc-700">
+                  <div class="absolute inset-0 bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  </div>
+                  <input type="file" id="barber-avatar" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                </div>
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">Foto de Perfil</p>
               </div>
-              <div>
-                <label class="block font-medium mb-1">Nombre</label>
-                <input type="text" id="barber-nombre" class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 rounded-lg">
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1 ml-1">Nombre Completo</label>
+                  <input type="text" id="barber-nombre" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none font-bold shadow-sm transition-all">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1 ml-1">Nombre de Usuario</label>
+                  <input type="text" id="barber-usuario" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none font-bold shadow-sm transition-all">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1 ml-1">Contraseña</label>
+                  <input type="password" id="barber-password" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none font-bold shadow-sm transition-all">
+                </div>
+                <div class="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                  <input type="checkbox" id="barber-activo" checked class="w-5 h-5 rounded-lg text-red-600 focus:ring-red-500 border-gray-300">
+                  <label for="barber-activo" class="text-sm font-bold text-gray-700 dark:text-gray-300">Estado Activo</label>
+                </div>
               </div>
-              <div>
-                <label class="block font-medium mb-1">Usuario</label>
-                <input type="text" id="barber-usuario" class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 rounded-lg">
-              </div>
-              <div>
-                <label class="block font-medium mb-1">Contraseña</label>
-                <input type="password" id="barber-password" class="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 rounded-lg">
-              </div>
-              <div class="flex items-center gap-2">
-                <input type="checkbox" id="barber-activo" checked>
-                <label for="barber-activo" class="font-medium">Activo</label>
-              </div>
-              <div class="flex gap-3">
-                <button id="barber-guardar" class="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg">Guardar</button>
-                <button id="barber-nuevo" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-lg">Nuevo</button>
+
+              <div class="flex gap-3 pt-4">
+                <button id="barber-guardar" class="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-3 rounded-2xl font-black shadow-lg hover:scale-105 transition-all flex items-center justify-center">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  Guardar
+                </button>
+                <button id="barber-nuevo" class="bg-white dark:bg-zinc-800 text-gray-700 dark:text-gray-200 px-6 py-3 rounded-2xl font-black border border-gray-100 dark:border-white/5 shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-700 transition-all">
+                  Nuevo
+                </button>
               </div>
               <input type="hidden" id="barber-id">
             </div>
-            <div class="md:col-span-2">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr>
-                    <th class="border-b p-2">Avatar</th>
-                    <th class="border-b p-2">Nombre</th>
-                    <th class="border-b p-2">Usuario</th>
-                    <th class="border-b p-2">Estado</th>
-                    <th class="border-b p-2">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody id="barberos-lista"></tbody>
-              </table>
+
+            <div class="lg:col-span-2 overflow-hidden bg-zinc-50 dark:bg-black/40 rounded-3xl border border-gray-100 dark:border-white/5">
+              <div class="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                <h3 class="text-sm font-black text-gray-500 uppercase tracking-widest">Lista de Personal</h3>
+                <span class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest">Gestionar</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead>
+                    <tr class="bg-gray-100/50 dark:bg-zinc-800/50">
+                      <th class="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Avatar</th>
+                      <th class="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Nombre</th>
+                      <th class="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Usuario</th>
+                      <th class="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Estado</th>
+                      <th class="px-6 py-4 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="barberos-lista" class="divide-y divide-gray-100 dark:divide-white/5"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
-      </main>
+      </div>
+    </main>
 
-      <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-6 mt-12 px-6">
-        © 2025 TurnoRD Todos los derechos reservados • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
-      </footer>
-    </div>
+    <footer class="bg-zinc-950 text-gray-400 text-center text-sm py-8 px-6 border-t border-white/5 mt-auto">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <p>© 2026 <span class="text-white font-bold">JBarber<span class="text-red-500">.</span></span> Todos los derechos reservados</p>
+        <p class="text-xs">Hecho por <strong class="text-white">LUIS ALFREDO CABRERA REYES</strong></p>
+      </div>
+    </footer>
   </div>
 
   <!-- Importamos JS separado -->
@@ -238,5 +336,4 @@
 
 
 </body>
-</html>
 </html>

@@ -4,21 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Panel - JBarber</title>
+  <link rel="icon" type="image/png" href="jbarber/jjj.png" />
+  <link rel="apple-touch-icon" href="jbarber/jjj.png" />
+  <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Fuente Premium: Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <script>
     tailwind.config = { 
       darkMode: 'class', 
       theme: { 
         extend: { 
-          fontFamily: { sans: ['Outfit', 'sans-serif'] },
+          fontFamily: { sans: ['Outfit', 'sans-serif'], display: ['Bebas Neue', 'sans-serif'] },
           colors: { 
-            gold: { 400: '#FACC15', 500: '#EAB308', 600: '#CA8A04' },
+            barberRed: '#C1121F',
+            barberBlue: '#003049',
             dark: { 900: '#09090b', 800: '#18181b', 700: '#27272a' }
           } 
         } 
@@ -28,7 +32,7 @@
   <style>
     /* Estilos base */
     body { background-color: #F3F4F6; }
-    .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% -20%, #27272a 0%, #000000 100%); background-attachment: fixed; }
+    .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #000000 100%); background-attachment: fixed; }
     
     .glass-panel { 
         background: rgba(255, 255, 255, 0.7); 
@@ -55,10 +59,10 @@
     @keyframes fadeIn { to { opacity: 1; transform: scale(1); } }
 
     .slot-selected {
-      background-color: #EAB308 !important; /* gold-500 */
+      background-color: #C1121F !important; /* barberRed */
       color: white !important;
       transform: scale(1.05);
-      border-color: #EAB308 !important;
+      border-color: #C1121F !important;
     }
     /* Toast */
     #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
@@ -76,12 +80,20 @@
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   </style>
 </head>
-<body class="text-slate-800 dark:text-slate-200 transition-colors duration-300 font-sans antialiased selection:bg-gold-500 selection:text-white">
+<body class="text-slate-800 dark:text-slate-200 transition-colors duration-300 font-sans antialiased selection:bg-barberRed selection:text-white relative">
+
+  <!-- Decoración de Fondo (Barbería) -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-5 dark:opacity-10">
+      <!-- Tijeras -->
+      <svg class="absolute top-20 -left-10 w-64 h-64 text-gray-500 transform -rotate-12" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9L15,11L21,5V3M19,5L15,9L17,11L21,7V5M19,7L17,9L19,11L21,9V7M19,9L18,10L19,11L20,10V9M19,11L19,11L19,11L19,11M12,10.5C12,9.67 11.33,9 10.5,9C9.67,9 9,9.67 9,10.5C9,11.33 9.67,12 10.5,12C11.33,12 12,11.33 12,10.5M10.5,7C10.5,7 10.5,7 10.5,7M10.5,14C10.5,14 10.5,14 10.5,14M7.5,10.5C7.5,9.67 6.83,9 6,9C5.17,9 4.5,9.67 4.5,10.5C4.5,11.33 5.17,12 6,12C6.83,12 7.5,11.33 7.5,10.5M6,7C6,7 6,7 6,7M6,14C6,14 6,14 6,14"/></svg>
+      <!-- Navaja -->
+      <svg class="absolute bottom-20 -right-10 w-64 h-64 text-gray-500 transform rotate-45" viewBox="0 0 24 24" fill="currentColor"><path d="M19,7H16V5H19V7M19,11H16V9H19V11M19,15H16V13H19V15M19,19H16V17H19V19M14,5H11V19H14V5M9,5H6V7H9V5M9,9H6V11H9V9M9,13H6V15H9V13M9,19H6V17H9V19"/></svg>
+  </div>
 
   <!-- Loading Screen -->
   <div id="loading-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-50 dark:bg-black transition-opacity duration-500">
     <div class="flex flex-col items-center">
-        <div class="w-16 h-16 border-4 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
+        <div class="w-16 h-16 border-4 border-barberRed border-t-transparent rounded-full animate-spin"></div>
         <p class="mt-4 text-gray-500 dark:text-gray-400 font-medium animate-pulse">Cargando experiencia...</p>
     </div>
   </div>
@@ -91,13 +103,13 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center gap-2">
-          <div class="w-9 h-9 bg-gradient-to-br from-gold-400 to-gold-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-gold-500/20">J</div>
-          <span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white">JBarber<span class="text-gold-500">.</span></span>
+          <img src="jbarber/jjj.png" alt="Logo" class="w-9 h-9 rounded-xl shadow-lg shadow-red-500/20 object-cover">
+          <span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white font-display tracking-wide">JBarber<span class="text-barberRed">.</span></span>
         </div>
         <!-- Profile Dropdown -->
         <div class="relative">
-          <div class="flex items-center gap-3 cursor-pointer group" onclick="toggleProfileMenu()">
-            <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=EAB308&color=fff" class="w-9 h-9 rounded-full border-2 border-gold-500/50 group-hover:border-gold-500 transition-colors object-cover shadow-sm">
+          <div class="flex items-center gap-3 cursor-pointer group z-50" onclick="toggleProfileMenu()">
+            <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=C1121F&color=fff" class="w-9 h-9 rounded-full border-2 border-barberRed/50 group-hover:border-barberRed transition-colors object-cover shadow-sm">
             <span id="nav-name" class="hidden sm:block font-medium text-sm text-gray-700 dark:text-gray-200">Cargando...</span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
           </div>
@@ -129,36 +141,74 @@
     </div>
   </nav>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6 relative z-10">
     
     <!-- Banner Marketing -->
-    <div class="bg-gradient-to-br from-dark-900 via-dark-800 to-black rounded-3xl p-8 md:p-10 text-white shadow-2xl relative overflow-hidden border border-white/10 group">
-      <div class="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-gold-500 rounded-full opacity-10 blur-[80px] group-hover:opacity-20 transition-opacity duration-700"></div>
-      <h2 class="text-3xl font-bold mb-2 tracking-tight">Bienvenido a tu Espacio Premium</h2>
-      <p class="text-gray-400 text-base mb-6 max-w-lg">Gestiona tus citas y turnos con la elegancia y rapidez que mereces. Tu estilo es nuestra prioridad.</p>
-      <div class="inline-flex items-center gap-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-4 py-1.5 text-sm text-gold-400 font-medium shadow-lg">
-        <span class="w-2 h-2 rounded-full bg-gold-500 animate-pulse"></span> Cliente VIP
+    <div id="banner-marketing" class="bg-gradient-to-br from-black via-dark-900 to-barberBlue rounded-3xl p-8 md:p-10 text-white shadow-2xl relative overflow-hidden border border-white/10 group transition-all duration-500">
+      <div class="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-barberRed rounded-full opacity-20 blur-[80px] group-hover:opacity-30 transition-opacity duration-700"></div>
+      <h2 id="banner-title" class="text-4xl font-display font-bold mb-2 tracking-wide">Bienvenido a tu Espacio Premium</h2>
+      <p id="banner-text" class="text-gray-400 text-base mb-6 max-w-lg">Gestiona tus citas y turnos con la elegancia y rapidez que mereces. Tu estilo es nuestra prioridad.</p>
+      <div class="inline-flex items-center gap-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-4 py-1.5 text-sm text-white font-medium shadow-lg">
+        <span class="w-2 h-2 rounded-full bg-barberRed animate-pulse"></span> <span id="banner-badge">Cliente VIP</span>
       </div>
     </div>
 
     <!-- Micro Dashboard (Estado Rápido) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in">
-      <div class="glass-panel p-5 rounded-2xl flex flex-col justify-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Turnos en espera</p>
-        <p class="text-3xl font-black text-gray-900 dark:text-white mt-1" id="quick-espera">0</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in mb-8">
+      <!-- Card 1: Tu Estado -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group flex flex-col justify-between min-h-[120px]">
+        <div class="absolute right-0 top-0 p-3 opacity-10 text-blue-600 dark:text-blue-400">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider z-10">Tu Estado</p>
+        <div id="dash-card-1" class="z-10 mt-2">
+           <span class="text-3xl font-black text-gray-900 dark:text-white block">Sin turno</span>
+           <span class="text-sm text-gray-500 dark:text-gray-400">--</span>
+        </div>
       </div>
 
-      <div class="glass-panel p-5 rounded-2xl flex flex-col justify-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Tiempo estimado</p>
-        <p class="text-3xl font-black text-gold-500 mt-1" id="quick-tiempo">0 min</p>
+      <!-- Card 2: Tiempo Estimado -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group flex flex-col justify-between min-h-[120px]">
+        <div class="absolute right-0 top-0 p-3 opacity-10 text-gold-500">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="currentColor" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider z-10">Tiempo Estimado</p>
+        <div id="dash-card-2" class="z-10 mt-2">
+           <span class="text-3xl font-black text-gray-900 dark:text-white block">-- min</span>
+           <span class="text-sm text-gray-500 dark:text-gray-400">Atención aprox: --:--</span>
+        </div>
       </div>
 
-      <div class="glass-panel p-5 rounded-2xl flex flex-col justify-center items-start">
-        <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Estado barbería</p>
-        <span id="quick-estado" class="inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-          Fluida
-        </span>
+      <!-- Card 3: Demanda -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group flex flex-col justify-between min-h-[120px]">
+        <div class="absolute right-0 top-0 p-3 opacity-10 text-green-500">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider z-10">Demanda Actual</p>
+        <div id="dash-card-3" class="z-10 mt-2">
+           <span class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-sm font-bold">Calculando...</span>
+        </div>
       </div>
+    </div>
+
+    <!-- Contacto Directo -->
+    <div class="grid grid-cols-4 gap-3 mb-8 animate-fade-in">
+        <a href="https://wa.me/18295877564" target="_blank" class="flex flex-col items-center justify-center p-4 bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all group hover:-translate-y-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            <span class="text-[10px] font-bold text-gray-600 dark:text-gray-400 group-hover:text-green-600">WhatsApp</span>
+        </a>
+        <a href="tel:+18295877564" class="flex flex-col items-center justify-center p-4 bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all group hover:-translate-y-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+            <span class="text-[10px] font-bold text-gray-600 dark:text-gray-400 group-hover:text-blue-600">Llamar</span>
+        </a>
+        <a href="https://maps.google.com/?q=JBarber" target="_blank" class="flex flex-col items-center justify-center p-4 bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all group hover:-translate-y-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <span class="text-[10px] font-bold text-gray-600 dark:text-gray-400 group-hover:text-red-600">Ubicación</span>
+        </a>
+        <a href="https://instagram.com/jbarber" target="_blank" class="flex flex-col items-center justify-center p-4 bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all group hover:-translate-y-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-pink-500 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            <span class="text-[10px] font-bold text-gray-600 dark:text-gray-400 group-hover:text-pink-600">Instagram</span>
+        </a>
     </div>
 
     <!-- Panel con Pestañas -->
@@ -166,7 +216,7 @@
       <!-- Botones de Pestañas -->
       <div class="mb-8 flex justify-center sm:justify-start border-b border-gray-200 dark:border-white/10">
         <nav class="-mb-px flex space-x-6" aria-label="Tabs">
-          <button id="tab-turno-btn" class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-all border-gold-500 text-gold-600 dark:text-gold-500">
+          <button id="tab-turno-btn" class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-all border-barberRed text-barberRed dark:text-barberRed">
             Gestión de Turnos
           </button>
           <button id="tab-cita-btn" class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm transition-all border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600">
@@ -182,28 +232,45 @@
       <div>
         <!-- Pestaña: Mi Turno -->
         <div id="tab-turno-panel">
+          <!-- Mi Cita Activa (Nueva Tarjeta) -->
+          <div id="card-cita-activa" class="hidden bg-gradient-to-br from-barberBlue to-black p-8 rounded-3xl shadow-xl text-white relative overflow-hidden mb-8 group transition-all duration-500">
+            <div class="absolute top-0 right-0 p-4 opacity-20 text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <h3 class="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">📅 Tu Cita Programada</h3>
+            <div class="flex flex-col gap-1">
+              <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide">--</span>
+              <span id="cita-barbero" class="text-lg font-medium text-blue-100">--</span>
+            </div>
+            <p id="cita-servicio" class="text-white/90 mt-3 font-medium">Cita Reservada</p>
+            <div class="mt-6 pt-6 border-t border-white/20 flex justify-between items-center">
+              <div class="text-sm text-blue-100">Llega 5 min antes</div>
+              <button onclick="cancelarCita()" class="text-white/80 hover:text-white text-sm font-semibold transition-colors bg-white/10 px-4 py-2 rounded-lg hover:bg-white/20">Cancelar Cita</button>
+            </div>
+          </div>
+
           <!-- Mi Turno Activo -->
-          <div id="card-turno-activo" class="hidden bg-white dark:bg-dark-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden mb-8 group">
+          <div id="card-turno-activo" class="hidden bg-white dark:bg-dark-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden mb-8 group transition-all duration-500">
             <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-green-400 to-green-600"></div>
             <div class="absolute top-0 right-0 p-4 opacity-10 text-green-500">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
             </div>
             <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tu Turno en Curso</h3>
             <div class="flex items-baseline gap-3">
-              <span id="mi-numero-turno" class="text-6xl font-black text-gray-900 dark:text-white tracking-tighter">--</span>
+              <span id="mi-numero-turno" class="text-6xl font-display font-bold text-gray-900 dark:text-white tracking-wide">--</span>
               <span id="mi-estado-turno" class="px-4 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold border border-green-200 dark:border-green-800">En Espera</span>
             </div>
             <p id="mi-servicio-turno" class="text-gray-600 dark:text-gray-300 mt-3 font-medium text-lg">Servicio...</p>
             <div class="mt-6 pt-6 border-t border-gray-100 dark:border-white/5 flex justify-between items-center">
-              <p class="text-sm text-gray-500 dark:text-gray-400">Mantente atento a las notificaciones.</p>
+              <div id="mi-info-extra" class="text-sm text-gray-500 dark:text-gray-400">Calculando...</div>
               <button onclick="cancelarTurno()" class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-sm font-semibold transition-colors">Cancelar Turno</button>
             </div>
           </div>
 
           <!-- Widget Tomar Turno -->
           <div id="seccion-tomar-turno" class="glass-panel p-8 rounded-3xl shadow-xl">
-            <h3 class="text-2xl font-bold mb-8 flex items-center gap-3 text-gray-900 dark:text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <h3 class="text-3xl font-display font-bold mb-8 flex items-center gap-3 text-gray-900 dark:text-white tracking-wide">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-barberRed" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Reservar Nuevo Turno
             </h3>
             
@@ -215,13 +282,13 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Selecciona Servicio</label>
-                <select id="select-servicio" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition-all shadow-sm hover:bg-white dark:hover:bg-dark-800">
+                <select id="select-servicio" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed focus:border-transparent outline-none transition-all shadow-sm hover:bg-white dark:hover:bg-dark-800">
                   <option value="">Cargando servicios...</option>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Selecciona Barbero</label>
-                <select id="select-barbero-turno" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition-all shadow-sm hover:bg-white dark:hover:bg-dark-800">
+                <select id="select-barbero-turno" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed focus:border-transparent outline-none transition-all shadow-sm hover:bg-white dark:hover:bg-dark-800">
                   <option value="">Cargando barberos...</option>
                 </select>
               </div>
@@ -230,11 +297,11 @@
                 <p class="text-sm text-blue-800 dark:text-blue-300 font-bold mb-3 uppercase tracking-wide">Estado Actual de la Barbería</p>
                 <div class="flex justify-between items-end">
                   <div>
-                    <span class="text-4xl font-black text-blue-600 dark:text-blue-400" id="personas-delante">0</span>
+                    <span class="text-5xl font-display font-bold text-blue-600 dark:text-blue-400" id="personas-delante">0</span>
                     <span class="text-sm text-gray-600 dark:text-gray-400 font-medium ml-1">personas delante</span>
                   </div>
                   <div class="text-right">
-                    <span class="text-2xl font-bold text-gray-800 dark:text-gray-200" id="tiempo-espera">0 min</span>
+                    <span class="text-3xl font-display font-bold text-gray-800 dark:text-gray-200" id="tiempo-espera">0 min</span>
                     <span class="text-xs block text-gray-500 dark:text-gray-400 font-medium uppercase mt-1">espera aprox.</span>
                   </div>
                 </div>
@@ -245,7 +312,7 @@
               </div>
             </div>
 
-            <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.01] transition-all flex justify-center items-center gap-3 text-lg">
+            <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.01] transition-all flex justify-center items-center gap-3 text-lg border border-gray-800 dark:border-transparent">
               <span>Confirmar Turno</span>
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
             </button>
@@ -256,8 +323,8 @@
         <div id="tab-cita-panel" class="hidden">
           <!-- Cita Inteligente -->
           <div id="seccion-cita-inteligente" class="glass-panel p-8 rounded-3xl shadow-xl">
-            <h3 class="text-2xl font-bold mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            <h3 class="text-3xl font-display font-bold mb-2 flex items-center gap-2 text-gray-900 dark:text-white tracking-wide">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-barberRed" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
               Agendar cita inteligente
             </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-6" id="texto-sugerencia">Calculando mejor hora...</p>
@@ -267,11 +334,11 @@
                 <p class="text-sm text-blue-800 dark:text-blue-300 font-bold mb-3 uppercase tracking-wide">Estado Actual de la Barbería</p>
                 <div class="flex justify-between items-end">
                   <div>
-                    <span class="text-4xl font-black text-blue-600 dark:text-blue-400" id="personas-delante-cita">0</span>
+                    <span class="text-5xl font-display font-bold text-blue-600 dark:text-blue-400" id="personas-delante-cita">0</span>
                     <span class="text-sm text-gray-600 dark:text-gray-400 font-medium ml-1">personas delante</span>
                   </div>
                   <div class="text-right">
-                    <span class="text-2xl font-bold text-gray-800 dark:text-gray-200" id="tiempo-espera-cita">0 min</span>
+                    <span class="text-3xl font-display font-bold text-gray-800 dark:text-gray-200" id="tiempo-espera-cita">0 min</span>
                     <span class="text-xs block text-gray-500 dark:text-gray-400 font-medium uppercase mt-1">espera aprox.</span>
                   </div>
                 </div>
@@ -283,7 +350,7 @@
 
             <div class="mb-6">
               <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Selecciona Barbero</label>
-              <select id="select-barbero-cita" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition-all shadow-sm">
+              <select id="select-barbero-cita" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed focus:border-transparent outline-none transition-all shadow-sm">
                 <option value="">Cargando barberos...</option>
               </select>
             </div>
@@ -294,32 +361,26 @@
               <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 border border-gray-300 dark:border-white/20 text-gray-900 dark:text-white font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-white/10 transition-all">
                 Ver horarios libres
               </button>
-              <button id="btn-reservar-mas-tarde" onclick="reservarMasTarde()" class="hidden flex-1 px-6 py-4 bg-gold-500 text-white font-bold rounded-2xl shadow hover:scale-[1.02] transition">
+              <button id="btn-reservar-mas-tarde" onclick="reservarMasTarde()" class="hidden flex-1 px-6 py-4 bg-barberRed text-white font-bold rounded-2xl shadow hover:scale-[1.02] transition">
                 Reservar para más tarde
               </button>
             </div>
             <div id="horarios-libres" class="mt-6 hidden">
               <!-- Pasos Visuales -->
               <div class="flex flex-wrap gap-3 mb-6 text-sm font-semibold">
-                <span class="px-3 py-1 rounded-full bg-gold-500 text-white shadow-sm">1. Fecha</span>
+                <span class="px-3 py-1 rounded-full bg-barberRed text-white shadow-sm">1. Fecha</span>
                 <span class="px-3 py-1 rounded-full bg-gray-200 dark:bg-dark-700 text-gray-600 dark:text-gray-300">2. Barbero</span>
                 <span class="px-3 py-1 rounded-full bg-gray-200 dark:bg-dark-700 text-gray-600 dark:text-gray-300">3. Hora</span>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Fecha</label>
-                  <input id="date-picker" type="date" class="w-full p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 outline-none transition-all">
-                </div>
-                <div>
-                  <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Barbero</label>
-                  <select id="select-barbero-cita2" class="w-full p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 outline-none transition-all">
-                    <option value="">Selecciona un barbero...</option>
-                  </select>
+                  <input id="date-picker" type="date" class="w-full p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed outline-none transition-all">
                 </div>
                 <div>
                   <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Servicio</label>
-                  <select id="select-servicio-cita" class="w-full p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 outline-none transition-all">
+                  <select id="select-servicio-cita" class="w-full p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed outline-none transition-all">
                     <option value="">Selecciona un servicio...</option>
                   </select>
                 </div>
@@ -340,16 +401,16 @@
           <div class="glass-panel p-8 rounded-3xl shadow-xl max-w-2xl mx-auto">
             <div class="flex flex-col sm:flex-row items-center gap-6">
               <div class="relative flex-shrink-0">
-                <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 border-white dark:border-dark-800 shadow-2xl object-cover">
-                <button onclick="document.getElementById('avatar-upload').click()" class="absolute bottom-0 right-0 bg-gold-500 text-white p-2.5 rounded-full hover:bg-gold-600 shadow-lg border-4 border-white dark:border-dark-900 transition-colors">
+                <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 border-white dark:border-dark-800 shadow-2xl object-cover ring-2 ring-barberRed">
+                <button onclick="document.getElementById('avatar-upload').click()" class="absolute bottom-0 right-0 bg-barberRed text-white p-2.5 rounded-full hover:bg-red-700 shadow-lg border-4 border-white dark:border-dark-900 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </button>
                 <input type="file" id="avatar-upload" class="hidden" accept="image/*" onchange="subirAvatar(this)">
               </div>
               <div class="text-center sm:text-left">
-                <h3 id="profile-name" class="text-3xl font-bold text-gray-900 dark:text-white">Cargando...</h3>
+                <h3 id="profile-name" class="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-wide">Cargando...</h3>
                 <p id="profile-phone" class="text-gray-500 dark:text-gray-400 text-lg mt-1">...</p>
-                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-gold-100 dark:bg-gold-900/20 text-gold-700 dark:text-gold-400 text-xs font-bold border border-gold-200 dark:border-gold-800/30">
+                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs font-bold border border-red-200 dark:border-red-800/30">
                   Cliente frecuente ⭐
                 </span>
               </div>
@@ -358,11 +419,11 @@
             <form id="form-perfil" class="mt-10 space-y-6">
               <div>
                 <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Nombre Completo</label>
-                <input type="text" id="edit-nombre" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition-all">
+                <input type="text" id="edit-nombre" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed focus:border-transparent outline-none transition-all">
               </div>
               <div>
                 <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Correo Electrónico</label>
-                <input type="email" id="edit-email" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition-all">
+                <input type="email" id="edit-email" class="w-full p-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-dark-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed focus:border-transparent outline-none transition-all">
               </div>
               <button type="submit" class="w-full bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-dark-900 font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex justify-center items-center gap-2 mt-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -386,6 +447,25 @@
     let serviciosCache = {};
     let configCache = null;
     let diasOperacionNum = [];
+    
+    // Contenido Rotativo del Banner
+    const bannerContent = [
+        { title: "✂️ Consejo del día", text: "No te laves el cabello justo después del corte. Espera al menos 24 horas para que el estilo se asiente.", badge: "Tip Pro" },
+        { title: "🤯 ¿Sabías que...?", text: "El cabello crece en promedio 1.25 cm al mes. ¡Mantén tu corte fresco cada 3 semanas!", badge: "Curiosidad" },
+        { title: "💈 Servicio Premium", text: "Prueba nuestro tratamiento de toalla caliente. Relajación total para tu piel.", badge: "Recomendado" },
+        { title: "🌙 Dato Curioso", text: "La barba crece más rápido de noche debido a la relajación del cuerpo.", badge: "Sabías que" },
+        { title: "🔥 Promoción", text: "Trae a un amigo y obtén un 10% de descuento en tu próximo corte.", badge: "Oferta" },
+        { title: "🧔 Cuidado de Barba", text: "Usa aceite para barba diariamente para evitar la picazón y mantenerla suave.", badge: "Tip Barba" },
+        { title: "🚿 Agua Fría", text: "Enjuagar tu cabello con agua fría al final del baño ayuda a cerrar las cutículas y dar brillo.", badge: "Tip Salud" }
+    ];
+
+    function updateBanner() {
+        const idx = Math.floor(Math.random() * bannerContent.length);
+        const content = bannerContent[idx];
+        document.getElementById('banner-title').textContent = content.title;
+        document.getElementById('banner-text').textContent = content.text;
+        document.getElementById('banner-badge').textContent = content.badge;
+    }
     
     // Clave pública VAPID (Debe coincidir con la de backend)
     const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
@@ -437,7 +517,7 @@
     const turnoPanel = document.getElementById('tab-turno-panel');
     const citaPanel = document.getElementById('tab-cita-panel');
     const perfilPanel = document.getElementById('tab-perfil-panel');
-    const activeClasses = 'border-gold-500 text-gold-600 dark:text-gold-500';
+    const activeClasses = 'border-barberRed text-barberRed dark:text-barberRed';
     const inactiveClasses = 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600';
 
     const switchTab = (tab) => {
@@ -460,14 +540,15 @@
 
     // Cargar Datos Iniciales
     async function init() {
+      updateBanner(); // Actualizar banner al inicio
       await cargarPerfil();
       await cargarServicios();
       await actualizarEstadoFila();
       await verificarTurnoActivo();
+      await verificarCitaActiva(); // Verificar citas
       
       // Listeners Reactivos para Citas
       document.getElementById('date-picker')?.addEventListener('change', renderSlotsForSelectedDate);
-      document.getElementById('select-barbero-cita2')?.addEventListener('change', renderSlotsForSelectedDate);
       document.getElementById('select-servicio-cita')?.addEventListener('change', renderSlotsForSelectedDate);
       document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
       
@@ -477,6 +558,7 @@
           () => {
             actualizarEstadoFila();
             verificarTurnoActivo();
+            verificarCitaActiva();
           })
         .subscribe();
 
@@ -531,6 +613,36 @@
         if(telefono) await supabase.from('push_subscriptions').upsert({ user_id: telefono, subscription, negocio_id: negocioId }, { onConflict: 'user_id, negocio_id' });
     }
 
+    // --- LÓGICA DE TIEMPO REAL (CORE) ---
+    function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarbers) {
+        const barberos = Math.max(1, activeBarbers);
+        
+        // REGLA 1: Si hay huecos libres (menos gente atendiendo que barberos) y nadie esperando
+        if (turnosEnAtencion.length < barberos && turnosEnEspera.length === 0) {
+            return 0;
+        }
+
+        let tiempoTotalMinutos = 0;
+
+        // 1. Sumar lo que falta de los que están en atención (REGLA 2)
+        turnosEnAtencion.forEach(t => {
+            const duracion = t.duracion || serviciosCache[t.servicio] || 30; // Usar duración guardada si existe
+            const inicio = t.started_at ? new Date(t.started_at) : new Date();
+            const transcurrido = (Date.now() - inicio.getTime()) / 60000;
+            const restante = Math.max(0, duracion - transcurrido);
+            tiempoTotalMinutos += restante;
+        });
+
+        // 2. Sumar duración completa de los que están en espera (REGLA 3)
+        turnosEnEspera.forEach(t => {
+            const duracion = t.duracion || serviciosCache[t.servicio] || 30;
+            tiempoTotalMinutos += duracion;
+        });
+
+        // 3. Promediar entre barberos activos
+        return Math.round(tiempoTotalMinutos / barberos);
+    }
+
     async function cargarPerfil() {
       const { data, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
       if (error) {
@@ -552,7 +664,7 @@
         document.getElementById('edit-nombre').value = data.nombre;
         document.getElementById('edit-email').value = data.email || '';
         
-        const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=EAB308&color=fff&bold=true`;
+        const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
         document.getElementById('nav-avatar').src = avatarUrl;
         document.getElementById('profile-avatar').src = avatarUrl;
       }
@@ -604,126 +716,103 @@
 
     async function actualizarEstadoFila() {
       const hoy = new Date().toISOString().slice(0, 10);
-      // Contar gente en espera
-      const { count } = await supabase.from('turnos')
-            .select('*', { count: 'exact', head: true })
+      
+      // Obtener TODOS los turnos activos con sus detalles para cálculo preciso
+      const { data: turnosActivos } = await supabase.from('turnos')
+            .select('id, estado, servicio, started_at, created_at, duracion')
             .eq('negocio_id', negocioId)
             .eq('fecha', hoy)
             .in('estado', ['En espera', 'En atención']);
       
-      // Contar citas en atención
-      const { count: citasEnAtencion } = await supabase.from('citas')
-        .select('*', { count: 'exact', head: true })
-        .eq('negocio_id', negocioId)
-        .eq('estado', 'En atención')
-        .gte('start_at', hoy + 'T00:00:00')
-        .lte('start_at', hoy + 'T23:59:59');
-      
-      const totalEnEspera = (count || 0) + (citasEnAtencion || 0);
-      
-      if (totalEnEspera === 0) {
-          document.getElementById('personas-delante').textContent = '0';
-          const pdCita = document.getElementById('personas-delante-cita');
-          if(pdCita) pdCita.textContent = '0';
-
-          document.getElementById('tiempo-espera').textContent = 'Sin espera';
-          const teCita = document.getElementById('tiempo-espera-cita');
-          if(teCita) teCita.textContent = 'Sin espera';
-
-          document.getElementById('quick-espera').textContent = '0';
-          
-          const quickTiempo = document.getElementById('quick-tiempo');
-          quickTiempo.textContent = 'Disponible ahora';
-          quickTiempo.classList.remove('text-3xl');
-          quickTiempo.classList.add('text-xl');
-
-          const quickEstado = document.getElementById('quick-estado');
-          quickEstado.textContent = 'Pasa directamente';
-          quickEstado.className = "inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-
-          // Ocultar tarjeta de turno activo si existe
-          document.getElementById('card-turno-activo')?.classList.add('hidden');
-          
-          // Actualizar barberos activos para mantener consistencia
-          const { count: barberosActivos } = await supabase.from('barberos')
-            .select('*', { count: 'exact', head: true })
-            .eq('negocio_id', negocioId)
-            .eq('activo', true);
-          const activosVal = barberosActivos || 0;
-          document.getElementById('barberos-activos').textContent = activosVal;
-          const baCita = document.getElementById('barberos-activos-cita');
-          if(baCita) baCita.textContent = activosVal;
-
-          return;
-      }
-
-      document.getElementById('personas-delante').textContent = totalEnEspera;
-      const pdCita = document.getElementById('personas-delante-cita');
-      if(pdCita) pdCita.textContent = totalEnEspera;
+      const enEspera = (turnosActivos || []).filter(t => t.estado === 'En espera');
+      const enAtencion = (turnosActivos || []).filter(t => t.estado === 'En atención');
 
       // Barberos activos
-      const { count: barberosActivos } = await supabase.from('barberos')
+      const { count: barberosCount } = await supabase.from('barberos')
         .select('*', { count: 'exact', head: true })
         .eq('negocio_id', negocioId)
         .eq('activo', true);
-      
-      const activosVal = barberosActivos || 0;
-      document.getElementById('barberos-activos').textContent = activosVal;
+      const activeBarbers = barberosCount || 1;
+
+      // Actualizar UI Barberos
+      const ba = document.getElementById('barberos-activos');
+      if(ba) ba.textContent = activeBarbers;
       const baCita = document.getElementById('barberos-activos-cita');
-      if(baCita) baCita.textContent = activosVal;
+      if(baCita) baCita.textContent = activeBarbers;
 
-      // Duración del servicio seleccionado o promedio
-      const servicioSel = document.getElementById('select-servicio').value;
-      const duracion = (servicioSel && serviciosCache[servicioSel]) ? serviciosCache[servicioSel] : 30;
-
-      // Tiempo estimado híbrido
-      const espera = totalEnEspera;
-      const activos = Math.max(1, barberosActivos || 0);
+      // Personas delante (En espera)
+      const personasEnCola = enEspera.length;
       
-      let tiempoVal = '';
+      const pd = document.getElementById('personas-delante');
+      if(pd) pd.textContent = personasEnCola;
+      const pdCita = document.getElementById('personas-delante-cita');
+      if(pdCita) pdCita.textContent = personasEnCola;
+      
+      // Calcular Tiempo Estimado (Lógica Nueva)
+      const tiempoEstimado = calcularTiempoEsperaReal(enEspera, enAtencion, activeBarbers);
+      
+      let tiempoTexto = "";
       let estado = 'Fluida';
-      let badgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+      let badgeClass = 'bg-green-100 text-green-700';
+      let demandaTexto = "🟢 Baja";
 
-      // Lógica inteligente de tiempos (Corrección solicitada)
-      if (espera === 0) {
-          tiempoVal = "¡Pasa directo!";
+      if (tiempoEstimado <= 0) {
+          tiempoTexto = "Atención inmediata";
           estado = 'Libre';
-      } else if (espera < activos) {
-          tiempoVal = "Atención inmediata";
-          estado = 'Fluida';
       } else {
-          const tiempoEstimado = Math.round((espera / activos) * duracion);
-          tiempoVal = `${tiempoEstimado} min aprox`;
-          
-          if (espera >= 4 && espera <= 7) { estado = 'Media'; badgeClass = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'; }
-          if (espera >= 8) { estado = 'Alta'; badgeClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'; }
+          tiempoTexto = `${tiempoEstimado} min`;
+          if (tiempoEstimado > 20) { 
+              estado = 'Media'; 
+              badgeClass = 'bg-yellow-100 text-yellow-700'; 
+              demandaTexto = "🟡 Media";
+          }
+          if (tiempoEstimado > 45) { 
+              estado = 'Alta'; 
+              badgeClass = 'bg-red-100 text-red-700'; 
+              demandaTexto = "🔴 Alta";
+          }
       }
       
-      document.getElementById('tiempo-espera').textContent = tiempoVal;
+      const te = document.getElementById('tiempo-espera');
+      if(te) te.textContent = tiempoTexto;
       const teCita = document.getElementById('tiempo-espera-cita');
-      if(teCita) teCita.textContent = tiempoVal;
+      if(teCita) teCita.textContent = tiempoTexto;
 
-      const badge = document.getElementById('estado-barberia-badge');
-      badge.textContent = estado;
-      badge.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
-      
-      // Update Micro Dashboard
-      document.getElementById('quick-espera').textContent = totalEnEspera;
-      
-      const quickTiempo = document.getElementById('quick-tiempo');
-      quickTiempo.textContent = tiempoVal;
-      // Ajustar tamaño de fuente si es texto largo
-      if (tiempoVal.length > 8) {
-          quickTiempo.classList.remove('text-3xl');
-          quickTiempo.classList.add('text-xl');
-      } else {
-          quickTiempo.classList.add('text-3xl');
-          quickTiempo.classList.remove('text-xl');
+      const badge = document.getElementById('estado-barberia-badge'); 
+      if(badge) {
+          badge.textContent = estado;
+          badge.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
       }
 
-      const quickEstado = document.getElementById('quick-estado');
-      quickEstado.textContent = estado;
-      quickEstado.className = `inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold ${badgeClass}`;
+      // --- ACTUALIZAR NUEVAS TARJETAS (DASHBOARD) ---
+      // Card 1: Tu Estado (Default si no hay turno)
+      const dashCard1 = document.getElementById('dash-card-1');
+      if(dashCard1 && !window.hasActiveTurn && !window.hasActiveAppointment) {
+          dashCard1.innerHTML = `
+             <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${personasEnCola}</span>
+             <span class="text-sm text-gray-500 dark:text-gray-400">Personas en espera</span>
+          `;
+      }
+
+      // Card 2: Tiempo Estimado
+      const dashCard2 = document.getElementById('dash-card-2');
+      if(dashCard2 && !window.hasActiveTurn && !window.hasActiveAppointment) {
+          const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+          dashCard2.innerHTML = `
+             <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${tiempoTexto}</span>
+             <span class="text-sm text-gray-500 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
+          `;
+      }
+
+      // Card 3: Demanda
+      const dashCard3 = document.getElementById('dash-card-3');
+      if(dashCard3) {
+          dashCard3.innerHTML = `
+             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-lg ${badgeClass} dark:bg-opacity-20 text-sm font-bold">
+                ${demandaTexto}
+             </span>
+          `;
+      }
 
       const badgeCita = document.getElementById('estado-barberia-badge-cita');
       if(badgeCita) {
@@ -736,7 +825,7 @@
       const btnSug = document.getElementById('btn-reservar-sugerida');
       const btnMasTarde = document.getElementById('btn-reservar-mas-tarde');
       const ahora = new Date();
-      const sugerida = sugerirHora(ahora, tiempoEstimado, duracion, estado);
+      const sugerida = sugerirHora(ahora, tiempoEstimado, 30, estado);
       const fmt = sugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
       if (estado === 'Alta') {
         textoSug.textContent = `Alta demanda ahora mismo. Te recomendamos reservar para más tarde (ej: ${fmt}).`;
@@ -748,7 +837,7 @@
         btnMasTarde.classList.add('hidden');
       }
       window.__sugeridaHora__ = sugerida;
-      window.__duracionServicio__ = duracion;
+      window.__duracionServicio__ = 30; // Default
     }
 
     async function verificarTurnoActivo() {
@@ -767,40 +856,167 @@
       const form = document.getElementById('seccion-tomar-turno');
 
       if (data) {
+        window.hasActiveTurn = true;
         card.classList.remove('hidden');
         form.classList.add('opacity-50', 'pointer-events-none'); // Deshabilitar tomar otro
         document.getElementById('mi-numero-turno').textContent = data.turno;
-        document.getElementById('mi-estado-turno').textContent = data.estado;
         document.getElementById('mi-servicio-turno').textContent = data.servicio;
         document.getElementById('bloqueado-msg').classList.remove('hidden');
         
-        // Calcular gente delante especificamente para este usuario
-        if (data.estado === 'En espera') {
-           const { count } = await supabase.from('turnos')
-            .select('*', { count: 'exact', head: true })
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .eq('estado', 'En espera')
-            .lt('created_at', data.created_at);
-           
-           const pd = count || 0;
-           document.getElementById('personas-delante').textContent = pd;
+        const estadoEl = document.getElementById('mi-estado-turno');
+        const infoExtra = document.getElementById('mi-info-extra');
 
-           // Notificación: Tu turno está cerca
-           if (pd <= 2 && !window.notificacionCercaEnviada) {
-               sendPushNotification('¡Tu turno se acerca!', `Solo quedan ${pd} personas delante de ti. ¡Prepárate!`);
-               window.notificacionCercaEnviada = true;
-           }
+        // --- ACTUALIZAR DASHBOARD CON DATOS DEL TURNO ---
+        const dashCard1 = document.getElementById('dash-card-1');
+        if(dashCard1) {
+            dashCard1.innerHTML = `
+               <span class="text-4xl font-display font-bold text-barberRed block">${data.turno}</span>
+               <span class="text-sm text-gray-500 dark:text-gray-400 font-bold">TU TURNO ACTUAL</span>
+            `;
+        }
+
+        if (data.estado === 'En atención') {
+            estadoEl.textContent = "En Atención";
+            estadoEl.className = "px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold border border-blue-200 dark:border-blue-800 animate-pulse";
+            
+            // Contexto emocional
+            document.querySelector('#card-turno-activo h3').textContent = "✂️ Te están atendiendo";
+            infoExtra.innerHTML = `<span class="text-lg font-medium text-gray-800 dark:text-white">Relájate y disfruta 😌</span>`;
+            
+            const dashCard2 = document.getElementById('dash-card-2');
+            if(dashCard2) {
+                dashCard2.innerHTML = `
+                   <span class="text-3xl font-display font-bold text-barberBlue dark:text-blue-400 block">AHORA</span>
+                   <span class="text-sm text-gray-500 dark:text-gray-400">Te están atendiendo</span>
+                `;
+            }
+
         } else {
-           document.getElementById('personas-delante').textContent = "0";
-           document.getElementById('tiempo-espera').textContent = "¡Es tu turno!";
+            estadoEl.textContent = "En Espera";
+            estadoEl.className = "px-4 py-1.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-bold border border-yellow-200 dark:border-yellow-800";
+            document.querySelector('#card-turno-activo h3').textContent = "🕒 Tu turno está en cola";
+
+            // Calcular espera específica para este usuario
+            const { data: allTurns } = await supabase.from('turnos')
+                .select('id, estado, servicio, started_at, created_at')
+                .eq('negocio_id', negocioId)
+                .eq('fecha', hoy)
+                .in('estado', ['En espera', 'En atención']);
+            
+            const enAtencion = allTurns.filter(t => t.estado === 'En atención');
+            const enEsperaAntes = allTurns.filter(t => t.estado === 'En espera' && t.created_at < data.created_at);
+            
+            const { count: barberosCount } = await supabase.from('barberos').select('*', { count: 'exact', head: true }).eq('negocio_id', negocioId).eq('activo', true);
+            const activeBarbers = barberosCount || 1;
+
+            const personasDelante = enEsperaAntes.length;
+            const tiempoEstimado = calcularTiempoEsperaReal(enEsperaAntes, enAtencion, activeBarbers);
+            
+            let mensajeTiempo = "";
+            if (personasDelante === 0 && enAtencion.length < activeBarbers) {
+                 mensajeTiempo = "¡Es casi tu turno! Prepárate.";
+            } else {
+                 mensajeTiempo = `⏳ Tiempo estimado: ~${tiempoEstimado} min`;
+            }
+
+            const dashCard2 = document.getElementById('dash-card-2');
+            if(dashCard2) {
+                const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                dashCard2.innerHTML = `
+                   <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${tiempoEstimado} min</span>
+                   <span class="text-sm text-gray-500 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
+                `;
+            }
+
+            infoExtra.innerHTML = `
+                <div class="flex flex-col">
+                    <span class="font-bold text-lg text-gray-900 dark:text-white">${personasDelante} personas delante</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">${mensajeTiempo}</span>
+                </div>
+            `;
+
+            // Notificación inteligente
+            if (personasDelante <= 1 && !window.notificacionCercaEnviada) {
+               sendPushNotification('🔔 ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`);
+               window.notificacionCercaEnviada = true;
+            }
         }
 
       } else {
+        window.hasActiveTurn = false;
         card.classList.add('hidden');
         form.classList.remove('opacity-50', 'pointer-events-none');
         document.getElementById('bloqueado-msg').classList.add('hidden');
       }
+    }
+
+    // --- LÓGICA DE CITAS (NUEVA) ---
+    async function verificarCitaActiva() {
+        const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
+        if (!telefono) return;
+
+        const nowISO = new Date().toISOString();
+        const { data: cita } = await supabase
+            .from('citas')
+            .select('*, barberos(nombre)')
+            .eq('negocio_id', negocioId)
+            .eq('cliente_telefono', telefono)
+            .neq('estado', 'Cancelada')
+            .gte('start_at', nowISO)
+            .order('start_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        const cardCita = document.getElementById('card-cita-activa');
+        const seccionTurno = document.getElementById('seccion-tomar-turno');
+        
+        if (cita) {
+            window.hasActiveAppointment = true;
+            cardCita.classList.remove('hidden');
+            seccionTurno.classList.add('hidden'); // Ocultar tomar turno si hay cita
+            
+            const date = new Date(cita.start_at);
+            const today = new Date();
+            const isToday = date.toDateString() === today.toDateString();
+            const dateStr = isToday ? 'Hoy' : date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+            const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            
+            document.getElementById('cita-fecha-hora').textContent = `${dateStr} – ${timeStr}`;
+            
+            let barberName = "Barbero asignado";
+            if (cita.barberos) {
+                 barberName = cita.barberos.nombre;
+            } else if (cita.barber_id) {
+                 const { data: b } = await supabase.from('barberos').select('nombre').eq('id', cita.barber_id).single();
+                 if(b) barberName = b.nombre;
+            }
+            document.getElementById('cita-barbero').textContent = `Barbero: ${barberName}`;
+            cardCita.dataset.id = cita.id;
+
+            // Update Dashboard
+            const dashCard1 = document.getElementById('dash-card-1');
+            if(dashCard1) {
+                 dashCard1.innerHTML = `
+                   <span class="text-4xl font-display font-bold text-barberBlue dark:text-blue-400 block">CITA</span>
+                   <span class="text-sm text-gray-500 dark:text-gray-400 font-bold">PROGRAMADA</span>
+                `;
+            }
+            const dashCard2 = document.getElementById('dash-card-2');
+            if(dashCard2) {
+                 dashCard2.innerHTML = `
+                   <span class="text-3xl font-display font-bold text-gray-900 dark:text-white block">${timeStr}</span>
+                   <span class="text-sm text-gray-500 dark:text-gray-400">Hora de atención</span>
+                `;
+            }
+
+        } else {
+            window.hasActiveAppointment = false;
+            cardCita.classList.add('hidden');
+            // Solo mostrar tomar turno si no hay turno activo tampoco
+            if (!window.hasActiveTurn) {
+                 seccionTurno.classList.remove('hidden');
+            }
+        }
     }
 
     // Helper para notificaciones push
@@ -855,26 +1071,40 @@
       const nuevoTurno = `${letra}${String(num).padStart(2, '0')}`;
 
       // Insertar
-      const { error } = await supabase.from('turnos').insert([{
-        negocio_id: negocioId,
-        turno: nuevoTurno,
-        nombre, telefono, servicio,
-        estado: 'En espera',
-        fecha: hoy,
-        hora: hora,
-        barber_id: Number(barberSel)
-      }]);
+      const btn = document.querySelector('button[onclick="tomarTurno()"]');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reservando...</span>';
+      }
 
-      if (error) alert('Error: ' + error.message);
-      else {
+      try {
+        const { error } = await supabase.from('turnos').insert([{
+          negocio_id: negocioId,
+          turno: nuevoTurno,
+          nombre, telefono, servicio,
+          estado: 'En espera',
+          fecha: hoy,
+          hora: hora,
+          barber_id: Number(barberSel)
+        }]);
+
+        if (error) throw error;
+
         showToast(`¡Turno ${nuevoTurno} reservado!`);
         
         // Enviar notificación
-        sendPushNotification('¡Turno Reservado!', `Tu turno ${nuevoTurno} ha sido registrado. Te avisaremos cuando se acerque.`);
+        await sendPushNotification('🎉 ¡Estás en la lista!', `Tu turno ${nuevoTurno} está confirmado. Relájate, nosotros te avisamos.`);
         
         if (navigator.vibrate) navigator.vibrate(200);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         verificarTurnoActivo();
+      } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Confirmar Turno';
+        }
       }
     };
 
@@ -906,16 +1136,6 @@
         opt.textContent = b.nombre || b.usuario;
         select.appendChild(opt);
       });
-      const select2 = document.getElementById('select-barbero-cita2');
-      if (select2) {
-        select2.innerHTML = '<option value="">Selecciona un barbero...</option>';
-        (data || []).forEach(b => {
-          const opt = document.createElement('option');
-          opt.value = b.id;
-          opt.textContent = b.nombre || b.usuario;
-          select2.appendChild(opt);
-        });
-      }
       const selectTurno = document.getElementById('select-barbero-turno');
       if (selectTurno) {
         selectTurno.innerHTML = '<option value="">Selecciona un barbero...</option>';
@@ -931,10 +1151,22 @@
     window.reservarCitaInteligente = async () => {
       const telefono = document.getElementById('profile-phone').textContent;
       const start = window.__sugeridaHora__;
-      const end = new Date(start); end.setMinutes(end.getMinutes() + (window.__duracionServicio__ || 30));
+      const end = new Date(start); 
+      end.setMinutes(end.getMinutes() + (window.__duracionServicio__ || 30));
       const barberSel = document.getElementById('select-barbero-cita').value;
       const barberId = barberSel ? Number(barberSel) : null;
-      if (!barberId) { alert('No hay barberos activos'); return; }
+      const btn = document.querySelector('button[onclick="reservarCitaInteligente()"]');
+
+      if (!barberId) { 
+        showToast('No hay barberos seleccionados', 'error'); 
+        return; 
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reservando Cita...</span>';
+      }
+
       try {
         const { data, error } = await supabase.rpc('programar_cita', {
           p_negocio_id: negocioId,
@@ -943,10 +1175,21 @@
           p_start: start.toISOString(),
           p_end: end.toISOString()
         });
+
         if (error) throw error;
-        alert('Cita reservada exitosamente');
+
+        showToast('¡Cita inteligente reservada!');
+        await sendPushNotification('¡Cita Reservada!', `Tu cita inteligente para hoy a las ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ha sido confirmada.`);
+        
+        // Cerrar modal o redirigir
+        setTimeout(() => window.location.reload(), 2000);
       } catch (e) {
-        alert('No se pudo reservar la cita: ' + e.message);
+        showToast('No se pudo reservar la cita: ' + e.message, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Agendar Cita Inteligente';
+        }
       }
     };
 
@@ -999,7 +1242,7 @@
     async function renderSlotsForSelectedDate() {
       await cargarConfigNegocio();
       const dateStr = document.getElementById('date-picker').value;
-      const barberSel = document.getElementById('select-barbero-cita2').value || document.getElementById('select-barbero-cita').value;
+      const barberSel = document.getElementById('select-barbero-cita').value;
       const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
       
       const slotsContainer = document.getElementById('slots-container');
@@ -1054,8 +1297,7 @@
               .eq('negocio_id', negocioId)
               .eq('cliente_telefono', telefono)
               .neq('estado', 'Cancelada')
-              .gte('start_at', startDay.toISOString())
-              .lte('start_at', endDay.toISOString());
+              .eq('fecha', dateStr); // ✅ Validación robusta por fecha exacta
 
           if (misCitas && misCitas.length > 0) {
               slotsContainer.innerHTML = `
@@ -1115,6 +1357,10 @@
       const tmp = new Date(startDay);
       const now = new Date();
       
+      // ✅ Fix Correcto para slots pasados
+      const nowLocalStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      const isToday = dateStr === nowLocalStr;
+      
       slotsContainer.innerHTML = '';
 
       while (tmp < endDay) {
@@ -1122,7 +1368,7 @@
         
         // Validar si el slot está en el pasado (si es hoy)
         let isPast = false;
-        if (currentSlot.getTime() < now.getTime()) isPast = true;
+        if (isToday && currentSlot.getTime() < now.getTime()) isPast = true;
 
         // Validar que el servicio cabe antes del cierre
         const slotEnd = new Date(currentSlot);
@@ -1136,7 +1382,7 @@
         const baseClass = "slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center";
         
         if (disponible) {
-            btn.className = `${baseClass} bg-white dark:bg-dark-800 border-gray-200 dark:border-white/10 hover:bg-gold-500 hover:text-white hover:border-gold-500 dark:hover:border-gold-500 shadow-sm cursor-pointer group`;
+            btn.className = `${baseClass} bg-white dark:bg-dark-800 border-gray-200 dark:border-white/10 hover:bg-barberRed hover:text-white hover:border-barberRed dark:hover:border-barberRed shadow-sm cursor-pointer group`;
             btn.onclick = () => seleccionarHora(currentSlot, btn);
         } else {
             btn.className = `${baseClass} bg-gray-50 dark:bg-dark-900/50 border-transparent text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-60`;
@@ -1185,12 +1431,14 @@
 
     async function confirmarReservaManual() {
         // Solicitar permiso de notificación al interactuar
-        if (Notification.permission === 'default') await solicitarPermisoNotificacion();
+        if (Notification.permission === 'default') {
+            await solicitarPermisoNotificacion();
+        }
 
         if (!window.__horaSeleccionada__) return;
         
         const date = window.__horaSeleccionada__;
-        const barberSel = document.getElementById('select-barbero-cita2').value || document.getElementById('select-barbero-cita').value;
+        const barberSel = document.getElementById('select-barbero-cita').value;
         const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
         const telefono = document.getElementById('profile-phone').textContent;
         const dur = serviciosCache[servicioSel] || 30;
@@ -1200,7 +1448,11 @@
         
         const timeStr = date.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
         
-        if(confirm(`¿Confirmar cita para las ${timeStr}?\nServicio: ${servicioSel}\nDuración: ${dur} min`)) {
+        // ✅ Modal Pro en lugar de confirm()
+        confirmarAccion(
+            'Confirmar Cita',
+            `¿Reservar para las ${timeStr}?\nServicio: ${servicioSel} (${dur} min)`,
+            async () => {
             try {
                 const { error } = await supabase.rpc('programar_cita', {
                     p_negocio_id: negocioId,
@@ -1226,23 +1478,39 @@
                 alert('Ese horario acaba de ocuparse o hubo un error. Por favor selecciona otro.');
                 renderSlotsForSelectedDate();
             }
-        }
+        });
     }
 
     window.cancelarTurno = async () => {
-      if(!confirm('¿Cancelar tu turno actual?')) return;
-      const telefono = document.getElementById('profile-phone').textContent;
-      const hoy = new Date().toISOString().slice(0, 10);
-      
-      const { error } = await supabase.from('turnos')
-        .update({ estado: 'Cancelado' })
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .eq('telefono', telefono)
-        .in('estado', ['En espera']);
+      confirmarAccion('Cancelar Turno', '¿Estás seguro de que deseas cancelar tu turno actual?', async () => {
+          const telefono = document.getElementById('profile-phone').textContent;
+          const hoy = new Date().toISOString().slice(0, 10);
+          
+          const { error } = await supabase.from('turnos')
+            .update({ estado: 'Cancelado' })
+            .eq('negocio_id', negocioId)
+            .eq('fecha', hoy)
+            .eq('telefono', telefono)
+            .in('estado', ['En espera']);
+            
+          if(error) showToast('Error al cancelar', 'error');
+          else {
+              showToast('Turno cancelado');
+              verificarTurnoActivo();
+          }
+      });
+    };
+
+    window.cancelarCita = async () => {
+        const card = document.getElementById('card-cita-activa');
+        const id = card.dataset.id;
+        if(!id) return;
         
-      if(error) alert('Error al cancelar');
-      else verificarTurnoActivo();
+        confirmarAccion('Cancelar Cita', '¿Estás seguro de que deseas cancelar tu cita programada?', async () => {
+            const { error } = await supabase.from('citas').update({ estado: 'Cancelada' }).eq('id', id);
+            if(error) showToast('Error al cancelar cita', 'error');
+            else { showToast('Cita cancelada'); verificarCitaActiva(); }
+        });
     };
 
     // Actualizar Perfil

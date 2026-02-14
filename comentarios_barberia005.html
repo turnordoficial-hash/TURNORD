@@ -24,104 +24,179 @@
     document.head.appendChild(base);
   </script>
 
-  <link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
+  <link rel="icon" type="image/png" href="jbarber/jjj.png" />
+  <link rel="apple-touch-icon" href="jbarber/jjj.png" />
+  <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
   <script type="module" src="auth-guard.js"></script>
   <script src="assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media (min-width: 768px) {
+      #sidebar {
+        width: 4.5rem;
+        overflow: hidden;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #sidebar:hover {
+        width: 18rem;
+      }
+      #sidebar .tracking-wide,
+      #sidebar .tracking-tighter,
+      #sidebar span {
+        opacity: 0;
+        transition: opacity 0.2s;
+        white-space: nowrap;
+      }
+      #sidebar:hover .tracking-wide,
+      #sidebar:hover .tracking-tighter,
+      #sidebar:hover span {
+        opacity: 1;
+      }
+    }
+  </style>
   <script>
     function inicializarModoOscuro() {
       const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
       document.documentElement.classList.toggle('dark', modoOscuro);
     }
     inicializarModoOscuro();
-    tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+    tailwind.config = { 
+      darkMode: 'class', 
+      theme: { 
+        extend: {
+          colors: {
+            primary: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              300: '#fca5a5',
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+              800: '#991b1b',
+              900: '#7f1d1d',
+            }
+          }
+        } 
+      } 
+    };
   </script>
 </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" data-negocio-id="barberia005">
 
-  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-    <!-- SVGs for dark mode toggle -->
-  </button>
+  <div class="flex flex-col min-h-screen">
+    <div class="flex flex-1 relative">
+      <!-- Mobile menu button -->
+      <button id="mobile-menu-button" class="md:hidden fixed top-4 left-4 z-50 bg-gray-900 text-white p-2 rounded-lg shadow-lg hover:bg-gray-800 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
 
-  <div class="flex min-h-screen relative">
-    <!-- Mobile menu button -->
-    <button id="mobile-menu-button" class="md:hidden fixed top-4 left-4 z-50 bg-gray-900 text-white p-2 rounded-lg shadow-lg hover:bg-gray-800 transition-colors">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
+      <!-- Overlay for mobile menu -->
+      <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
-    <!-- Overlay for mobile menu -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
-
-    <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-gray-900 text-gray-300 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 shadow-2xl border-r border-gray-800">
-      <div class="p-6 flex items-center justify-between border-b border-gray-800">
-        <div class="flex items-center gap-3">
-           <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-white font-bold">J</div>
-           <h2 class="text-xl font-bold text-white tracking-wide">JBarber<span class="text-amber-500">.</span></h2>
+      <!-- Sidebar -->
+      <aside id="sidebar" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+        <div class="p-6 flex items-center justify-between border-b border-white/5">
+          <div class="flex items-center gap-3">
+            <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
+            <h2 class="text-xl font-black text-white tracking-tighter">JBarber<span class="text-red-500">.</span></h2>
+          </div>
+          <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
+        
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+          <a href="panel_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-1">Inicio</span>
+          </a>
+
+          <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-1">Turnos</span>
+          </a>
+
+          <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-1">Mi Negocio</span>
+          </a>
+
+          <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-600/20 transition-all">
+            <div class="p-2 rounded-lg bg-white/20">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-3">Comentarios</span>
+          </a>
+
+          <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-1">Configuración</span>
+          </a>
+
+          <div class="pt-4 mt-4 border-t border-white/5">
+            <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-2xl transition-all group">
+              <div class="p-2 rounded-lg bg-red-500/5 group-hover:bg-red-500/20 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              </div>
+              <span class="font-bold text-sm tracking-wide ml-3">Cerrar sesión</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <main class="flex-1 md:ml-0 p-4 sm:p-6 w-full max-w-full overflow-x-hidden">
+        <div class="max-w-[1600px] mx-auto w-full space-y-6">
+          <!-- Icono de Barbería: Gillet -->
+          <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
+            <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A2,2 0 0,0 3,9V15A2,2 0 0,0 5,17H6V18A2,2 0 0,0 8,20H16A2,2 0 0,0 18,18V17H19A2,2 0 0,0 21,15V9A2,2 0 0,0 19,7M7,9H17V15H7V9M9,11V13H15V11H9Z"/>
+            </svg>
+          </div>
+          <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Comentarios de Clientes</h1>
+
+          <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-8 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-separate border-spacing-y-2">
+                <thead>
+                  <tr>
+                    <th class="py-4 px-6 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5">Cliente</th>
+                    <th class="py-4 px-6 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5">Calificación</th>
+                    <th class="py-4 px-6 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5">Comentario</th>
+                    <th class="py-4 px-6 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5">Sentimiento</th>
+                    <th class="py-4 px-6 text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/5 text-right">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-comentarios" class="divide-y divide-gray-100 dark:divide-white/5">
+                  <!-- Las filas se insertarán desde admin/comentarios.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer estandarizado -->
+    <footer class="bg-zinc-950 text-gray-400 text-center text-sm py-8 px-6 border-t border-white/5 mt-auto">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <p>© 2026 <span class="text-white font-bold">JBarber<span class="text-red-500">.</span></span> Todos los derechos reservados</p>
+        <p class="text-xs">Hecho por <strong class="text-white">LUIS ALFREDO CABRERA REYES</strong></p>
       </div>
-      
-      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          <span class="font-medium">Inicio</span>
-        </a>
-        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span class="font-medium">Turnos</span>
-        </a>
-        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          <span class="font-medium">Mi Negocio</span>
-        </a>
-        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 text-white bg-gray-800 rounded-xl shadow-sm transition-all border-l-4 border-amber-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-          <span class="font-medium">Comentarios</span>
-        </a>
-        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-800 hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          <span class="font-medium">Configuración</span>
-        </a>
-      </nav>
-      
-      <div class="p-4 border-t border-gray-800">
-        <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-xl transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          <span class="font-medium">Cerrar sesión</span>
-        </a>
-      </div>
-    </aside>
-
-    <main class="flex-1 md:ml-0 p-4 sm:p-6 w-full">
-      <h1 class="text-2xl font-bold mb-6">Comentarios de Clientes</h1>
-
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 overflow-x-auto">
-        <table class="min-w-full text-left">
-          <thead>
-            <tr>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Cliente</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Calificación</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Comentario</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Sentimiento</th>
-              <th class="py-2 px-4 border-b dark:border-gray-700 dark:text-gray-300">Fecha</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-comentarios" class="dark:text-gray-300">
-            <!-- Las filas se insertarán desde admin/comentarios.js -->
-          </tbody>
-        </table>
-      </div>
-    </main>
-  </div>
-
-  <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
-    © 2025 TurnoRD Todo los derechos reservado • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
-  </footer>
-
-  <script type="module" src="admin/comentarios.js"></script>
+    </footer>
+  </div><script type="module" src="admin/comentarios.js"></script>
   <script>
     document.getElementById('toggleDarkMode').addEventListener('click', function() {
       if (window.theme && window.theme.toggleMode) window.theme.toggleMode();

@@ -457,57 +457,212 @@ function initServiciosExtras() {
             });
         });
     }
+
+    const periodFilter = document.getElementById('filtro-periodo-servicio');
+    if (periodFilter) {
+        periodFilter.addEventListener('change', () => calcularUsoServicios(periodFilter.value));
+    }
+
+    const exportBtn = document.getElementById('exportar-servicios-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportarReporteServicios);
+    }
+
+    const chartTypeBtns = document.querySelectorAll('.chart-type-btn');
+    chartTypeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.getAttribute('data-type');
+            chartTypeBtns.forEach(b => {
+                b.classList.remove('bg-emerald-100', 'text-emerald-600', 'dark:bg-emerald-900/30', 'dark:text-emerald-400');
+                b.classList.add('bg-gray-100', 'text-gray-400', 'dark:bg-zinc-800');
+            });
+            btn.classList.remove('bg-gray-100', 'text-gray-400', 'dark:bg-zinc-800');
+            btn.classList.add('bg-emerald-100', 'text-emerald-600', 'dark:bg-emerald-900/30', 'dark:text-emerald-400');
+            renderServiciosChart(currentServiciosData, type);
+        });
+    });
+
     calcularUsoServicios();
-    setInterval(calcularUsoServicios, 60000);
+    setInterval(() => calcularUsoServicios(periodFilter?.value || 'hoy'), 60000);
 }
 
-async function calcularUsoServicios() {
+let currentServiciosData = {};
+
+async function calcularUsoServicios(periodo = 'hoy') {
+    if (!negocioId) return;
     try {
-        const hoy = new Date().toISOString().slice(0, 10);
-        const { data } = await supabase
-            .from('turnos')
-            .select('servicio')
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy);
-        const conteo = {};
+        let query = supabase.from('turnos').select('servicio, monto_cobrado, fecha').eq('negocio_id', negocioId);
+        
+        const hoy = new Date();
+        if (periodo === 'hoy') {
+            query = query.eq('fecha', hoy.toISOString().slice(0, 10));
+        } else if (periodo === 'semana') {
+            const startOfWeek = new Date(hoy);
+            startOfWeek.setDate(hoy.getDate() - hoy.getDay() + (hoy.getDay() === 0 ? -6 : 1));
+            query = query.gte('fecha', startOfWeek.toISOString().slice(0, 10));
+        } else if (periodo === 'mes') {
+            const startOfMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            query = query.gte('fecha', startOfMonth.toISOString().slice(0, 10));
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const analysis = {};
         (data || []).forEach(t => {
-            const k = t.servicio || 'N/A';
-            conteo[k] = (conteo[k] || 0) + 1;
+            const s = t.servicio || 'N/A';
+            if (!analysis[s]) analysis[s] = { count: 0, revenue: 0 };
+            analysis[s].count++;
+            analysis[s].revenue += Number(t.monto_cobrado) || 0;
         });
-        const top = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0];
-        const topEl = document.getElementById('svc-mas-usado');
-        if (topEl) topEl.textContent = top ? `${top[0]} (${top[1]})` : '--';
-        renderServiciosChart(conteo);
-    } catch {}
+
+        currentServiciosData = analysis;
+        actualizarUIServicios(analysis);
+    } catch (error) {
+        console.error('Error al analizar servicios:', error);
+    }
+}
+
+function actualizarUIServicios(analysis) {
+    const sorted = Object.entries(analysis).sort((a, b) => b[1].count - a[1].count);
+    const top = sorted[0];
+
+    // Actualizar Card Top
+    const topNameEl = document.getElementById('svc-mas-usado');
+    const topCountEl = document.getElementById('svc-top-conteo');
+    const topRevenueEl = document.getElementById('svc-top-ganancia');
+
+    if (topNameEl) topNameEl.textContent = top ? top[0] : '--';
+    if (topCountEl) topCountEl.textContent = top ? top[1].count : '0';
+    if (topRevenueEl) topRevenueEl.textContent = top ? `$${top[1].revenue.toFixed(2)}` : '$0.00';
+
+    // Actualizar Lista Ranking
+    const listEl = document.getElementById('ranking-servicios-list');
+    if (listEl) {
+        listEl.innerHTML = sorted.map(([name, data], index) => `
+            <div class="flex items-center justify-between p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold">${index + 1}</span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate w-32">${name}</span>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-bold text-gray-900 dark:text-white">${data.count} usos</p>
+                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400">$${data.revenue.toFixed(2)}</p>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center text-gray-500 text-xs py-4">No hay datos para este periodo</p>';
+    }
+
+    renderServiciosChart(analysis);
 }
 
 let serviciosChart;
-function renderServiciosChart(conteo) {
+function renderServiciosChart(analysis, type = 'bar') {
     const canvas = document.getElementById('servicios-uso-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const labels = Object.keys(conteo);
-    const data = Object.values(conteo);
+    
+    const labels = Object.keys(analysis);
+    const counts = labels.map(l => analysis[l].count);
+    const revenues = labels.map(l => analysis[l].revenue);
+
     if (serviciosChart) serviciosChart.destroy();
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#e2e8f0' : '#1e293b';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
     serviciosChart = new Chart(ctx, {
-        type: 'bar',
+        type: type,
         data: {
             labels,
-            datasets: [{
-                label: 'Uso de servicios',
-                data,
-                backgroundColor: 'rgba(99, 102, 241, 0.5)',
-                borderColor: 'rgb(99, 102, 241)',
-                borderWidth: 1
-            }]
+            datasets: [
+                {
+                    label: 'Cantidad de Usos',
+                    data: counts,
+                    backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Ganancia (RD$)',
+                    data: revenues,
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    yAxisID: 'y1',
+                    hidden: type === 'doughnut'
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: true, position: 'top' } },
-            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: textColor, font: { weight: 'bold', size: 11 } }
+                },
+                tooltip: {
+                    backgroundColor: isDark ? '#18181b' : '#ffffff',
+                    titleColor: isDark ? '#ffffff' : '#18181b',
+                    bodyColor: isDark ? '#a1a1aa' : '#71717a',
+                    borderColor: 'rgba(16, 185, 129, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 12
+                }
+            },
+            scales: type === 'doughnut' ? {} : {
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, precision: 0 },
+                    title: { display: true, text: 'Usos', color: textColor }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: { color: textColor, callback: v => '$' + v },
+                    title: { display: true, text: 'Ganancia', color: textColor }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: textColor }
+                }
+            }
         }
     });
+}
+
+async function exportarReporteServicios() {
+    try {
+        const labels = Object.keys(currentServiciosData);
+        if (labels.length === 0) {
+            mostrarNotificacion('Sin datos', 'No hay datos de servicios para exportar', 'info');
+            return;
+        }
+
+        const data = labels.map(l => ({
+            Servicio: l,
+            Usos: currentServiciosData[l].count,
+            'Ganancia Total (RD$)': currentServiciosData[l].revenue.toFixed(2)
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Análisis de Servicios');
+        XLSX.writeFile(wb, `reporte_servicios_${new Date().toISOString().slice(0, 7)}.xlsx`);
+        mostrarNotificacion('Éxito', 'Reporte de servicios exportado correctamente', 'success');
+    } catch (error) {
+        console.error('Error al exportar reporte:', error);
+        mostrarNotificacion('Error', 'No se pudo exportar el reporte', 'error');
+    }
 }
 
 document.getElementById('btnGuardarBreakSemanal')?.addEventListener('click', async () => {

@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Acceso Clientes - TurnoRD</title>
+  <link rel="icon" type="image/png" href="jbarber/jjj.png" />
+  <link rel="apple-touch-icon" href="jbarber/jjj.png" />
+  <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -199,32 +202,49 @@
       const telefono = document.getElementById('reg_telefono').value.trim();
       const email = document.getElementById('reg_email').value.trim();
       const documento = document.getElementById('reg_documento').value.trim();
-      const password = document.getElementById('reg_password').value.trim();
+      const pass = document.getElementById('reg_password').value.trim();
+      
       const btn = document.getElementById('btnRegSubmit');
       const btnText = document.getElementById('btnRegText');
 
       btn.disabled = true;
-      btnText.textContent = 'Creando perfil...';
+      btnText.textContent = 'Creando cuenta...';
 
       try {
+        // 1. Verificar si ya existe el documento
+        const { data: existente, error: errorCheck } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('negocio_id', negocioId)
+          .eq('documento_identidad', documento)
+          .maybeSingle();
+
+        if (errorCheck) throw errorCheck;
+        if (existente) throw new Error('Este usuario/cédula ya está registrado');
+
+        // 2. Insertar nuevo cliente
         const { data, error } = await supabase
           .from('clientes')
           .insert([{
             negocio_id: negocioId,
-            nombre, telefono, email, 
-            documento_identidad: documento, 
-            password
+            nombre,
+            telefono,
+            email,
+            documento_identidad: documento,
+            password: pass // En producción: usar hashing
           }])
           .select()
           .single();
 
         if (error) throw error;
 
-        alert('¡Registro exitoso! Ahora puedes iniciar sesión.');
+        alert('¡Cuenta creada con éxito! Ya puedes iniciar sesión.');
         cerrarModalRegistro();
-        document.getElementById('formRegistro').reset();
+        document.getElementById('usuario_login').value = documento;
+        document.getElementById('password_login').value = pass;
+
       } catch (error) {
-        alert('Error al registrar: ' + (error.message.includes('unique') ? 'El usuario ya existe' : error.message));
+        alert(error.message || 'Error al registrarse');
       } finally {
         btn.disabled = false;
         btnText.textContent = 'Crear Cuenta';

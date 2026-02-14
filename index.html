@@ -25,10 +25,9 @@
 </script>
 
 <!-- Favicons -->
-<link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
-<link rel="icon" type="image/png" sizes="16x16" href="imegenlogin/favicon-16x16.png" />
-<link rel="icon" type="image/png" sizes="32x32" href="imegenlogin/favicon-32x32.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="imegenlogin/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="jbarber/jjj.png" />
+<link rel="apple-touch-icon" href="jbarber/jjj.png" />
+<link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
 <link rel="manifest" href="imegenlogin/site.webmanifest">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -106,6 +105,57 @@
     50% { transform: scale(1.1) rotate(3deg); }
   }
   .animate-shine { animation: shine-badge 4s infinite ease-in-out; }
+
+  /* Gallery Grid Styles */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  .gallery-card {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    cursor: pointer;
+    transform: translateY(0);
+    transition: all .4s ease;
+  }
+  .gallery-card img, .gallery-card video {
+    width: 100%;
+    height: 320px;
+    object-fit: cover;
+    transition: all .6s ease;
+  }
+  .gallery-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 20px 60px rgba(193, 18, 31, 0.35);
+  }
+  .gallery-card:hover img, .gallery-card:hover video {
+    transform: scale(1.1);
+  }
+  .gallery-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    display: flex;
+    align-items: flex-end;
+    padding: 20px;
+    opacity: 0;
+    transition: .4s;
+  }
+  .gallery-card:hover .gallery-overlay {
+    opacity: 1;
+  }
+  .gallery-overlay span {
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    transform: translateY(20px);
+    transition: .4s;
+  }
+  .gallery-card:hover .gallery-overlay span {
+    transform: translateY(0);
+  }
 </style>
 
 <!-- Inicializar modo oscuro -->
@@ -123,7 +173,7 @@ inicializarModoOscuro();
   <header class="fixed top-0 w-full z-50 bg-barberBlack text-white">
     <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3 font-extrabold text-lg">
-        <span class="w-8 h-8 bg-barberRed flex items-center justify-center rounded">J</span>
+        <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded object-cover">
         JBarber
       </div>
       <div class="flex items-center gap-4">
@@ -274,7 +324,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1593702295093-d4a3c1b78f02?q=80&w=1200&auto=format&fit=crop" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/TURNORD-main/jbarber/j1.jpg" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">✂️</div>
@@ -288,7 +338,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1604917877939-8f5951b47f9c?q=80&w=1200&auto=format&fit=crop" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/TURNORD-main/jbarber/j11.jpg" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberBlue rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">💈</div>
@@ -302,7 +352,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1584582845222-cbb760e09bf9?q=80&w=1200&auto=format&fit=crop" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/TURNORD-main/jbarber/j6.jpg" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">🧔</div>
@@ -316,7 +366,7 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1605653238859-725b1c7d6f62?q=80&w=1200&auto=format&fit=crop" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/TURNORD-main/jbarber/j2.jpg" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">👑</div>
@@ -328,6 +378,112 @@ inicializarModoOscuro();
         </div>
       </div>
     </section>
+
+    <!-- Galería Premium (Grid) -->
+    <section class="py-24 bg-white dark:bg-barberBlack transition-colors duration-500">
+      <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+              <h2 class="text-4xl font-extrabold font-['Bebas_Neue'] tracking-wide text-gray-900 dark:text-white">
+                Galería Premium
+              </h2>
+              <p class="text-gray-500 mt-2">
+                Trabajos reales. Resultados reales.
+              </p>
+            </div>
+
+            <div class="gallery-grid">
+              <div class="gallery-card">
+                <img src="jbarber/j1.jpg" alt="Corte Premium" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Corte Premium</span>
+                </div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="jbarber/j11.jpg" alt="Fade moderno" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Fade moderno</span>
+                </div>
+              </div>
+              
+              <div class="gallery-card">
+                <img src="jbarber/j12.jpg" alt="Corte Premium" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Corte Premium</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="jbarber/j13.jpg" alt="Estilo Moderno" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Estilo Moderno</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="jbarber/j2.jpg" alt="Diseño exclusivo" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Diseño exclusivo</span>
+                </div>
+              </div>
+              
+              <div class="gallery-card">
+                <img src="jbarber/j6.jpg" alt="Barba premium" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Barba premium</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="jbarber/j3.jpg" alt="Ambiente VIP" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Ambiente VIP</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="jbarber/j1.jpg" alt="Estilo Urbano" loading="lazy">
+                <div class="gallery-overlay">
+                  <span>Estilo Urbano</span>
+                </div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="jbarber/j15.jpg" alt="Tendencia" loading="lazy">
+                <div class="gallery-overlay"><span>Tendencia</span></div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="jbarber/j16.jpg" alt="Precisión" loading="lazy">
+                <div class="gallery-overlay"><span>Precisión</span></div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="jbarber/j17.jpg" alt="Arte" loading="lazy">
+                <div class="gallery-overlay"><span>Arte</span></div>
+              </div>
+
+                <div class="gallery-card">
+                <img src="jbarber/j18.jpg" alt="Tendencia" loading="lazy">
+                <div class="gallery-overlay"><span>Tendencia</span></div>
+              </div>
+
+            </div>
+
+            <!-- Video Section -->
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="gallery-card h-64 md:h-80">
+                <video src="jbarber/j7.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>En Movimiento</span></div>
+              </div>
+              <div class="gallery-card h-64 md:h-80">
+                <video src="jbarber/j4.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>En Acción</span></div>
+              </div>
+              <div class="gallery-card h-64 md:h-80">
+                <video src="jbarber/j5.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>Técnica</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
 
     <!-- Cómo funciona -->
     <section class="w-full py-24 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-white/5 transition-colors duration-500">
@@ -422,6 +578,13 @@ inicializarModoOscuro();
         let comentarios = [];
         let currentIndex = 0;
 
+        // Datos de respaldo por si falla la base de datos
+        const fallbackComentarios = [
+            { nombre_cliente: "Carlos M.", comentario: "El mejor servicio de la ciudad. ¡Recomendado!", calificacion: 5 },
+            { nombre_cliente: "David R.", comentario: "Excelente ambiente y profesionales de primera.", calificacion: 5 },
+            { nombre_cliente: "Juan P.", comentario: "Siempre salgo satisfecho con mi corte.", calificacion: 5 }
+        ];
+
         const render = (idx) => {
             if (comentarios.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">Aún no hay testimonios. ¡Sé el primero en visitarnos!</p>';
@@ -440,7 +603,7 @@ inicializarModoOscuro();
         };
 
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('comentarios')
             .select('nombre_cliente, comentario, calificacion')
             .eq('negocio_id', 'barberia005')
@@ -448,11 +611,19 @@ inicializarModoOscuro();
             .order('created_at', { ascending: false })
             .limit(10);
             
-          if (data) comentarios = data;
-          render(0);
+          if (error) throw error;
 
-          // Suscripción Realtime para nuevos comentarios
-          supabase.channel('comentarios-home')
+          comentarios = (data && data.length > 0) ? data : fallbackComentarios;
+          
+        } catch (e) { 
+            console.warn("Usando testimonios locales por error de conexión:", e);
+            comentarios = fallbackComentarios;
+        }
+
+        render(0);
+
+        // Suscripción Realtime para nuevos comentarios
+        supabase.channel('comentarios-home')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comentarios', filter: "negocio_id=eq.barberia005" }, (payload) => {
                 const nuevo = payload.new;
                 // Solo agregar si es un buen comentario
@@ -464,7 +635,6 @@ inicializarModoOscuro();
                 }
             })
             .subscribe();
-          
           nextBtn.onclick = () => { 
               if(comentarios.length > 0) {
                   currentIndex = (currentIndex + 1) % comentarios.length; 
@@ -477,8 +647,7 @@ inicializarModoOscuro();
                   render(currentIndex); 
               }
           };
-          setInterval(() => { if(comentarios.length > 0) nextBtn.click(); }, 6000); // Auto-play
-        } catch (e) { console.error(e); }
+          if (comentarios.length > 1) setInterval(() => { nextBtn.click(); }, 6000); // Auto-play
       });
     </script>
     
@@ -522,7 +691,7 @@ inicializarModoOscuro();
           <div class="flex gap-4">
             <a href="#" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gradient-to-tr hover:from-yellow-400 hover:via-red-500 hover:to-purple-500 transition-all duration-300 group" aria-label="Instagram">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                <path d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M17.25,5.5A1.25,1.25 0 0,1 18.5,6.75A1.25,1.25 0 0,1 17.25,8A1.25,1.25 0 0,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z"/>
               </svg>
             </a>
             <a href="https://wa.me/18295877564" target="_blank" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-[#25D366] transition-all duration-300" aria-label="WhatsApp">
@@ -616,6 +785,7 @@ inicializarModoOscuro();
           window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
         });
       });
+
     });
   </script>
 

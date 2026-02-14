@@ -19,6 +19,11 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const negocioId = getNegocioId();
 
   try {
+    // Verificar conexión antes de intentar login
+    if (!navigator.onLine) {
+      throw new Error('Sin conexión a internet. Verifique su red.');
+    }
+
     const client = await ensureSupabase();
     const { data, error } = await client.auth.signInWithPassword({
       email,
@@ -26,6 +31,10 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     });
 
     if (error) {
+      // Manejar errores específicos de Supabase/Red
+      if (error.message.includes('fetch')) {
+        throw new Error('No se pudo contactar al servidor. Verifique su conexión.');
+      }
       throw error;
     }
 
@@ -49,7 +58,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
   } catch (error) {
     console.error('Error en el inicio de sesión:', error.message);
-    errorElement.textContent = 'Email o contraseña incorrecta.';
+    
+    // Diferenciar mensaje según el tipo de error
+    if (error.message.includes('Sin conexión') || error.message.includes('servidor')) {
+      errorElement.textContent = error.message;
+    } else {
+      errorElement.textContent = 'Email o contraseña incorrecta.';
+    }
+    
     errorElement.classList.remove('hidden');
   }
 });

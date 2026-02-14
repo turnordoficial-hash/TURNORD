@@ -4,23 +4,9 @@ let atencionInterval = null; // Timer para el turno en atención
 let serviciosCache = {}; // Cache para duraciones de servicios
 let refreshTimer = null; // Timer para debounce
 let currentAtencionId = null; // Para evitar reiniciar timer si es el mismo turno
-
-/**
- * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
- * Este ID es crucial para todas las operaciones de la base de datos en esta página.
- * @returns {string|null} El ID del negocio o null si no está presente.
- */
-function getNegocioId() {
-  const id = document.body.dataset.negocioId;
-  if (!id) {
-    console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
-    alert('Error de configuración: No se pudo identificar el negocio. Contacte a soporte.');
-  }
-  return id;
-}
-
-// Obtener el ID del negocio al inicio y usarlo globalmente en este script.
-const negocioId = getNegocioId();
+let negocioId = null; // Se inicializa de forma segura
+let turnosChannel = null;
+let citasChannel = null;
 
 function handleAuthError(err) {
   if (err && err.code === 'PGRST303') {
@@ -90,7 +76,7 @@ async function cargarDatos() {
     const hoyLocal = ymdLocal(new Date());
     const { data, error } = await supabase
       .from('turnos')
-      .select('*')
+      .select('id, turno, nombre, estado, hora, servicio, started_at, created_at') // 2. Optimización de consulta
       .eq('negocio_id', negocioId)
       .eq('fecha', hoyLocal)
       .order('created_at', { ascending: false });
@@ -138,38 +124,43 @@ function mostrarNotificacion(mensaje, icono = 'info') {
 // Limpia el historial de turnos que ya no están activos.
 async function limpiarHistorialTurnos() {
   if (!negocioId) return;
-  if (!confirm('¿Estás seguro de que quieres limpiar el historial de turnos atendidos y cancelados del día?')) return;
+  
+  Swal.fire({
+    title: '¿Limpiar historial de hoy?',
+    text: "Se eliminarán los turnos atendidos y cancelados de la fecha actual.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, limpiar'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        const hoyLocal = ymdLocal(new Date());
+        const { error } = await supabase
+          .from('turnos')
+          .delete()
+          .eq('negocio_id', negocioId)
+          .eq('fecha', hoyLocal) // 8. Mejora: Filtrar siempre por fecha
+          .in('estado', ['Atendido', 'Cancelado', 'No presentado']);
 
-  const btn = document.getElementById('btnLimpiarHistorial');
-
-  try {
-    btn.disabled = true;
-    btn.textContent = 'Limpiando...';
-
-    const { error } = await supabase
-      .from('turnos')
-      .delete()
-      .eq('negocio_id', negocioId)
-      .in('estado', ['Atendido', 'Cancelado', 'No presentado']);
-
-    if (error) throw error;
-
-    alert('✅ Historial limpiado con éxito.');
-    await cargarDatos(); // Refrescar la vista
-  } catch (error) {
-    console.error('Error al limpiar historial:', error);
-    alert('❌ Error al limpiar historial: ' + error.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Limpiar historial';
-  }
+        if (error) throw error;
+        mostrarNotificacion('Historial limpiado con éxito.', 'success');
+        await cargarDatos();
+      } catch (error) {
+        console.error('Error al limpiar historial:', error);
+        mostrarNotificacion('Error al limpiar historial: ' + error.message, 'error');
+      }
+    }
+  });
 }
 
 // Configura la suscripción a cambios en la tabla de turnos en tiempo real.
 function suscribirseTurnos() {
   if (!negocioId) return;
+  if (turnosChannel) supabase.removeChannel(turnosChannel);
 
-  const channel = supabase
+  turnosChannel = supabase
     .channel(`turnos-negocio-${negocioId}`)
     .on('postgres_changes', {
         event: '*',
@@ -178,6 +169,11 @@ function suscribirseTurnos() {
         filter: `negocio_id=eq.${negocioId}`,
       },
       payload => {
+        // 3. Debounce Inteligente: Solo refrescar si afecta al día actual
+        const hoyLocal = ymdLocal(new Date());
+        if (payload.new && payload.new.fecha && payload.new.fecha !== hoyLocal) return;
+        if (payload.old && payload.old.fecha && payload.old.fecha !== hoyLocal) return;
+
         console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
         
         if (payload.eventType === 'INSERT') {
@@ -188,15 +184,14 @@ function suscribirseTurnos() {
       }
     )
     .subscribe();
-
-  return channel;
 }
 
 // Configura la suscripción a cambios en la tabla de citas en tiempo real.
 function suscribirseCitas() {
   if (!negocioId) return;
+  if (citasChannel) supabase.removeChannel(citasChannel);
 
-  const channel = supabase
+  citasChannel = supabase
     .channel(`citas-negocio-${negocioId}`)
     .on('postgres_changes', {
         event: '*',
@@ -213,8 +208,6 @@ function suscribirseCitas() {
       }
     )
     .subscribe();
-
-  return channel;
 }
 
 // Actualiza la tarjeta del turno que está "En atención" y gestiona su temporizador.
@@ -264,19 +257,37 @@ function actualizarTurnoEnAtencion(turnosHoy) {
   }
 }
 
-// Inicialización de la página.
-window.addEventListener('DOMContentLoaded', async () => {
+// Inicialización segura de la página.
+async function init() {
   await ensureSupabase();
-  if (!negocioId) return; // Detener si no hay ID de negocio
+  
+  // 1. Seguridad: Intentar obtener negocioId desde la sesión (Backend Source of Truth)
+  // Eliminado fallback a dataset para evitar manipulación
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && user.user_metadata && user.user_metadata.negocio_id) {
+      negocioId = user.user_metadata.negocio_id;
+  }
+
+  if (!negocioId) {
+      console.error('No se pudo identificar el negocio.');
+      return;
+  }
 
   await cargarServicios();
   await cargarDatos();
   suscribirseTurnos();
   suscribirseCitas();
   setupSidebar();
-
-  // Exponer la función de limpiar historial al objeto window para que el HTML la pueda llamar.
   window.limpiarHistorialTurnos = limpiarHistorialTurnos;
+}
+
+window.addEventListener('DOMContentLoaded', init);
+
+// 4. Memory Leak Prevention: Limpieza al salir
+window.addEventListener('beforeunload', () => {
+    if (turnosChannel) supabase.removeChannel(turnosChannel);
+    if (citasChannel) supabase.removeChannel(citasChannel);
+    if (atencionInterval) clearInterval(atencionInterval);
 });
 
 function setupSidebar() {
@@ -284,6 +295,7 @@ function setupSidebar() {
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const closeSidebar = document.getElementById('closeSidebar');
     
     if (!sidebar) return;
 
@@ -297,13 +309,20 @@ function setupSidebar() {
         }
     };
 
+    // Lógica para colapsar sidebar en escritorio
     const toggleDesktop = () => {
         sidebar.classList.toggle('w-64');
         sidebar.classList.toggle('w-20');
-        sidebar.querySelectorAll('.sidebar-text').forEach(el => el.classList.toggle('hidden'));
+        
+        // Ocultar/Mostrar textos con transición suave
+        const texts = sidebar.querySelectorAll('.sidebar-text');
+        texts.forEach(el => {
+            el.classList.toggle('hidden');
+        });
     };
 
     if (btn) btn.addEventListener('click', toggleMobile);
     if (overlay) overlay.addEventListener('click', toggleMobile);
+    if (closeSidebar) closeSidebar.addEventListener('click', toggleMobile);
     if (toggleBtn) toggleBtn.addEventListener('click', toggleDesktop);
 }

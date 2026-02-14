@@ -26,11 +26,9 @@
   document.head.appendChild(base);
 </script>
 
-  <link rel="icon" type="image/x-icon" href="imegenlogin/favicon.ico" />
-  <link rel="icon" type="image/png" href="imegenlogin/favicon-16x16.png" sizes="16x16" />
-  <link rel="icon" type="image/png" href="imegenlogin/favicon-32x32.png" sizes="32x32" />
-   <link rel="apple-touch-icon" href="imegenlogin/apple-touch-icon.png" />
-  <link rel="shortcut icon" href="imegenlogin/favicon.ico" type="image/x-icon"/>
+  <link rel="icon" type="image/png" href="jbarber/jjj.png" />
+  <link rel="apple-touch-icon" href="jbarber/jjj.png" />
+  <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
 
 
 
@@ -59,7 +57,22 @@
     tailwind.config = {
       darkMode: 'class',
       theme: {
-        extend: {}
+        extend: {
+          colors: {
+            primary: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              300: '#fca5a5',
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+              800: '#991b1b',
+              900: '#7f1d1d',
+            }
+          }
+        }
       }
     }
   </script>
@@ -71,9 +84,10 @@
   /* Medios escalables */
   img, canvas, svg, video { max-width: 100%; height: auto; }
   /* Contenedor responsive utilitario */
-  .responsive-container { max-width: 1280px; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+  .responsive-container { width: 100%; max-width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
   
   .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000000 70%); background-attachment: fixed; }
+
 </style>
 </head>
 <body class="bg-gray-50 text-gray-800 dark:text-gray-200 font-sans antialiased transition-colors duration-300" data-negocio-id="barberia005">
@@ -99,81 +113,110 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 shadow-2xl border-r border-gray-200 dark:border-white/5">
-      <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200 dark:border-white/5">
-        <div class="flex items-center gap-3 overflow-hidden">
-           <div class="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-amber-500/20">J</div>
-           <h2 class="text-xl font-bold text-gray-900 dark:text-white tracking-wide whitespace-nowrap sidebar-text">JBarber<span class="text-amber-500">.</span></h2>
+    <aside id="sidebar" role="navigation" aria-label="Menú principal" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+      <div class="p-6 flex items-center justify-between border-b border-white/5">
+        <div class="flex items-center gap-3">
+           <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
+           <h2 class="text-xl font-black text-white tracking-tighter sidebar-text transition-opacity duration-300">JBarber<span class="text-red-500">.</span></h2>
         </div>
-        <button id="sidebar-toggle-btn" class="hidden md:flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
+        <button id="sidebar-toggle-btn" class="hidden md:block text-gray-400 hover:text-white transition-colors focus:outline-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
       
-      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 text-gray-900 dark:text-white bg-gray-100 dark:bg-white/5 rounded-xl shadow-sm transition-all border-l-4 border-amber-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Inicio</span>
+      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-600/20 transition-all">
+          <div class="p-2 rounded-lg bg-white/20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Inicio</span>
         </a>
-        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Turnos</span>
+
+        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Turnos</span>
         </a>
-        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Mi Negocio</span>
+
+        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Mi Negocio</span>
         </a>
-        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Comentarios</span>
+
+        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Comentarios</span>
         </a>
-        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white rounded-xl transition-all group">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Configuración</span>
+
+        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Configuración</span>
         </a>
+
+        <div class="pt-4 mt-4 border-t border-white/5">
+          <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg bg-red-500/5 group-hover:bg-red-500/20 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-3 sidebar-text transition-opacity duration-300">Cerrar sesión</span>
+          </a>
+        </div>
       </nav>
-      
-      <div class="p-4 border-t border-gray-200 dark:border-white/5">
-        <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          <span class="font-medium ml-3 sidebar-text">Cerrar sesión</span>
-        </a>
-      </div>
     </aside>
 
+    <div class="flex-1 flex flex-col min-w-0 transition-all duration-300">
     <!-- Contenido principal -->
-    <main class="flex-1 md:ml-0 p-4 sm:p-6 responsive-container w-full">
-      <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Panel de Control</h1>
+    <main role="main" class="flex-1 md:ml-0 p-4 sm:p-6 w-full max-w-full overflow-x-hidden">
+      <div class="max-w-[1600px] mx-auto w-full">
+        <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Panel de Control</h1>
 
-      <!-- Resumen -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
-          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos en espera</h3>
-          <p id="turnosEspera" class="text-4xl font-black text-blue-600 dark:text-blue-400 mt-2">0</p>
+        <!-- Resumen -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 w-full">
+        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-red-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.65,6.5L15,11.15V9.85C15,9.02 14.33,8.35 13.5,8.35H8.5C7.67,8.35 7,9.02 7,9.85V11.15L2.35,6.5V9.5L7.35,14.5V16.5C7.35,17.33 8.02,18 8.85,18H13.15C13.98,18 14.65,17.33 14.65,16.5V14.5L19.65,9.5V6.5M12.5,16.5H9.5V9.85H12.5V16.5Z"/></svg>
+          </div>
+          <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest relative z-10">En espera</h3>
+          <p id="turnosEspera" class="text-5xl font-black text-red-600 dark:text-red-400 mt-4 relative z-10">0</p>
         </div>
-        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
-          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos atendidos</h3>
-          <p id="turnosAtendidos" class="text-4xl font-black text-green-600 dark:text-green-400 mt-2">0</p>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-blue-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5,2C11.67,2 11,2.67 11,3.5V5.5L6,1V4L11,8.5V10.5C11,11.33 11.67,12 12.5,12H17.5C18.33,12 19,11.33 19,10.5V8.5L24,4V1L19,5.5V3.5C19,2.67 18.33,2 17.5,2H12.5M16.5,10.5H13.5V3.5H16.5V10.5M5,12H3V21H5V12M9,12H7V21H9V12M13,14H11V21H13V14M17,14H15V21H17V14M1,10V21H3V10H1Z"/></svg>
+          </div>
+          <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest relative z-10">Atendidos</h3>
+          <p id="turnosAtendidos" class="text-5xl font-black text-blue-600 dark:text-blue-400 mt-4 relative z-10">0</p>
         </div>
-        <div class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5">
-          <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turnos del día</h3>
-          <p id="turnosDia" class="text-4xl font-black text-purple-600 dark:text-purple-400 mt-2">0</p>
+
+        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-red-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9V11H11V9L5,3V6L11,12V21H13V12L19,6V3M7.8,5.4L11.8,9.4L12,9.6L12.2,9.4L16.2,5.4L16.6,5L16.2,5.4L12.2,9.4L12,9.6L11.8,9.4L7.8,5.4L7.4,5L7.8,5.4Z"/></svg>
+          </div>
+          <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest relative z-10">Total Hoy</h3>
+          <p id="turnosDia" class="text-5xl font-black text-red-600 dark:text-red-400 mt-4 relative z-10">0</p>
         </div>
       </div>
 
-      <!-- Gráfico de Estadísticas -->
-      <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-6 mb-8">
-        <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Actividad de Hoy</h2>
-        <div class="relative h-80 w-full">
-          <canvas id="dashboardChart"></canvas>
-        </div>
+      <!-- Icono de Barbería: Navaja -->
+      <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
+        <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2,6V19H5V6H2M19,6V10H7V6H19M19,11V15H7V11H19M19,16V19H7V16H19Z"/>
+        </svg>
       </div>
 
       <!-- Turno en Atención -->
       <div id="turno-en-atencion-card" class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden hidden mb-8">
-        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-green-400 to-green-600"></div>
+        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-red-400 to-red-600"></div>
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold text-gray-900 dark:text-white">Turno en Atención</h2>
           <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-4 py-1 rounded-xl border border-red-100 dark:border-red-800">--:--</div>
@@ -181,7 +224,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Turno</p>
-            <p id="atencion-turno" class="text-4xl font-black text-green-600 dark:text-green-400 tracking-tight">--</p>
+            <p id="atencion-turno" class="text-4xl font-black text-red-600 dark:text-red-400 tracking-tight">--</p>
           </div>
           <div>
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Cliente</p>
@@ -236,7 +279,15 @@
   oninput="this.setCustomValidity('')" />
       </div-->
 
+      </div>
     </main>
+    <footer class="bg-zinc-950 text-gray-400 text-center text-sm py-8 mt-auto px-6 border-t border-white/5">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <p>© 2026 <span class="text-white font-bold">JBarber<span class="text-red-500">.</span></span> Todos los derechos reservados</p>
+        <p class="text-xs">Hecho por <strong class="text-white">LUIS ALFREDO CABRERA REYES</strong></p>
+      </div>
+    </footer>
+    </div>
   </div>
 
   <script type="module" src="admin/panel.js"></script>
@@ -245,118 +296,7 @@
     
     const negocioId = document.body.dataset.negocioId;
 
-    async function initChart() {
-        const ctx = document.getElementById('dashboardChart');
-        if(!ctx) return;
-
-        // Fetch data for today
-        const hoy = new Date().toISOString().slice(0, 10);
-        const { data: turnos } = await supabase
-            .from('turnos')
-            .select('hora, estado')
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy);
-
-        // Process data: Turns per hour
-        const hours = Array.from({length: 13}, (_, i) => i + 8); // 8:00 to 20:00
-        const labels = hours.map(h => `${h}:00`);
-        const dataAtendidos = new Array(hours.length).fill(0);
-        const dataEspera = new Array(hours.length).fill(0);
-
-        if(turnos) {
-            turnos.forEach(t => {
-                const h = parseInt(t.hora.split(':')[0]);
-                const idx = hours.indexOf(h);
-                if(idx !== -1) {
-                    if(t.estado === 'Atendido') dataAtendidos[idx]++;
-                    else if(t.estado === 'En espera' || t.estado === 'En atención') dataEspera[idx]++;
-                }
-            });
-        }
-
-        // Gradient setup
-        const chartCtx = ctx.getContext('2d');
-        const gradientAtendidos = chartCtx.createLinearGradient(0, 0, 0, 400);
-        gradientAtendidos.addColorStop(0, 'rgba(34, 197, 94, 0.5)'); // Green 500
-        gradientAtendidos.addColorStop(1, 'rgba(34, 197, 94, 0.0)');
-
-        const gradientEspera = chartCtx.createLinearGradient(0, 0, 0, 400);
-        gradientEspera.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); // Blue 500
-        gradientEspera.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Atendidos',
-                        data: dataAtendidos,
-                        borderColor: '#22c55e',
-                        backgroundColor: gradientAtendidos,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#22c55e',
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: 'En Espera',
-                        data: dataEspera,
-                        borderColor: '#3b82f6',
-                        backgroundColor: gradientEspera,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#3b82f6',
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151', usePointStyle: true, font: { family: "'Inter', sans-serif", size: 12 } }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderWidth: 1,
-                        padding: 10,
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false, drawBorder: false },
-                        ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#6b7280', font: { size: 11 } }
-                    },
-                    y: {
-                        grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderDash: [5, 5] },
-                        ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#6b7280', stepSize: 1, font: { size: 11 } },
-                        beginAtZero: true
-                    }
-                },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
-                }
-            }
-        });
-    }
-
-    // Initialize
-    initChart();
+    // initChart eliminado por solicitud del usuario
   </script>
   <!-- Script de validación eliminado ya que los campos están comentados -->
   <!-- Script de validación de entrada eliminado ya que los campos están comentados -->
@@ -370,9 +310,6 @@
     }
   });
 </script>
-  <footer class="bg-primary-700 dark:bg-primary-700 text-white text-center text-sm py-4 mt-12 rounded-t-xl">
-  © 2025 TurnoRD Todos los derechos reservados • Hecho por <strong>LUIS ALFREDO CABRERA REYES</strong>
-</footer>
 
 <script>
   // Función para alternar modo oscuro con theme.js
