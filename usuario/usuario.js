@@ -77,7 +77,8 @@ async function guardarSuscripcion(subscription) {
       .upsert({
         user_id: telefonoUsuario, // Usamos el teléfono como ID de usuario
         subscription: subscription,
-        negocio_id: negocioId
+        negocio_id: negocioId,
+        endpoint: subscription.endpoint // Guardar el endpoint para borrado seguro
       }, {
         onConflict: 'user_id, negocio_id' // Si ya existe, actualiza la suscripción
       });

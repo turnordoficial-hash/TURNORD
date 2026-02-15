@@ -180,14 +180,21 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     user_id TEXT NOT NULL,
     subscription JSONB NOT NULL,
+    endpoint TEXT,
     negocio_id VARCHAR(255) NOT NULL
 );
+
+-- Asegurar que la columna endpoint exista si la tabla ya fue creada anteriormente
+ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS endpoint TEXT;
 
 COMMENT ON TABLE push_subscriptions IS 'Almacena las suscripciones de notificaciones push de los usuarios para un negocio específico.';
 
 ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_key;
 ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS ux_push_subscriptions_user_negocio;
 ALTER TABLE public.push_subscriptions ADD CONSTRAINT ux_push_subscriptions_user_negocio UNIQUE (user_id, negocio_id);
+
+-- Índice para búsquedas y eliminaciones eficientes por endpoint
+CREATE UNIQUE INDEX IF NOT EXISTS ux_push_subscriptions_endpoint ON public.push_subscriptions(endpoint);
 
 -- ==============================================================================
 -- 6) Modificaciones a Tabla: turnos

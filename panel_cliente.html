@@ -231,7 +231,7 @@
                     
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="cerrarModalCalificacion()" class="flex-1 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Omitir</button>
-                        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-barberRed text-white shadow-lg hover:bg-red-700 transition-colors">Enviar</button>
+                        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-barberRed text-white shadow-lg hover:bg-red-700 transition-all transform hover:scale-105">Enviar</button>
                     </div>
                 </form>
             </div>
@@ -729,7 +729,12 @@
 
     async function guardarSuscripcion(subscription) {
         const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-        if(telefono) await supabase.from('push_subscriptions').upsert({ user_id: telefono, subscription, negocio_id: negocioId }, { onConflict: 'user_id, negocio_id' });
+        if(telefono) await supabase.from('push_subscriptions').upsert({ 
+            user_id: telefono, 
+            subscription, 
+            negocio_id: negocioId,
+            endpoint: subscription.endpoint // Guardar el endpoint para borrado seguro
+        }, { onConflict: 'user_id, negocio_id' });
     }
 
     // --- LÓGICA DE TIEMPO REAL (CORE) ---

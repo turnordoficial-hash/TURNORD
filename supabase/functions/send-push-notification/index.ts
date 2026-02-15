@@ -63,28 +63,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Faltan variables de entorno VAPID_PRIVATE_KEY o VAPID_MAILTO" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
     try {
-      webpush.setVapidDetails(VAPID_MAILTO, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+      webpush.setVapidDetails(`mailto:${VAPID_MAILTO}`, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
     } catch (e) {
       return new Response(JSON.stringify({ error: "Error configurando VAPID: " + (e?.message || String(e)) }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    let { data, error } = await supabase
+    // Búsqueda mejorada por teléfono, como sugeriste
+    const { data, error } = await supabase
       .from("push_subscriptions")
-      .select("subscription")
+      .select("subscription, endpoint") // Seleccionamos también el endpoint
       .eq("user_id", telefono)
       .eq("negocio_id", negocio_id);
 
-    if ((!data || data.length === 0) && !error) {
-      const fallback = await supabase
-        .from("push_subscriptions")
-        .select("subscription")
-        .eq("telefono", telefono)
-        .eq("negocio_id", negocio_id);
-      data = fallback.data;
-      error = fallback.error;
+    if (error) {
+       return new Response(JSON.stringify({ error: "Error al buscar suscripción: " + error.message }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
-
-    if (error || !data || data.length === 0) {
+    if (!data || data.length === 0) {
       return new Response(JSON.stringify({ error: "Suscripción no encontrada" }), { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
@@ -92,22 +86,26 @@ serve(async (req) => {
       title: title || "¡Es tu turno!",
       body: body || "Un barbero te está esperando",
       icon: "/android-chrome-192x192.png",
-      url: "/panel_cliente.html",
+      badge: "/jbarber/jjj.png", // Badge para Android
+      vibrate: [200, 100, 200], // Patrón de vibración
+      data: {
+        url: "/panel_cliente.html", // URL en el objeto data
+      }
     });
 
     // Iterar sobre todas las suscripciones encontradas para ese teléfono
-    for (const suscripcion of data) {
+    for (const sub of data) {
       try {
-        await webpush.sendNotification(suscripcion.subscription, payload);
-      } catch (sendError) {
+        await webpush.sendNotification(sub.subscription, payload);
+      } catch (sendError: any) {
         console.error("Error al enviar notificación a una suscripción:", sendError);
         // Si la suscripción es inválida (e.g., 410 Gone), la eliminamos
         if (sendError.statusCode === 410 || sendError.statusCode === 404) {
-          console.log("Eliminando suscripción inválida:", suscripcion.subscription.endpoint);
+          console.log("Eliminando suscripción inválida por endpoint:", sub.endpoint);
           await supabase
             .from('push_subscriptions')
             .delete()
-            .eq('subscription', suscripcion.subscription);
+            .eq('endpoint', sub.endpoint); // Eliminación segura por endpoint
         }
       }
     }
