@@ -1324,7 +1324,10 @@ async function notificarAvanceFila() {
                     const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                     const res = await fetch(url, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${supabase.supabaseKey}`
+                        },
                         body: JSON.stringify({
                             telefono: turno.telefono,
                             negocio_id: negocioId,
@@ -1384,7 +1387,10 @@ async function notificarSiguienteEnCola() {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabase.supabaseKey}`
+                    },
                     body: JSON.stringify({
                         telefono: siguienteTurno.telefono,
                         negocio_id: negocioId,
@@ -1449,7 +1455,10 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabase.supabaseKey}`
+                    },
                     body: JSON.stringify({
                         telefono: telefono,
                         negocio_id: negocioId,

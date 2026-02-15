@@ -469,3 +469,76 @@ CREATE TABLE IF NOT EXISTS public.citas (
   estado TEXT DEFAULT 'Programada',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+CREATE OR REPLACE FUNCTION registrar_turno(
+  p_negocio_id TEXT,
+  p_nombre TEXT,
+  p_telefono TEXT,
+  p_servicio TEXT,
+  p_barber_id BIGINT
+) RETURNS JSONB AS $$
+DECLARE
+  v_fecha DATE := CURRENT_DATE;
+  v_letra CHAR(1);
+  v_ultimo_turno TEXT;
+  v_nuevo_numero INT;
+  v_nuevo_turno TEXT;
+  v_turno_id BIGINT;
+  v_fecha_base DATE := '2024-08-23'; -- Fecha base para cálculo de letra
+  v_diff_dias INT;
+BEGIN
+  -- 1. Validar si ya tiene turno activo
+  IF EXISTS (
+    SELECT 1 FROM turnos 
+    WHERE negocio_id = p_negocio_id 
+      AND fecha = v_fecha 
+      AND telefono = p_telefono 
+      AND estado IN ('En espera', 'En atención')
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Ya tienes un turno activo.');
+  END IF;
+
+  -- 2. Calcular letra del día (A, B, C...)
+  v_diff_dias := (v_fecha - v_fecha_base);
+  -- Asegurar índice positivo para el módulo
+  v_letra := CHR(65 + (MOD((MOD(v_diff_dias, 26) + 26), 26)));
+
+  -- 3. Obtener último turno del día (Bloqueo pesimista para evitar duplicados)
+  SELECT turno INTO v_ultimo_turno
+  FROM turnos
+  WHERE negocio_id = p_negocio_id 
+    AND fecha = v_fecha
+    AND turno LIKE v_letra || '%'
+  ORDER BY created_at DESC
+  LIMIT 1
+  FOR UPDATE;
+
+  -- 4. Generar nuevo número
+  IF v_ultimo_turno IS NULL THEN
+    v_nuevo_numero := 1;
+  ELSE
+    v_nuevo_numero := CAST(SUBSTRING(v_ultimo_turno FROM 2) AS INT) + 1;
+  END IF;
+
+  v_nuevo_turno := v_letra || LPAD(v_nuevo_numero::TEXT, 2, '0');
+
+  -- 5. Insertar el turno
+  INSERT INTO turnos (
+    negocio_id, turno, nombre, telefono, servicio, barber_id, estado, fecha, hora
+  ) VALUES (
+    p_negocio_id,
+    v_nuevo_turno,
+    p_nombre,
+    p_telefono,
+    p_servicio,
+    p_barber_id,
+    'En espera',
+    v_fecha,
+    TO_CHAR(NOW(), 'HH24:MI')
+  ) RETURNING id INTO v_turno_id;
+
+  -- 6. Retornar éxito
+  RETURN jsonb_build_object('success', true, 'turno', v_nuevo_turno, 'id', v_turno_id);
+END;
+$$ LANGUAGE plpgsql;
