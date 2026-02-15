@@ -32,7 +32,7 @@ function getDeadlineKey(turno) {
 
 // Clave pública VAPID - ¡Esta clave debe ser generada y almacenada de forma segura!
 // Es seguro exponerla en el lado del cliente.
-const VAPID_PUBLIC_KEY = 'BC5jD225d3BEpkV1E_gQSv2hSRn2kX2h5lVfIYG3_k2Z7Fq5ZzXVy7i_h5kHl-bO3F4GfI8aZ3E2Xl8Yk9ZzC7Q';
+const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
 
 /**
  * Registra el Service Worker.
