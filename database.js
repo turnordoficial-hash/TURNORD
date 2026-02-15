@@ -8,30 +8,30 @@ let supabase;
 let supabaseReadyResolve;
 const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
 
-function initializeSupabase() {
+async function initializeSupabase() {
   try {
-    // Verificar conexión a internet antes de intentar inicializar
     if (!navigator.onLine) {
       handleOfflineStatus(true);
     }
 
+    let createClientFn = null;
     if (window.supabase && typeof window.supabase.createClient === 'function') {
-      const { createClient } = window.supabase;
-      supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      });
-      console.log("Supabase client initialized successfully.");
-      supabaseReadyResolve && supabaseReadyResolve(supabase);
+      createClientFn = window.supabase.createClient;
     } else {
-      throw new Error('Supabase client not found on window object. Make sure the Supabase CDN script is loaded before this script.');
+      const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      createClientFn = mod.createClient;
     }
+
+    supabase = createClientFn(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+    supabaseReadyResolve && supabaseReadyResolve(supabase);
   } catch (error) {
     console.error('Error initializing Supabase client:', error);
-    // Solo mostrar error crítico si no es un problema de red (que se maneja aparte)
     if (navigator.onLine) {
       document.body.innerHTML = '<div style="color: red; padding: 20px; text-align: center; font-family: sans-serif;">' +
         '<h2 style="margin-bottom: 10px;">Error de Conexión</h2>' +

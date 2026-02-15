@@ -8,7 +8,7 @@ self.addEventListener("push", (event) => {
     title: "TurnoRD",
     body: "Hay una nueva notificación para ti.",
     icon: "/android-chrome-192x192.png",
-    url: "/panel_cliente.html"
+    url: "panel_cliente.html"
   };
 
   if (event.data) {
@@ -25,7 +25,7 @@ self.addEventListener("push", (event) => {
     badge: "/favicon-32x32.png",
     vibrate: [100, 50, 100],
     data: {
-      url: payload.url || "/panel_cliente.html"
+      url: payload.url || "panel_cliente.html"
     },
     actions: [
       {
@@ -56,15 +56,20 @@ self.addEventListener("notificationclick", (event) => {
 
   const targetUrl = new URL(
     event.notification.data.url,
-    self.location.origin
+    self.location.href // Resolver relativo a la ubicación del SW
   ).href;
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true })
       .then((clientList) => {
 
+        // Buscar si ya hay una pestaña abierta con la URL destino
         for (const client of clientList) {
-          if (client.url.includes("barberia005") && "focus" in client) {
+          if (client.url === targetUrl && "focus" in client) {
+            return client.focus();
+          }
+          // Fallback: Si está en el mismo origen, enfocar y navegar
+          if (client.url.startsWith(self.location.origin) && "focus" in client) {
             client.navigate(targetUrl);
             return client.focus();
           }

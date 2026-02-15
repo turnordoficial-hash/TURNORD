@@ -91,7 +91,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+    <aside id="sidebar" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5">
       <div class="p-6 flex items-center justify-between border-b border-white/5">
         <div class="flex items-center gap-3">
            <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
@@ -155,7 +155,7 @@
     <div class="flex-1 flex flex-col min-w-0 transition-all duration-300 w-full">
     <!-- Contenido principal -->
     <main class="flex-1 md:ml-0 p-4 sm:p-6 w-full max-w-full overflow-x-hidden">
-      <div class="max-w-[1600px] mx-auto w-full space-y-6">
+      <div class="max-w-[1600px] mx-auto w-full space-y-3">
         <!-- Icono de Barbería: Recortador -->
         <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
           <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
@@ -174,9 +174,9 @@
         </div>
 
         <!-- Tarjetas de información -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 w-full">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 w-full">
         <!-- Turno actual -->
-        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border border-gray-100 dark:border-white/5 w-full">
+        <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm transition-all hover:shadow-md border border-gray-100 dark:border-white/5 w-full">
           <div class="flex justify-between items-start">
             <div>
               <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300">Turno Actual</h2>
@@ -195,7 +195,7 @@
         </div>
 
         <!-- Turnos en espera -->
-        <div class="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-md transition-all hover:shadow-lg border border-gray-100 dark:border-white/5 w-full">
+        <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm transition-all hover:shadow-md border border-gray-100 dark:border-white/5 w-full">
           <div class="flex justify-between items-start">
             <div>
               <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300">En Espera</h2>
@@ -217,7 +217,7 @@
       </div>
 
       <!-- Botones de acción -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 w-full">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 w-full">
         <!-- Botón Atender (Grande) -->
         <button id="btnAtender" class="col-span-2 md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3 group transform hover:scale-[1.02]">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -404,7 +404,7 @@
       </div>
 
       <!-- Turnos en Atencion -->
-      <div id="contenedor-atencion" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-6 border-2 border-green-500/20">
+      <div id="contenedor-atencion" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3 border border-green-500/20">
         <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -417,7 +417,7 @@
       </div>
 
       <!-- Lista de turnos en espera -->
-      <div id="contenedor-lista-espera" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-6">
+      <div id="contenedor-lista-espera" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -434,7 +434,7 @@
             </button>
           </div>
         </div>
-        <div id="listaEspera" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div id="listaEspera" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <!-- Turnos agregados aparecerán aquí -->
           <!-- Ejemplo de tarjeta de turno (se generará dinámicamente) -->
           <div class="hidden bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg shadow-sm border border-blue-100 dark:border-blue-800 transition-all hover:shadow-md">
@@ -463,7 +463,7 @@
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-6">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,10 +473,10 @@
           </h2>
           <span id="contador-citas-hoy" class="bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs font-medium px-2.5 py-0.5 rounded-full">0 citas</span>
         </div>
-        <div id="listaCitasHoy" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+        <div id="listaCitasHoy" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-6">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -486,10 +486,10 @@
           </h2>
           <span id="contador-citas-futuras" class="bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200 text-xs font-medium px-2.5 py-0.5 rounded-full">0 citas</span>
         </div>
-        <div id="listaCitasFuturas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+        <div id="listaCitasFuturas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-6">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -498,11 +498,11 @@
             Turnos y Citas por Barbero
           </h2>
         </div>
-        <div id="barberos-contenedor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="barberos-contenedor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
       </div>
 
       <!-- Sección de estadísticas -->
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

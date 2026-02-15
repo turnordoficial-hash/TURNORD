@@ -1309,14 +1309,36 @@ async function notificarAvanceFila() {
                 mensaje = `La fila avanzó. Quedan ${turnosDelante} personas antes que tú. Estamos más cerca de tu turno.`;
             }
 
-            const { data, error } = await supabase.functions.invoke('send-push-notification', {
-                body: {
-                    telefono: turno.telefono,
-                    negocio_id: negocioId,
-                    title: `Turno ${turno.turno} - ${turno.nombre}`,
-                    body: mensaje
+            let data, error;
+            try {
+                ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                    body: {
+                        telefono: turno.telefono,
+                        negocio_id: negocioId,
+                        title: `Turno ${turno.turno} - ${turno.nombre}`,
+                        body: mensaje
+                    }
+                }));
+            } catch (eInvoke) {
+                try {
+                    const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            telefono: turno.telefono,
+                            negocio_id: negocioId,
+                            title: `Turno ${turno.turno} - ${turno.nombre}`,
+                            body: mensaje
+                        })
+                    });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    data = await res.json().catch(() => ({ success: true }));
+                    error = null;
+                } catch (eFetch) {
+                    error = eFetch;
                 }
-            });
+            }
 
             if (error) {
                 console.error(`Error notificando a ${turno.nombre}:`, error.message);
@@ -1347,14 +1369,36 @@ async function notificarSiguienteEnCola() {
     try {
         console.log(`Intentando notificar al siguiente en cola: ${siguienteTurno.nombre} (${siguienteTurno.telefono})`);
 
-        const { data, error } = await supabase.functions.invoke('send-push-notification', {
-            body: {
-                telefono: siguienteTurno.telefono,
-                negocio_id: negocioId,
-                title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
-                body: 'Dirígete al local ahora. Es tu momento.'
+        let data, error;
+        try {
+            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                body: {
+                    telefono: siguienteTurno.telefono,
+                    negocio_id: negocioId,
+                    title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
+                    body: 'Dirígete al local ahora. Es tu momento.'
+                }
+            }));
+        } catch (eInvoke) {
+            try {
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telefono: siguienteTurno.telefono,
+                        negocio_id: negocioId,
+                        title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
+                        body: 'Dirígete al local ahora. Es tu momento.'
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = await res.json().catch(() => ({ success: true }));
+                error = null;
+            } catch (eFetch) {
+                error = eFetch;
             }
-        });
+        }
 
         if (error) {
             console.error('Error devuelto por la función de notificación:', error.message);
@@ -1390,14 +1434,36 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
     try {
         console.log(`Notificando turno tomado a: ${nombre} (${telefono})`);
 
-        const { data, error } = await supabase.functions.invoke('send-push-notification', {
-            body: {
-                telefono: telefono,
-                negocio_id: negocioId,
-                title: `¡Turno confirmado, ${nombre}!`,
-                body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
+        let data, error;
+        try {
+            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                body: {
+                    telefono: telefono,
+                    negocio_id: negocioId,
+                    title: `¡Turno confirmado, ${nombre}!`,
+                    body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
+                }
+            }));
+        } catch (eInvoke) {
+            try {
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        telefono: telefono,
+                        negocio_id: negocioId,
+                        title: `¡Turno confirmado, ${nombre}!`,
+                        body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = await res.json().catch(() => ({ success: true }));
+                error = null;
+            } catch (eFetch) {
+                error = eFetch;
             }
-        });
+        }
 
         if (error) {
             console.error('Error al notificar turno tomado:', error.message);

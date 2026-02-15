@@ -107,7 +107,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" role="navigation" aria-label="Menú principal" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+    <aside id="sidebar" role="navigation" aria-label="Menú principal" class="w-64 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5">
       <div class="p-6 flex items-center justify-between border-b border-white/5">
         <div class="flex items-center gap-3">
            <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
@@ -175,8 +175,8 @@
         <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Panel de Control</h1>
 
         <!-- Resumen -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 w-full">
-        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6 w-full">
+        <div class="bg-white dark:bg-zinc-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden group">
           <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-red-500/10 transition-colors">
             <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.65,6.5L15,11.15V9.85C15,9.02 14.33,8.35 13.5,8.35H8.5C7.67,8.35 7,9.02 7,9.85V11.15L2.35,6.5V9.5L7.35,14.5V16.5C7.35,17.33 8.02,18 8.85,18H13.15C13.98,18 14.65,17.33 14.65,16.5V14.5L19.65,9.5V6.5M12.5,16.5H9.5V9.85H12.5V16.5Z"/></svg>
           </div>
@@ -184,7 +184,7 @@
           <p id="turnosEspera" class="text-5xl font-black text-red-600 dark:text-red-400 mt-4 relative z-10">0</p>
         </div>
 
-        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+        <div class="bg-white dark:bg-zinc-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden group">
           <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-blue-500/10 transition-colors">
             <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5,2C11.67,2 11,2.67 11,3.5V5.5L6,1V4L11,8.5V10.5C11,11.33 11.67,12 12.5,12H17.5C18.33,12 19,11.33 19,10.5V8.5L24,4V1L19,5.5V3.5C19,2.67 18.33,2 17.5,2H12.5M16.5,10.5H13.5V3.5H16.5V10.5M5,12H3V21H5V12M9,12H7V21H9V12M13,14H11V21H13V14M17,14H15V21H17V14M1,10V21H3V10H1Z"/></svg>
           </div>
@@ -192,7 +192,7 @@
           <p id="turnosAtendidos" class="text-5xl font-black text-blue-600 dark:text-blue-400 mt-4 relative z-10">0</p>
         </div>
 
-        <div class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden group">
+        <div class="bg-white dark:bg-zinc-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden group">
           <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-red-500/10 transition-colors">
             <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9V11H11V9L5,3V6L11,12V21H13V12L19,6V3M7.8,5.4L11.8,9.4L12,9.6L12.2,9.4L16.2,5.4L16.6,5L16.2,5.4L12.2,9.4L12,9.6L11.8,9.4L7.8,5.4L7.4,5L7.8,5.4Z"/></svg>
           </div>
@@ -209,9 +209,9 @@
       </div>
 
       <!-- Turno en Atención -->
-      <div id="turno-en-atencion-card" class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden hidden mb-8">
+      <div id="turno-en-atencion-card" class="bg-white dark:bg-zinc-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden hidden mb-4">
         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-red-400 to-red-600"></div>
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex justify-between items-center mb-3">
           <h2 class="text-xl font-bold text-gray-900 dark:text-white">Turno en Atención</h2>
           <div id="atencion-timer" class="text-2xl font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-4 py-1 rounded-xl border border-red-100 dark:border-red-800">--:--</div>
         </div>
@@ -233,14 +233,14 @@
       <!-- Fin Turno en Atención -->
 
       <!-- Botón limpiar historial -->
-      <div class="flex justify-end mb-4">
+      <div class="flex justify-end mb-3">
         <button id="btnLimpiarHistorial" onclick="limpiarHistorialTurnos()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg transition-all hover:scale-105">
           Limpiar historial
         </button>
       </div>
 
       <!-- Tabla de turnos -->
-      <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-6 overflow-x-auto">
+      <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-white/5 p-4 overflow-x-auto">
         <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Historial de turnos</h2>
         <table class="min-w-full text-left">
           <thead>

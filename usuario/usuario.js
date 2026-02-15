@@ -19,7 +19,11 @@ const negocioId = getNegocioId();
 let turnoAsignado = null;
 let intervaloContador = null;
 let telefonoUsuario = localStorage.getItem(`telefonoUsuario_${negocioId}`) || null;
-let configCache = {};
+let configCache = {
+    hora_apertura: '08:00',
+    hora_cierre: '23:00',
+    limite_turnos: 50
+};
 let serviciosCache = {};
 
 function getDeadlineKey(turno) {
@@ -344,7 +348,11 @@ async function obtenerConfig() {
             .limit(1)
             .maybeSingle();
         if (error) throw error;
-        if (data) configCache = { ...configCache, ...data };
+        if (data) {
+            // Filtrar valores nulos para no romper los defaults
+            const validData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== null));
+            configCache = { ...configCache, ...validData };
+        }
         return data;
     } catch (error) {
         console.error('Error al obtener configuración:', error.message);
@@ -557,6 +565,10 @@ async function actualizarTurnoActualYConteo() {
 
 async function tomarTurnoSimple(nombre, telefono, servicio) {
     if (!negocioId) return;
+    
+    // Asegurar que tenemos la configuración más reciente antes de validar
+    await obtenerConfig();
+
     if (!(await verificarDiaLaboralFecha(new Date()))) {
         alert('Hoy no es un día laboral.');
         return;
@@ -568,13 +580,17 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
     }
     const ahora = new Date();
     const horaActual = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-    if (horaActual < configCache.hora_apertura || horaActual > configCache.hora_cierre) {
-        alert(`Horario de atención: ${configCache.hora_apertura} - ${configCache.hora_cierre}.`);
+    
+    const apertura = configCache.hora_apertura || '08:00';
+    const cierre = configCache.hora_cierre || '23:00';
+
+    if (horaActual < apertura || horaActual > cierre) {
+        alert(`El negocio está cerrado en este momento.\n\nHorario de atención: ${apertura} - ${cierre}\nHora actual: ${horaActual}`);
         return;
     }
     const fechaHoy = obtenerFechaActual();
-    if ((await contarTurnosDia(fechaHoy)) >= configCache.limite_turnos) {
-        alert(`Se ha alcanzado el límite de ${configCache.limite_turnos} turnos para hoy.`);
+    if ((await contarTurnosDia(fechaHoy)) >= (configCache.limite_turnos || 50)) {
+        alert(`Se ha alcanzado el límite de ${configCache.limite_turnos || 50} turnos para hoy.`);
         return;
     }
     telefonoUsuario = telefono;
