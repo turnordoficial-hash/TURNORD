@@ -1473,6 +1473,12 @@
       const rangoDisplay = document.getElementById('rango-horario-display');
       const actionContainer = document.getElementById('action-container');
 
+      // --- VALIDACIONES PREVIAS (SOLUCIÓN ERROR 400) ---
+      if (!negocioId) { console.error("negocioId es undefined"); return; }
+      if (!barberSel) { console.error("Barbero no seleccionado"); return; }
+      if (!dateStr) { console.error("Fecha no seleccionada"); return; }
+      // ------------------------------------------------
+
       // --- OPTIMIZACIÓN CACHÉ ---
       const cacheKey = `${dateStr}_${barberSel}`;
       // Si los parámetros son los mismos y tenemos datos, no recargamos
@@ -1524,6 +1530,10 @@
           return;
       }
 
+      // Definir rango del día para consultas (ISO 8601)
+      const startDayISO = new Date(dateStr + 'T00:00:00').toISOString();
+      const endDayISO = new Date(dateStr + 'T23:59:59').toISOString();
+
       startDay.setHours(ap[0], ap[1], 0, 0);
       
       const endDay = new Date(dateStr + 'T00:00:00');
@@ -1533,13 +1543,15 @@
       const telefono = document.getElementById('profile-phone').textContent;
       let misCitas = [];
       if (telefono && telefono !== '...') {
+          // CORRECCIÓN: Usar rango de fechas en lugar de columna 'fecha' que no existe en tabla citas
           const pMisCitas = supabase
               .from('citas')
               .select('id')
               .eq('negocio_id', negocioId)
               .eq('cliente_telefono', telefono)
               .neq('estado', 'Cancelada')
-              .eq('fecha', dateStr);
+              .gte('start_at', startDayISO)
+              .lte('start_at', endDayISO);
           promises.push(pMisCitas.then(r => { misCitas = r.data || []; }));
       }
 
@@ -1551,8 +1563,8 @@
           .eq('negocio_id', negocioId)
           .eq('barber_id', Number(barberSel))
           .neq('estado', 'Cancelada')
-          .gte('start_at', startDay.toISOString())
-          .lte('start_at', endDay.toISOString());
+          .gte('start_at', startDayISO)
+          .lte('start_at', endDayISO);
       promises.push(pCitas.then(r => { citas = r.data || []; }));
 
       // Obtener breaks
