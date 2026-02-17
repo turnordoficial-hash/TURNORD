@@ -834,6 +834,7 @@
       const btn = document.getElementById('mobile-menu-button');
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('sidebar-overlay');
+      const closeBtn = document.getElementById('closeSidebar');
 
       if (btn && sidebar && overlay) {
         const toggle = () => {
@@ -843,6 +844,7 @@
         };
         btn.addEventListener('click', toggle);
         overlay.addEventListener('click', toggle);
+        if (closeBtn) closeBtn.addEventListener('click', toggle);
       }
     });
   </script>

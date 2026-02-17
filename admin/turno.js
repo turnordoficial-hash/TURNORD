@@ -121,6 +121,13 @@ function iniciarTimerParaTurno(turno) {
 }
 
 let __refreshTimer = null;
+let refreshTimeout = null;
+function safeRefresh() {
+    if (refreshTimeout) clearTimeout(refreshTimeout);
+    refreshTimeout = setTimeout(() => {
+        refrescarUI();
+    }, 300);
+}
 function refrescarUI() {
     // Si ya se está ejecutando una carga, o hay un timer pendiente, controlamos la saturación
     if (__refreshTimer) return;
@@ -304,6 +311,7 @@ function setupSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     const closeSidebar = document.getElementById('closeSidebar');
+    const sidebarTexts = document.querySelectorAll('.sidebar-text');
 
     if (!sidebar) return;
 
@@ -318,8 +326,7 @@ function setupSidebar() {
     const toggleDesktop = () => {
         sidebar.classList.toggle('w-64');
         sidebar.classList.toggle('w-20');
-        const texts = sidebar.querySelectorAll('.sidebar-text');
-        texts.forEach(t => t.classList.toggle('hidden'));
+        sidebarTexts.forEach(t => t.classList.toggle('hidden'));
     };
 
     if (mobileMenuButton) mobileMenuButton.addEventListener('click', toggleMobile);
@@ -539,6 +546,35 @@ async function tomarTurno(event) {
         return;
     }
     const servicio = document.getElementById('servicio').value;
+    
+    // --- MEJORA DE LÓGICA: Verificar si hay tiempo antes de la próxima cita ---
+    // Esto evita que un turno manual se tome justo antes de una cita, creando retrasos.
+    const duracionServicio = serviciosCache[servicio] || 30;
+    const asignacion = obtenerBarberoSugerido(duracionServicio);
+    
+    if (!asignacion) {
+        // Si no hay barbero sugerido, significa que todos están ocupados o tienen citas próximas
+        // Verificamos si es por citas
+        const hayCitasProximas = citasHoy.some(c => {
+            const start = new Date(c.start_at);
+            const diffMin = (start - new Date()) / 60000;
+            return diffMin > 0 && diffMin < duracionServicio + 10; // 10 min buffer
+        });
+        
+        if (hayCitasProximas) {
+            const confirmar = await Swal.fire({
+                title: '⚠️ Agenda apretada',
+                text: 'Hay citas programadas próximamente y este servicio podría causar retrasos. ¿Registrar de todos modos?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, registrar',
+                cancelButtonText: 'Cancelar'
+            });
+            if (!confirmar.isConfirmed) return;
+        }
+    }
+    // -----------------------------------------------------------------------
+
     const fechaHoy = new Date().toISOString().slice(0, 10);
     
     // 1. Eliminado cálculo manual de 'orden' para evitar Race Condition.
@@ -611,7 +647,7 @@ async function tomarTurno(event) {
 }
 
 async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
-    // --- SISTEMA PRO DE CÁLCULO DE TIEMPOS (Simulación de Cola Real) ---
+    // --- CÁLCULO INTELIGENTE DE TIEMPO (Lógica Oficial TurnoRD) ---
     const hoy = new Date().toISOString().slice(0, 10);
     const ahora = new Date();
     
@@ -641,106 +677,40 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
         return 0;
     }
 
-    // 2. Inicializar Líneas de Tiempo por Barbero (Simulación)
-    // Map<BarberID, Date> -> Momento en que se libera
-    let timelines = new Map();
-    
-    // Si no hay barberos activos, retornar tiempo alto o 0
-    if (barberosActivosList.length === 0) return 0;
+    let tiempoTotalPendiente = 0;
 
-    barberosActivosList.forEach(b => {
-        timelines.set(b.id, new Date(ahora));
-    });
-
-    // 3. Proyectar Turnos en Atención (Base de la simulación)
+    // PASO 1: Calcular tiempo restante real de turnos en atención
     enAtencion.forEach(t => {
-        if (t.barber_id && timelines.has(t.barber_id)) {
-            const duracion = serviciosCache[t.servicio] || 30;
-            const inicio = t.started_at ? new Date(t.started_at) : new Date(ahora);
-            const finEstimado = new Date(inicio.getTime() + duracion * 60000);
-            // El barbero se libera cuando termine, o ahora si ya debió terminar
-            const realFin = finEstimado > ahora ? finEstimado : ahora;
-            timelines.set(t.barber_id, realFin);
-        }
+        const duracion = serviciosCache[t.servicio] || 30;
+        const inicio = t.started_at ? new Date(t.started_at) : new Date();
+        const transcurrido = (Date.now() - inicio.getTime()) / 60000;
+        const restante = Math.max(0, duracion - transcurrido);
+        tiempoTotalPendiente += restante;
     });
 
-    // 4. Simular Cola de Espera (Load Balancing Inteligente)
-    // Función auxiliar para encontrar el mejor barbero disponible para un servicio
-    const encontrarMejorBarbero = (duracionServicio) => {
-        let mejorBarberoId = null;
-        let tiempoInicioMasTemprano = null;
-
-        for (let [barberId, tiempoLibre] of timelines) {
-            let candidatoInicio = new Date(tiempoLibre);
-            let conflicto = true;
-            const buffer = 5 * 60000; // 5 min buffer entre servicios
-
-            // Ajustar candidatoInicio si choca con citas futuras (Mejora #3 y #4)
-            while (conflicto) {
-                conflicto = false;
-                const candidatoFin = new Date(candidatoInicio.getTime() + duracionServicio * 60000 + buffer);
-
-                // Buscar citas que bloqueen este intervalo
-                const citaBloqueante = citasHoy.find(c => {
-                    if (c.barber_id !== barberId) return false;
-                    if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
-                    
-                    const appStart = new Date(c.start_at);
-                    const appEnd = new Date(c.end_at);
-
-                    // Si la cita ya pasó (appEnd <= candidatoInicio), no bloquea
-                    if (appEnd <= candidatoInicio) return false;
-
-                    // Si el servicio termina antes de que empiece la cita (con buffer), no bloquea
-                    if (candidatoFin.getTime() <= appStart.getTime()) return false;
-
-                    return true; // Hay solapamiento
-                });
-
-                if (citaBloqueante) {
-                    conflicto = true;
-                    // Saltar al final de la cita para reevaluar disponibilidad
-                    candidatoInicio = new Date(new Date(citaBloqueante.end_at).getTime() + buffer);
-                }
-            }
-
-            if (tiempoInicioMasTemprano === null || candidatoInicio < tiempoInicioMasTemprano) {
-                tiempoInicioMasTemprano = candidatoInicio;
-                mejorBarberoId = barberId;
-            }
-        }
-        return { barberId: mejorBarberoId, inicio: tiempoInicioMasTemprano };
-    };
-
-    // Procesar cola turno por turno
-    for (const turno of cola) {
-        const duracion = serviciosCache[turno.servicio] || 30;
-        const asignacion = encontrarMejorBarbero(duracion);
-
-        if (asignacion.barberId) {
-            // Actualizar timeline del barbero asignado
-            const finServicio = new Date(asignacion.inicio.getTime() + duracion * 60000);
-            timelines.set(asignacion.barberId, finServicio);
-
-            // Si es el turno que buscamos, retornamos la espera hasta su inicio
-            if (turnoObjetivo && turno.turno === turnoObjetivo) {
-                const esperaMs = asignacion.inicio - ahora;
-                return Math.max(0, Math.ceil(esperaMs / 60000));
-            }
-        }
-    }
-    
-    // Si calculamos para un nuevo cliente (turnoObjetivo null)
-    if (!turnoObjetivo) {
-        const duracionPromedio = 30;
-        const asignacion = encontrarMejorBarbero(duracionPromedio);
-        if (asignacion.inicio) {
-            const esperaMs = asignacion.inicio - ahora;
-            return Math.max(0, Math.ceil(esperaMs / 60000));
+    // PASO 2: Sumar duración de turnos en espera
+    // Si buscamos para un turno específico, solo sumamos los que están antes
+    let colaFiltrada = cola;
+    if (turnoObjetivo) {
+        const index = cola.findIndex(t => t.turno === turnoObjetivo);
+        if (index !== -1) {
+            colaFiltrada = cola.slice(0, index);
+        } else {
+            // Si el turno no está en espera (quizás ya en atención), retornamos 0 o lógica especial
+            // Asumimos que si se llama esta función es para un turno en espera o nuevo
         }
     }
 
-    return 0;
+    colaFiltrada.forEach(t => {
+        const duracion = serviciosCache[t.servicio] || 30;
+        tiempoTotalPendiente += duracion;
+    });
+
+    // PASO 3: Dividir entre barberos activos
+    const barberosActivos = Math.max(1, barberosActivosList.length);
+    const tiempoEstimado = tiempoTotalPendiente / barberosActivos;
+
+    return Math.ceil(tiempoEstimado);
 }
 
 function obtenerLetraDelDia() {
@@ -1051,6 +1021,27 @@ async function cargarTurnos() {
     }
     renderCitas();
     renderPorBarbero(enAtencion || [], dataRender || [], citasHoy || []);
+    
+    // --- ALERTA VISUAL DE PRÓXIMA CITA ---
+    const ahora = new Date();
+    const proximaCitaInminente = citasHoy.find(c => {
+        if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
+        const start = new Date(c.start_at);
+        const diffMin = (start - ahora) / 60000;
+        return diffMin > 0 && diffMin <= 15; // Citas en los próximos 15 min
+    });
+
+    if (proximaCitaInminente) {
+        const alertaDiv = document.getElementById('alerta-cita-proxima') || document.createElement('div');
+        alertaDiv.id = 'alerta-cita-proxima';
+        alertaDiv.className = 'fixed bottom-4 right-4 bg-yellow-500 text-white px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce cursor-pointer';
+        alertaDiv.innerHTML = `<strong>⚠️ Cita Inminente</strong><br>${clientesMap[proximaCitaInminente.cliente_telefono] || 'Cliente'} - ${new Date(proximaCitaInminente.start_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        alertaDiv.onclick = () => atenderAhora(); // Clic para ir directo a atender
+        if (!document.getElementById('alerta-cita-proxima')) document.body.appendChild(alertaDiv);
+    } else {
+        const alerta = document.getElementById('alerta-cita-proxima');
+        if (alerta) alerta.remove();
+    }
 }
 
 function renderPorBarbero(enAtencionList, enEsperaList, citasHoyList) {
@@ -1223,27 +1214,29 @@ async function cargarEstadisticas() {
 }
 
 let canalTurnos = null;
-function suscribirseTurnos() {
+async function suscribirseTurnos() {
     if (canalTurnos) {
-        supabase.removeChannel(canalTurnos);
+        await supabase.removeChannel(canalTurnos);
+        canalTurnos = null;
     }
     canalTurnos = supabase
         .channel(`turnos-admin-${negocioId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` },
-            () => { refrescarUI(); }
+            () => { safeRefresh(); }
         )
         .subscribe();
 }
 
 let canalCitas = null;
-function suscribirseCitas() {
+async function suscribirseCitas() {
     if (canalCitas) {
-        supabase.removeChannel(canalCitas);
+        await supabase.removeChannel(canalCitas);
+        canalCitas = null;
     }
     canalCitas = supabase
         .channel(`citas-admin-${negocioId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` },
-            () => { refrescarUI(); }
+            () => { safeRefresh(); }
         )
         .subscribe();
 }
@@ -1286,6 +1279,7 @@ function cerrarModalPago() {
  */
 async function notificarAvanceFila() {
     if (__pushSubsCount === 0) return;
+    if (!Array.isArray(dataRender)) return;
     // Optimización: Solo notificar a los primeros 5 de la fila para evitar rate limits y costos
     const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 5);
     
@@ -1293,6 +1287,9 @@ async function notificarAvanceFila() {
         console.log('No hay turnos en espera para notificar avance de fila');
         return;
     }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || supabase.supabaseKey;
 
     // Notificar a todos los clientes en espera sobre el avance
     const promesas = turnosEnEspera.map(async (turno, i) => {
@@ -1326,7 +1323,7 @@ async function notificarAvanceFila() {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${supabase.supabaseKey}`
+                            'Authorization': `Bearer ${token}`
                         },
                         body: JSON.stringify({
                             telefono: turno.telefono,
@@ -1360,6 +1357,7 @@ async function notificarAvanceFila() {
 
 async function notificarSiguienteEnCola() {
     if (__pushSubsCount === 0) return;
+    if (!Array.isArray(dataRender)) return;
     // dataRender es el array de turnos en espera, ya ordenado.
     // El turno que se acaba de llamar estaba en el índice 0. El siguiente es el del índice 1.
     const siguienteTurno = dataRender.length > 1 ? dataRender[1] : null;
@@ -1371,6 +1369,9 @@ async function notificarSiguienteEnCola() {
 
     try {
         console.log(`Intentando notificar al siguiente en cola: ${siguienteTurno.nombre} (${siguienteTurno.telefono})`);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || supabase.supabaseKey;
 
         let data, error;
         try {
@@ -1389,7 +1390,7 @@ async function notificarSiguienteEnCola() {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${supabase.supabaseKey}`
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
                         telefono: siguienteTurno.telefono,
@@ -1440,6 +1441,9 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
     try {
         console.log(`Notificando turno tomado a: ${nombre} (${telefono})`);
 
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || supabase.supabaseKey;
+
         let data, error;
         try {
             ({ data, error } = await supabase.functions.invoke('send-push-notification', {
@@ -1457,7 +1461,7 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${supabase.supabaseKey}`
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
                         telefono: telefono,
@@ -1518,12 +1522,14 @@ function barberoTieneTiempo(barberId, duracionMinutos) {
     const finTurnoEstimado = new Date(ahora.getTime() + (duracionMinutos + bufferSeguridad) * 60000);
     
     // Buscar la próxima cita programada para este barbero hoy
-    const proximaCita = citasHoy.find(c => {
-        if (c.barber_id !== barberId) return false;
-        if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
-        const start = new Date(c.start_at);
-        return start > ahora;
-    });
+    const proximaCita = citasHoy
+        .filter(c => {
+            if (c.barber_id !== barberId) return false;
+            if (c.estado === ESTADOS.CITA_CANCELADA || c.estado === ESTADOS.CITA_ATENDIDA || c.estado === ESTADOS.ATENCION) return false;
+            const start = new Date(c.start_at);
+            return start > ahora;
+        })
+        .sort((a, b) => new Date(a.start_at) - new Date(b.start_at))[0];
 
     if (!proximaCita) return true; // No hay citas futuras hoy que bloqueen
 
@@ -1622,7 +1628,7 @@ async function atenderAhora() {
     }
 
     const ahora = new Date();
-    const ventanaMin = 10;
+    const ventanaMin = 20; // Aumentado a 20 min para dar prioridad absoluta a citas
     let citaPrioritaria = null;
     if (barberId) {
         citaPrioritaria = (citasHoy || []).find(c => {
@@ -1631,8 +1637,32 @@ async function atenderAhora() {
             const inicioVentana = new Date(start.getTime() - ventanaMin * 60000);
             return c.barber_id === barberId && ahora >= inicioVentana && ahora <= end && (c.estado === ESTADOS.CITA_PROGRAMADA || !c.estado);
         });
+    } else {
+        // Si es asignación automática, buscar CUALQUIER cita prioritaria
+        citaPrioritaria = (citasHoy || []).find(c => {
+            const start = new Date(c.start_at);
+            const inicioVentana = new Date(start.getTime() - ventanaMin * 60000);
+            // Solo si el barbero de la cita está libre (o es el que se va a liberar)
+            return ahora >= inicioVentana && (c.estado === ESTADOS.CITA_PROGRAMADA || !c.estado);
+        });
     }
+
     if (citaPrioritaria) {
+        const nombreCliente = clientesMap[citaPrioritaria.cliente_telefono] || 'Cliente Cita';
+        const horaCita = new Date(citaPrioritaria.start_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        
+        const confirmacion = await Swal.fire({
+            title: '📅 Cita Programada Detectada',
+            html: `Hay una cita para <strong>${nombreCliente}</strong> a las <strong>${horaCita}</strong>.<br>Por política de "No Filas", las citas tienen prioridad.`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: '✅ Atender Cita Ahora',
+            cancelButtonText: 'Saltar y tomar turno (No recomendado)',
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#6b7280'
+        });
+
+        if (confirmacion.isConfirmed) {
         // CORRECCIÓN CRÍTICA: Usar RPC para convertir la cita en turno real
         // Esto asegura que el tiempo de la cita se sume a la cola de espera
         try {
@@ -1885,6 +1915,7 @@ let isRecognizing = false;
 function iniciarReconocimientoVoz() {
     const voiceCommandButton = document.getElementById('voice-command-button');
     const micIcon = document.getElementById('mic-icon');
+    if (!voiceCommandButton) return;
     const micLoading = document.getElementById('mic-loading');
     const voiceCommandText = document.getElementById('voice-command-text');
 
@@ -2012,8 +2043,11 @@ function procesarComandoVoz(transcript) {
 
 
 async function handleDoubleClickDelete(event) {
-    const card = event.target.closest('.bg-blue-50');
+    if (!event) return;
+    event.preventDefault();
+    const card = event.target.closest('.turn-card-espera');
     if (!card) return;
+    event.stopPropagation();
 
     const turnId = card.dataset.id;
     const turnNombre = card.dataset.nombre;
@@ -2035,10 +2069,15 @@ async function handleDoubleClickDelete(event) {
             try {
                 const { error } = await supabase
                     .from('turnos')
-                    .update({ estado: ESTADOS.CANCELADO }) // Soft delete: Cambiar estado en lugar de borrar
-                    .eq('id', turnId);
+                    .update({ estado: ESTADOS.CANCELADO })
+                    .eq('id', turnId)
+                    .eq('negocio_id', negocioId);
 
                 if (error) throw error;
+
+                if (card && card.parentElement) {
+                    card.parentElement.removeChild(card);
+                }
 
                 mostrarNotificacion('Turno cancelado con éxito.', 'success');
                 refrescarUI();
@@ -2048,4 +2087,5 @@ async function handleDoubleClickDelete(event) {
             }
         }
     });
+}
 }

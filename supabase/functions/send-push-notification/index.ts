@@ -2,23 +2,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push";
 
-function buildCorsHeaders(origin?: string) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Credentials": "true",
-  };
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 // Clave pública VAPID (la que compartes en el cliente)
 const VAPID_PUBLIC_KEY =
   "BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ";
 
 serve(async (req) => {
-  const corsHeaders = buildCorsHeaders(req.headers.get("origin") || "*");
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: { "Content-Type": "text/plain", ...corsHeaders } });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   if (req.method === "GET") {

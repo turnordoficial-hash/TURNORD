@@ -85,6 +85,10 @@
     .fab-btn { transition: transform 0.3s ease; }
     .fab-btn.active { transform: rotate(45deg); }
     
+    /* Shimmer effect for progress bar */
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .animate-shimmer { animation: shimmer 2s infinite; }
+
     /* Safe area padding for mobile nav */
     .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
   </style>
@@ -155,7 +159,7 @@
     <!-- Banner Marketing (Template para clonar) -->
     <div id="banner-marketing-template" class="hidden relative overflow-hidden rounded-3xl p-6 md:p-8 shadow-2xl group transition-all duration-500 mb-6 border border-white/10">
       <!-- Fondo mejorado para legibilidad -->
-      <div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900/50 z-0"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900/50 z-0 banner-bg"></div>
       <div class="absolute -top-24 -right-24 w-64 h-64 bg-barberRed/20 rounded-full blur-3xl group-hover:bg-barberRed/30 transition-all duration-700 z-0"></div>
       
       <!-- Contenido -->
@@ -284,7 +288,7 @@
         </div>
       </a>
     </div>
-    <button onclick="toggleFab()" id="fab-main" class="fab-btn w-14 h-14 bg-barberRed text-white rounded-full shadow-lg flex items-center justify-center hover:bg-red-700 transition-colors z-50">
+    <button onclick="toggleFab()" id="fab-main" class="fab-btn w-14 h-14 bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-red-700 transition-colors z-50">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
     </button>
   </div>
@@ -315,7 +319,7 @@
     }
     
     // Contenido Rotativo del Banner
-    const bannerContent = [
+    const bannerContentDefault = [
         { title: "✂️ Consejo del día", text: "No te laves el cabello justo después del corte. Espera al menos 24 horas para que el estilo se asiente.", badge: "Tip Pro" },
         { title: "🤯 ¿Sabías que...?", text: "El cabello crece en promedio 1.25 cm al mes. ¡Mantén tu corte fresco cada 3 semanas!", badge: "Curiosidad" },
         { title: "💈 Servicio Premium", text: "Prueba nuestro tratamiento de toalla caliente. Relajación total para tu piel.", badge: "Recomendado" },
@@ -325,16 +329,38 @@
         { title: "🚿 Agua Fría", text: "Enjuagar tu cabello con agua fría al final del baño ayuda a cerrar las cutículas y dar brillo.", badge: "Tip Salud" }
     ];
 
-    function updateBanner() {
-        const idx = Math.floor(Math.random() * bannerContent.length);
-        const content = bannerContent[idx];
-        // Actualiza solo si el banner de inicio ya está renderizado
+    function updateBanner(mode = 'default') {
         const bannerInicio = document.getElementById('banner-inicio');
-        if (bannerInicio) {
-            bannerInicio.querySelector('.banner-title').textContent = content.title;
-            bannerInicio.querySelector('.banner-text').textContent = content.text;
-            bannerInicio.querySelector('.banner-badge').textContent = content.badge;
+        if (!bannerInicio) return;
+
+        let content;
+        const bgDiv = bannerInicio.querySelector('.banner-bg');
+        
+        if (mode === 'active_turn') {
+             content = { 
+                 title: "✂️ Tu barbero está trabajando", 
+                 text: "Estamos avanzando con los turnos. Mantente atento a tu posición.", 
+                 badge: "En Curso 🔥" 
+             };
+             // Estilo activo
+             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-barberRed/90 via-black to-black z-0 banner-bg";
+        } else if (mode === 'available') {
+             content = {
+                 title: "✅ Barbero disponible",
+                 text: "✂️ Puedes venir ahora mismo. Estamos listos para atenderte sin espera.",
+                 badge: "Sin Espera 🚀"
+             };
+             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-green-600 to-emerald-900 z-0 banner-bg";
+        } else {
+             const idx = Math.floor(Math.random() * bannerContentDefault.length);
+             content = bannerContentDefault[idx];
+             // Estilo default
+             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900/50 z-0 banner-bg";
         }
+
+        bannerInicio.querySelector('.banner-title').textContent = content.title;
+        bannerInicio.querySelector('.banner-text').textContent = content.text;
+        bannerInicio.querySelector('.banner-badge').textContent = content.badge;
     }
     
     // Clave pública VAPID (Debe coincidir con la de backend)
@@ -428,6 +454,7 @@
 
     // Cargar Datos Iniciales
     async function init() {
+      if (!clienteId) { window.location.href = 'login_cliente.html'; return; }
       renderStructure(); // Construir estructura dinámica
       updateBanner(); // Actualizar banner al inicio
       await cargarPerfil();
@@ -459,15 +486,21 @@
       
       // Listener para Perfil (Movido aquí para asegurar que el elemento existe)
       
-      // Suscripción Realtime
-      supabase.channel('cliente-updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, 
-          () => {
+      // Suscripción Realtime Optimizada
+      let refreshTimeout;
+      const safeRefresh = () => {
+          clearTimeout(refreshTimeout);
+          refreshTimeout = setTimeout(() => {
             actualizarEstadoFila();
             verificarTurnoActivo();
             verificarCitaActiva();
-            checkPendingRatings(); // Verificar si hay algo que calificar
-          })
+            checkPendingRatings();
+          }, 500); // Debounce de 500ms
+      };
+
+      supabase.channel('cliente-updates-v2')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, 
+          safeRefresh)
         .subscribe();
 
       // Inicializar Push Notifications
@@ -739,32 +772,29 @@
 
     // --- LÓGICA DE TIEMPO REAL (CORE) ---
     function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarbers) {
+        // LÓGICA MATEMÁTICA OFICIAL DE TURNORD
         const barberos = Math.max(1, activeBarbers);
-        
-        // REGLA 1: Si hay huecos libres (menos gente atendiendo que barberos) y nadie esperando
-        if (turnosEnAtencion.length < barberos && turnosEnEspera.length === 0) {
-            return 0;
-        }
-
         let tiempoTotalMinutos = 0;
 
-        // 1. Sumar lo que falta de los que están en atención (REGLA 2)
+        // 1. Sumar tiempo restante de los que están en atención
         turnosEnAtencion.forEach(t => {
-            const duracion = t.duracion || serviciosCache[t.servicio] || 30; // Usar duración guardada si existe
+            const duracion = serviciosCache[t.servicio] || 30; // Duración desde DB
             const inicio = t.started_at ? new Date(t.started_at) : new Date();
             const transcurrido = (Date.now() - inicio.getTime()) / 60000;
             const restante = Math.max(0, duracion - transcurrido);
             tiempoTotalMinutos += restante;
         });
 
-        // 2. Sumar duración completa de los que están en espera (REGLA 3)
+        // 2. Sumar duración completa de los que están en espera
         turnosEnEspera.forEach(t => {
-            const duracion = t.duracion || serviciosCache[t.servicio] || 30;
+            const duracion = serviciosCache[t.servicio] || 30;
             tiempoTotalMinutos += duracion;
         });
 
-        // 3. Promediar entre barberos activos
-        return Math.round(tiempoTotalMinutos / barberos);
+        // 3. Dividir entre barberos activos (Carga distribuida)
+        const tiempoEstimado = tiempoTotalMinutos / barberos;
+        
+        return Math.ceil(tiempoEstimado);
     }
 
     async function cargarPerfil() {
@@ -872,6 +902,15 @@
       const pdCita = document.getElementById('personas-delante-cita');
       if(pdCita) animateNumber(pdCita, personasEnCola);
       
+      // Lógica Banner Estado (Prioritaria)
+      if (!window.hasActiveTurn && !window.hasActiveAppointment) {
+          if (personasEnCola === 0 && enAtencion.length < activeBarbers) {
+              updateBanner('available');
+          } else {
+              updateBanner('default');
+          }
+      }
+
       // Calcular Tiempo Estimado (Lógica Nueva)
       const tiempoEstimado = calcularTiempoEsperaReal(enEspera, enAtencion, activeBarbers);
       
@@ -981,6 +1020,7 @@
 
       if (data) {
         window.hasActiveTurn = true;
+        updateBanner('active_turn'); // Banner estratégico
         card.classList.remove('hidden');
         if(form) form.classList.add('hidden'); // Ocultar completamente
         document.getElementById('mi-numero-turno').textContent = data.turno;
@@ -1039,7 +1079,7 @@
             
             let mensajeTiempo = "";
             if (personasDelante === 0 && enAtencion.length < activeBarbers) {
-                 mensajeTiempo = "¡Es casi tu turno! Prepárate.";
+                 mensajeTiempo = "🚀 ¡Es tu turno ahora mismo!";
             } else {
                  mensajeTiempo = `⏳ Tiempo estimado: ~${tiempoEstimado} min`;
             }
@@ -1053,10 +1093,23 @@
                 `;
             }
 
+            // Barra de Progreso Anti-Ansiedad
+            const porcentaje = Math.max(5, 100 - (personasDelante * 15)); // 15% por persona aprox
+            
             infoExtra.innerHTML = `
-                <div class="flex flex-col">
-                    <span class="font-bold text-lg text-gray-900 dark:text-white">${personasDelante} personas delante</span>
-                    <span class="text-sm text-gray-500 dark:text-gray-400">${mensajeTiempo}</span>
+                <div class="flex flex-col w-full mr-4">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="font-bold text-lg text-gray-900 dark:text-white">${personasDelante} personas delante</span>
+                        <span class="text-xs font-bold text-barberRed bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">${mensajeTiempo}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div class="bg-barberRed h-full rounded-full transition-all duration-1000 relative" style="width: ${porcentaje}%">
+                            <div class="absolute inset-0 bg-white/30 animate-shimmer"></div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1 text-right">
+                        ${personasDelante === 0 ? '🚀 ¡Es tu turno ahora mismo!' : 'La fila avanza...'}
+                    </p>
                 </div>
             `;
 
@@ -1075,6 +1128,7 @@
 
       } else {
         window.hasActiveTurn = false;
+        // updateBanner se maneja en actualizarEstadoFila para mostrar disponibilidad
         card.classList.add('hidden');
         if(form) form.classList.remove('hidden');
         document.getElementById('bloqueado-msg').classList.add('hidden');
@@ -1188,6 +1242,43 @@
     window.tomarTurno = async () => {
       // Solicitar permiso de notificación al interactuar (Mejor práctica UX)
       if (Notification.permission === 'default') await solicitarPermisoNotificacion();
+
+      // --- VALIDACIONES DE NEGOCIO ---
+      if (configCache) {
+          const ahora = new Date();
+          const dia = ahora.getDay(); // 0=Domingo
+          const hora = ahora.getHours() * 60 + ahora.getMinutes();
+          
+          // 1. Días de operación
+          if (diasOperacionNum.length > 0 && !diasOperacionNum.includes(dia)) {
+              alert('Hoy no laboramos. Por favor revisa nuestros días de operación.');
+              return;
+          }
+
+          // 2. Horario
+          if (configCache.hora_apertura && configCache.hora_cierre) {
+              const [hAp, mAp] = configCache.hora_apertura.split(':').map(Number);
+              const [hCi, mCi] = configCache.hora_cierre.split(':').map(Number);
+              const minAp = hAp * 60 + mAp;
+              const minCi = hCi * 60 + mCi;
+              
+              if (hora < minAp || hora >= minCi) {
+                  alert(`Nuestro horario es de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`);
+                  return;
+              }
+          }
+      }
+
+      // 3. Break (Verificar estado actual)
+      const { data: estadoNegocio } = await supabase.from('estado_negocio').select('en_break, break_end_time').eq('negocio_id', negocioId).maybeSingle();
+      if (estadoNegocio && estadoNegocio.en_break) {
+           const finBreak = new Date(estadoNegocio.break_end_time);
+           if (finBreak > new Date()) {
+               alert(`Estamos en break hasta las ${finBreak.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}.`);
+               return;
+           }
+      }
+      // -------------------------------
 
       const servicio = document.getElementById('select-servicio').value;
       if (!servicio) return alert('Selecciona un servicio');
@@ -1770,6 +1861,7 @@
             .eq('negocio_id', negocioId)
             .eq('telefono', telefono)
             .eq('estado', 'Atendido')
+            .eq('fecha', new Date().toISOString().slice(0, 10)) // FIX: Solo turnos de hoy
             .order('updated_at', { ascending: false })
             .limit(1);
 

@@ -296,16 +296,18 @@ function setupSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     const closeSidebar = document.getElementById('closeSidebar');
+    const sidebarTexts = document.querySelectorAll('.sidebar-text');
     
-    if (!sidebar) return;
+    if (!sidebar || !btn) {
+        console.warn('Elementos del sidebar no encontrados en esta página.');
+        return;
+    }
 
     const toggleMobile = () => {
-        if (window.innerWidth < 1024) {
-            sidebar.classList.toggle('-translate-x-full');
-            if (overlay) {
-                overlay.classList.toggle('opacity-0');
-                overlay.classList.toggle('pointer-events-none');
-            }
+        sidebar.classList.toggle('-translate-x-full');
+        if (overlay) {
+            overlay.classList.toggle('opacity-0');
+            overlay.classList.toggle('pointer-events-none');
         }
     };
 
@@ -315,13 +317,15 @@ function setupSidebar() {
         sidebar.classList.toggle('w-20');
         
         // Ocultar/Mostrar textos con transición suave
-        const texts = sidebar.querySelectorAll('.sidebar-text');
-        texts.forEach(el => {
+        sidebarTexts.forEach(el => {
             el.classList.toggle('hidden');
         });
     };
 
-    if (btn) btn.addEventListener('click', toggleMobile);
+    // Remover listeners anteriores para evitar duplicados si se llama varias veces
+    btn.removeEventListener('click', toggleMobile);
+    btn.addEventListener('click', toggleMobile);
+    
     if (overlay) overlay.addEventListener('click', toggleMobile);
     if (closeSidebar) closeSidebar.addEventListener('click', toggleMobile);
     if (toggleBtn) toggleBtn.addEventListener('click', toggleDesktop);
