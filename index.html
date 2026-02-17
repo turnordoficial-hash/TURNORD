@@ -860,23 +860,39 @@ inicializarModoOscuro();
       const installButtons = document.querySelectorAll('.install-trigger, a[download][href="login_cliente.html"]');
       installButtons.forEach(btn => {
           btn.addEventListener('click', async () => {
-              if (deferredPrompt) {
-                  // Si se puede instalar, mostramos el prompt nativo
-                  deferredPrompt.prompt();
-                  const { outcome } = await deferredPrompt.userChoice;
-                  deferredPrompt = null;
-              } else {
-                  // Si ya está instalada o no es compatible, redirigir a la App
-                  const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
-                  window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
+              try {
+                  if (deferredPrompt) {
+                      // Si se puede instalar, mostramos el prompt nativo
+                      deferredPrompt.prompt();
+                      const { outcome } = await deferredPrompt.userChoice;
+                      deferredPrompt = null;
+                      // Tras el prompt, si no se instaló o en cualquier caso, garantizamos el flujo hacia login_cliente.html
+                      // para empezar el proceso de acceso inmediatamente.
+                      if (outcome !== 'accepted') {
+                        window.location.href = 'login_cliente.html';
+                        return;
+                      }
+                      // Si el usuario aceptó, algunos navegadores no abren inmediatamente la app instalada.
+                      // Redirigimos también al flujo de login para esta sesión actual.
+                      window.location.href = 'login_cliente.html';
+                      return;
+                  }
+
+                  // Si no hay prompt disponible (ya instalada o no compatible), llevar directo a login_cliente.html
+                  // Si prefieres saltar al panel si ya existe sesión, descomenta las 2 líneas siguientes y comenta la redirección fija.
+                  // const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
+                  // window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
+                  window.location.href = 'login_cliente.html';
+                  return;
+              } finally {
+                  const overlay = document.getElementById('downloadOverlay');
+                  overlay?.classList.remove('hidden');
+                  overlay?.classList.add('flex');
+                  setTimeout(() => {
+                    overlay?.classList.add('hidden');
+                    overlay?.classList.remove('flex');
+                  }, 2000);
               }
-              const overlay = document.getElementById('downloadOverlay');
-              overlay?.classList.remove('hidden');
-              overlay?.classList.add('flex');
-              setTimeout(() => {
-                overlay?.classList.add('hidden');
-                overlay?.classList.remove('flex');
-              }, 3000);
           });
       });
 

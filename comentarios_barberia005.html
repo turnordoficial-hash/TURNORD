@@ -198,9 +198,12 @@
     </footer>
   </div><script type="module" src="admin/comentarios.js"></script>
   <script>
-    document.getElementById('toggleDarkMode').addEventListener('click', function() {
-      if (window.theme && window.theme.toggleMode) window.theme.toggleMode();
-    });
+    const toggleBtn = document.getElementById('toggleDarkMode');
+    if (toggleBtn && window.theme && window.theme.toggleMode) {
+      toggleBtn.addEventListener('click', function() {
+        window.theme.toggleMode();
+      });
+    }
   </script>
 
   <script>

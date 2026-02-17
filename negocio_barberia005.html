@@ -128,7 +128,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-18 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72">
+    <aside id="sidebar" class="w-18 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72 will-change-transform">
       <div class="p-6 flex items-center justify-between border-b border-white/5">
         <div class="flex items-center gap-3">
           <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
@@ -631,7 +631,7 @@
               </div>
             </div>
             
-            <div class="overflow-hidden rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+            <div class="overflow-x-auto rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm -mx-4 sm:mx-0">
               <table class="min-w-full divide-y divide-gray-100 dark:divide-white/5">
                 <thead class="bg-zinc-50 dark:bg-black/60">
                   <tr>
@@ -837,14 +837,29 @@
       const closeBtn = document.getElementById('closeSidebar');
 
       if (btn && sidebar && overlay) {
-        const toggle = () => {
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('opacity-0');
-        overlay.classList.toggle('pointer-events-none');
+        const open = () => {
+          sidebar.classList.remove('-translate-x-full');
+          sidebar.classList.add('translate-x-0');
+          overlay.classList.remove('opacity-0');
+          overlay.classList.remove('pointer-events-none');
+          sidebar.setAttribute('data-open', 'true');
         };
-        btn.addEventListener('click', toggle);
-        overlay.addEventListener('click', toggle);
-        if (closeBtn) closeBtn.addEventListener('click', toggle);
+        const close = () => {
+          sidebar.classList.remove('translate-x-0');
+          sidebar.classList.add('-translate-x-full');
+          overlay.classList.add('opacity-0');
+          overlay.classList.add('pointer-events-none');
+          sidebar.removeAttribute('data-open');
+        };
+        btn.addEventListener('click', (e) => { e.stopPropagation(); open(); });
+        overlay.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+        if (closeBtn) closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        // Estado inicial según breakpoint
+        const mql = window.matchMedia('(min-width: 768px)');
+        const handle = (e) => { if (e.matches) { open(); } else { close(); } };
+        handle(mql);
+        mql.addEventListener ? mql.addEventListener('change', handle) : mql.addListener(handle);
       }
     });
   </script>

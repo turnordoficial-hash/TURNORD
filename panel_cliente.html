@@ -34,16 +34,31 @@
     body { background-color: #F3F4F6; }
     .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #000000 100%); background-attachment: fixed; }
     
-    .glass-panel { 
-        background: rgba(255, 255, 255, 0.7); 
-        backdrop-filter: blur(16px); 
-        border: 1px solid rgba(255, 255, 255, 0.5);
+    .glass-panel {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.06);
     }
-    .dark .glass-panel { 
-        background: rgba(24, 24, 27, 0.6); 
-        border: 1px solid rgba(255, 255, 255, 0.05); 
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    .dark .glass-panel {
+        background: #18181b;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     }
+
+    /* Tarjeta sólida para dashboard/status cuando haya fondos contrastantes */
+    .card-solid {
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+    }
+    .dark .card-solid {
+        background: #18181b;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    }
+
+    /* Refuerzo de contraste para banners con texto claro */
+    .banner-text, .banner-title { text-shadow: 0 2px 10px rgba(0,0,0,0.45); }
 
     /* Animaciones sutiles */
     @keyframes fadeIn {
@@ -112,7 +127,7 @@
   </div>
 
   <!-- Navbar -->
-  <nav class="bg-white/70 dark:bg-dark-900/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/5 sticky top-0 z-50 transition-colors duration-300 hidden md:block">
+  <nav class="bg-white dark:bg-dark-900 border-b border-gray-200/50 dark:border-white/5 sticky top-0 z-50 transition-colors duration-300 hidden md:block">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center gap-2">
@@ -124,7 +139,7 @@
           <div class="flex items-center gap-3 cursor-pointer group z-50" onclick="toggleProfileMenu()">
             <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=C1121F&color=fff" class="w-9 h-9 rounded-full border-2 border-barberRed/50 group-hover:border-barberRed transition-colors object-cover shadow-sm">
             <span id="nav-name" class="hidden sm:block font-medium text-sm text-gray-700 dark:text-gray-200">Cargando...</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-barberRed hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
           </div>
           <!-- Dropdown Menu -->
           <div id="profile-menu" class="hidden absolute top-14 right-0 w-64 bg-white dark:bg-dark-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-white/5 py-2 transform origin-top-right transition-all ring-1 ring-black/5">
@@ -159,7 +174,7 @@
     <!-- Banner Marketing (Template para clonar) -->
     <div id="banner-marketing-template" class="hidden relative overflow-hidden rounded-3xl p-6 md:p-8 shadow-2xl group transition-all duration-500 mb-6 border border-white/10">
       <!-- Fondo mejorado para legibilidad -->
-      <div class="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900/50 z-0 banner-bg"></div>
+      <div class="absolute inset-0 bg-barberBlue z-0 banner-bg"></div>
       <div class="absolute -top-24 -right-24 w-64 h-64 bg-barberRed/20 rounded-full blur-3xl group-hover:bg-barberRed/30 transition-all duration-700 z-0"></div>
       
       <!-- Contenido -->
@@ -195,8 +210,8 @@
     </div>
 
     <!-- Modal Calificación -->
-    <div id="modal-calificacion" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white dark:bg-dark-800 rounded-3xl p-8 w-full max-w-sm mx-4 shadow-2xl transform scale-95 transition-transform duration-300" id="modal-calificacion-content">
+    <div id="modal-calificacion" class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-70 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-dark-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl transform scale-95 transition-all duration-300" id="modal-calificacion-content">
             <div class="text-center">
                 <div class="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-500">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
@@ -235,7 +250,7 @@
                     
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="cerrarModalCalificacion()" class="flex-1 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Omitir</button>
-                        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-barberRed text-white shadow-lg hover:bg-red-700 transition-all transform hover:scale-105">Enviar</button>
+                        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-red-600 text-white shadow-lg hover:bg-red-700 active:bg-red-700 focus:bg-red-700 transition-colors focus:outline-none">Enviar</button>
                     </div>
                 </form>
             </div>
@@ -245,7 +260,7 @@
   </main>
 
   <!-- Bottom Navigation (Mobile Only) -->
-  <div class="md:hidden fixed bottom-0 left-0 z-50 w-full bg-white/90 dark:bg-dark-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 pb-safe">
+  <div class="md:hidden fixed bottom-0 left-0 z-50 w-full bg-white dark:bg-dark-900 border-t border-gray-200 dark:border-white/10 pb-safe">
     <div class="flex justify-around items-center h-16">
       <button onclick="mostrarSeccion('inicio')" class="nav-item flex flex-col items-center justify-center w-full h-full text-barberRed transition-colors" data-tab="inicio">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
@@ -277,13 +292,13 @@
       </a>
       <a href="tel:+18295877564" class="flex items-center gap-2 group">
         <span class="bg-white dark:bg-dark-800 text-gray-700 dark:text-gray-200 text-xs font-bold px-2 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity">Llamar</span>
-        <div class="w-10 h-10 bg-blue-500 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
+        <div class="w-10 h-10 bg-barberBlue text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
         </div>
       </a>
       <a href="https://maps.google.com/?q=JBarber" target="_blank" class="flex items-center gap-2 group">
         <span class="bg-white dark:bg-dark-800 text-gray-700 dark:text-gray-200 text-xs font-bold px-2 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity">Mapa</span>
-        <div class="w-10 h-10 bg-red-500 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
+        <div class="w-10 h-10 bg-barberRed text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
         </div>
       </a>
@@ -342,21 +357,18 @@
                  text: "Estamos avanzando con los turnos. Mantente atento a tu posición.", 
                  badge: "En Curso 🔥" 
              };
-             // Estilo activo
-             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-barberRed/90 via-black to-black z-0 banner-bg";
         } else if (mode === 'available') {
              content = {
                  title: "✅ Barbero disponible",
                  text: "✂️ Puedes venir ahora mismo. Estamos listos para atenderte sin espera.",
                  badge: "Sin Espera 🚀"
              };
-             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-green-600 to-emerald-900 z-0 banner-bg";
         } else {
              const idx = Math.floor(Math.random() * bannerContentDefault.length);
              content = bannerContentDefault[idx];
-             // Estilo default
-             if(bgDiv) bgDiv.className = "absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900/50 z-0 banner-bg";
         }
+
+        if(bgDiv) bgDiv.className = "absolute inset-0 bg-barberBlue z-0 banner-bg";
 
         bannerInicio.querySelector('.banner-title').textContent = content.title;
         bannerInicio.querySelector('.banner-text').textContent = content.text;
@@ -466,6 +478,7 @@
       // Listeners Reactivos para Citas
       document.getElementById('date-picker')?.addEventListener('change', renderSlotsForSelectedDate);
       document.getElementById('select-servicio-cita')?.addEventListener('change', renderSlotsForSelectedDate);
+      document.getElementById('select-barbero-cita')?.addEventListener('change', renderSlotsForSelectedDate);
       document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
       
       // Listener para Perfil (Movido aquí para asegurar que el elemento existe)
@@ -547,9 +560,9 @@
         const statusContainer = document.getElementById('inicio-status-container');
         statusContainer.innerHTML = `
           <!-- Card 1: Estado -->
-          <div class="glass-panel p-6 rounded-3xl relative overflow-hidden group transition-all hover:shadow-lg border border-white/20 dark:border-white/5">
+          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
             <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl text-blue-600 dark:text-blue-400">
+                <div class="p-3 bg-blue-50 rounded-2xl text-barberBlue">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
                 </div>
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Tu Estado</span>
@@ -561,9 +574,9 @@
           </div>
 
           <!-- Card 2: Tiempo -->
-          <div class="glass-panel p-6 rounded-3xl relative overflow-hidden group transition-all hover:shadow-lg border border-white/20 dark:border-white/5">
+          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
             <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl text-amber-600 dark:text-amber-400">
+                <div class="p-3 bg-red-50 rounded-2xl text-barberRed">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
                 </div>
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Estimado</span>
@@ -575,9 +588,9 @@
           </div>
 
           <!-- Card 3: Demanda -->
-          <div class="glass-panel p-6 rounded-3xl relative overflow-hidden group transition-all hover:shadow-lg border border-white/20 dark:border-white/5">
+          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
             <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl text-green-600 dark:text-green-400">
+                <div class="p-3 bg-blue-50 rounded-2xl text-barberBlue">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
                 </div>
                 <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Demanda</span>
@@ -663,7 +676,7 @@
                       <select id="select-barbero-cita" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"><option value="">Cargando...</option></select>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-3">
-                      <button id="btn-reservar-sugerida" onclick="reservarCitaInteligente()" class="flex-1 px-6 py-4 bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold rounded-2xl shadow-lg">Reservar esa hora</button>
+                      <button id="btn-reservar-sugerida" onclick="reservarCitaInteligente()" class="flex-1 px-6 py-4 bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold rounded-2xl shadow-lg focus:outline-none">Reservar esa hora</button>
                       <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 border border-gray-300 dark:border-white/20 text-gray-900 dark:text-white font-bold rounded-2xl">Ver horarios libres</button>
                       <button id="btn-reservar-mas-tarde" onclick="reservarMasTarde()" class="hidden flex-1 px-6 py-4 bg-barberRed text-white font-bold rounded-2xl shadow">Reservar para más tarde</button>
                     </div>
@@ -676,7 +689,7 @@
                         <div class="mt-6 bg-gray-50 dark:bg-dark-800/30 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
                             <div id="slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
                             <div id="action-container" class="mt-6 hidden flex justify-center animate-fade-in">
-                                <button id="btn-confirmar-reserva" class="bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold py-3 px-8 rounded-xl shadow-lg">Confirmar Reserva</button>
+                                <button id="btn-confirmar-reserva" class="bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold py-3 px-8 rounded-xl shadow-lg focus:outline-none">Confirmar Reserva</button>
                             </div>
                         </div>
                     </div>
@@ -1475,8 +1488,14 @@
 
       // --- VALIDACIONES PREVIAS (SOLUCIÓN ERROR 400) ---
       if (!negocioId) { console.error("negocioId es undefined"); return; }
-      if (!barberSel) { console.error("Barbero no seleccionado"); return; }
-      if (!dateStr) { console.error("Fecha no seleccionada"); return; }
+      if (!barberSel) { 
+          if(slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-amber-600 dark:text-amber-400 font-bold py-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800/30">👆 Por favor selecciona un barbero arriba</div>';
+          return; 
+      }
+      if (!dateStr) { 
+          if(slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">Selecciona una fecha.</div>';
+          return; 
+      }
       // ------------------------------------------------
 
       // --- OPTIMIZACIÓN CACHÉ ---
@@ -1895,16 +1914,39 @@
 
     function mostrarModalCalificacion(turno) {
         const modal = document.getElementById('modal-calificacion');
+        const content = document.getElementById('modal-calificacion-content');
+
         const barberName = turno.barberos?.nombre || 'el barbero';
         document.getElementById('rating-barber-name').textContent = barberName;
         document.getElementById('rating-turno-id').value = turno.id;
-        
+
         modal.classList.remove('hidden');
-        // Small delay for animation
+
         setTimeout(() => {
             modal.classList.remove('opacity-0');
-            modal.classList.add('opacity-100');
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
         }, 10);
+    }
+
+    function cerrarModalCalificacion() {
+        const modal = document.getElementById('modal-calificacion');
+        const content = document.getElementById('modal-calificacion-content');
+
+        modal.classList.add('opacity-0');
+        content.classList.remove('scale-100');
+        content.classList.add('scale-95');
+
+        // Reset rating inputs y comentario
+        try {
+            document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
+            const txt = document.getElementById('rating-comment');
+            if (txt) txt.value = '';
+        } catch {}
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
     }
 
     async function enviarCalificacion(turnoId, rating, comment) {
@@ -1926,6 +1968,22 @@
             showToast('¡Gracias por tu opinión!');
             cerrarModalCalificacion();
         }
+    }
+
+    // Listener envío calificación con validación (UX tipo Booksy)
+    const formCal = document.getElementById('form-calificacion');
+    if (formCal) {
+        formCal.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const selected = document.querySelector('input[name="rating"]:checked');
+            if (!selected) {
+                showToast('Selecciona una calificación primero', 'error');
+                return;
+            }
+            const turnoId = document.getElementById('rating-turno-id').value;
+            const comment = document.getElementById('rating-comment').value;
+            await enviarCalificacion(turnoId, selected.value, comment);
+        });
     }
 
     init();

@@ -7,7 +7,7 @@ self.addEventListener("push", (event) => {
   let payload = {
     title: "TurnoRD",
     body: "Hay una nueva notificación para ti.",
-    icon: "/android-chrome-192x192.png",
+    icon: "jbarber/jjj.png",
     url: "panel_cliente.html"
   };
 
@@ -21,8 +21,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: payload.body,
-    icon: payload.icon || "/android-chrome-192x192.png",
-    badge: "/favicon-32x32.png",
+    icon: payload.icon || "jbarber/jjj.png",
+    badge: "imegenlogin/favicon-32x32.png",
     vibrate: [100, 50, 100],
     data: {
       url: payload.url || "panel_cliente.html"

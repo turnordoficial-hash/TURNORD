@@ -38,8 +38,7 @@
   <script src="assets/theme.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
   <script>
     // Configuración de Tailwind para modo oscuro
     tailwind.config = {
@@ -154,15 +153,9 @@
 
     <div class="flex-1 flex flex-col min-w-0 transition-all duration-300 w-full">
     <!-- Contenido principal -->
-    <main class="flex-1 md:ml-0 p-4 sm:p-6 w-full max-w-full overflow-x-hidden">
+    <main class="flex-1 md:ml-0 p-4 sm:p-6 pt-4 w-full max-w-full overflow-x-hidden">
       <div class="max-w-[1600px] mx-auto w-full space-y-3">
-        <!-- Icono de Barbería: Recortador -->
-        <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
-          <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10,2H14A2,2 0 0,1 16,4V6H18V8H16V10H14V8H10V10H8V8H6V6H8V4A2,2 0 0,1 10,2M10,12H14V14H16V16H14V18H16V20H14V22H10V20H8V18H10V16H8V14H10V12Z"/>
-          </svg>
-        </div>
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex justify-between items-center mb-6 mt-2">
           <h1 class="text-2xl font-bold">Gestión de Turnos</h1>
           <div class="text-sm text-gray-600 dark:text-gray-400">
             <span id="fecha-actual"></span> | <span id="hora-actual"></span>
@@ -501,19 +494,7 @@
         <div id="barberos-contenedor" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
       </div>
 
-      <!-- Sección de estadísticas -->
-      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
-        <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          Estadísticas de Hoy
-        </h2>
-        <div class="w-full h-64">
-          <canvas id="estadisticasChart"></canvas>
-        </div>
-      </div>
-    </main>
+          </main>
 
     <footer class="bg-zinc-950 text-gray-400 text-center text-sm py-8 px-6 border-t border-white/5 mt-auto">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">

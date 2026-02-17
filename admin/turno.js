@@ -6,7 +6,6 @@ let turnoEnAtencionActual = null; // Variable Global de Estado Maestro
 let HORA_APERTURA = "08:00";
 let HORA_LIMITE_TURNOS = "23:00";
 let LIMITE_TURNOS = 50;
-let chart = null;
 let ALLOWED_DAYS = [1, 2, 3, 4, 5, 6];
 let activeTurnIntervals = {};
 let serviciosCache = {};
@@ -144,8 +143,7 @@ function refrescarUI() {
         try {
             await Promise.all([
                 cargarClientesMap(),
-                cargarTurnos(),
-                cargarEstadisticas()
+                cargarTurnos()
             ]);
         } catch (error) {
             console.error("Error en refrescarUI:", error);
@@ -1110,109 +1108,6 @@ function renderPorBarbero(enAtencionList, enEsperaList, citasHoyList) {
     });
 }
 
-async function cargarEstadisticas() {
-    if (!negocioId) return;
-    const hoy = new Date().toISOString().slice(0, 10);
-    
-    try {
-        // Cargar datos en paralelo para eficiencia
-        const [resAtendidos, resDevueltos, resEspera] = await Promise.all([
-            supabase.from('turnos').select('id, monto_cobrado, hora').eq('estado', ESTADOS.ATENDIDO).eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('id, hora').eq('estado', ESTADOS.DEVUELTO).eq('negocio_id', negocioId).eq('fecha', hoy),
-            supabase.from('turnos').select('id, hora').eq('estado', ESTADOS.ESPERA).eq('negocio_id', negocioId).eq('fecha', hoy)
-        ]);
-
-        if (resAtendidos.error) throw resAtendidos.error;
-        if (resDevueltos.error) throw resDevueltos.error;
-        if (resEspera.error) throw resEspera.error;
-
-        const turnosAtendidos = resAtendidos.data || [];
-        const turnosDevueltos = resDevueltos.data || [];
-        const turnosEspera = resEspera.data || [];
-
-        // Actualizar UI de contadores
-        const turnosAtendidosElement = document.getElementById('turnos-atendidos');
-        if (turnosAtendidosElement) turnosAtendidosElement.textContent = turnosAtendidos.length;
-
-        const ingresos = turnosAtendidos.reduce((total, turno) => total + (turno.monto_cobrado || 0), 0);
-        const ingresosHoy = document.getElementById('ingresos-hoy');
-        if (ingresosHoy) ingresosHoy.textContent = `RD$${ingresos.toFixed(2)}`;
-
-        const promedioCobro = document.getElementById('promedio-cobro');
-        if (promedioCobro && turnosAtendidos.length > 0) {
-            const promedio = ingresos / turnosAtendidos.length;
-            promedioCobro.textContent = `RD$${promedio.toFixed(2)}`;
-        }
-
-        // Preparar datos para el gráfico
-        const ctx = document.getElementById('estadisticasChart');
-        if (!ctx) return;
-
-        const turnosPorHora = {};
-        const horasDelDia = [];
-        for (let i = 8; i <= 20; i++) {
-            const hora = i < 10 ? `0${i}:00` : `${i}:00`;
-            horasDelDia.push(hora);
-            turnosPorHora[hora] = { atendidos: 0, devueltos: 0, espera: 0 };
-        }
-
-        const procesarTurnos = (lista, tipo) => {
-            lista.forEach(turno => {
-                const hora = turno.hora.slice(0, 5);
-                const horaRedondeada = `${hora.slice(0, 2)}:00`;
-                if (turnosPorHora[horaRedondeada]) {
-                    turnosPorHora[horaRedondeada][tipo]++;
-                }
-            });
-        };
-
-        procesarTurnos(turnosAtendidos, 'atendidos');
-        procesarTurnos(turnosDevueltos, 'devueltos');
-        procesarTurnos(turnosEspera, 'espera');
-
-        const datosAtendidos = horasDelDia.map(hora => turnosPorHora[hora].atendidos);
-        const datosDevueltos = horasDelDia.map(hora => turnosPorHora[hora].devueltos);
-        const datosEspera = horasDelDia.map(hora => turnosPorHora[hora].espera);
-
-        // 3. Limpieza correcta de memoria Chart.js
-        if (chart) {
-            chart.destroy();
-            chart = null;
-        }
-        
-        chart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: horasDelDia,
-                datasets: [
-                    { label: 'Atendidos', data: datosAtendidos, backgroundColor: 'rgba(34, 197, 94, 0.5)', borderColor: 'rgb(34, 197, 94)', borderWidth: 1 },
-                    { label: 'Devueltos', data: datosDevueltos, backgroundColor: 'rgba(239, 68, 68, 0.5)', borderColor: 'rgb(239, 68, 68)', borderWidth: 1 },
-                    { label: 'En Espera', data: datosEspera, backgroundColor: 'rgba(245, 158, 11, 0.5)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top', labels: { color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151' } },
-                    tooltip: { mode: 'index', intersect: false }
-                },
-                scales: {
-                    x: { ticks: { color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } },
-                    y: { beginAtZero: true, ticks: { precision: 0, color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563' }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(75, 85, 99, 0.2)' : 'rgba(209, 213, 219, 0.2)' } }
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error('Error al cargar estadísticas:', error.message);
-        // Evitar spam de alertas si es error de JWT, solo loguear
-        if (error.message && (error.message.includes('JWT') || error.code === '401')) {
-            console.warn('Sesión expirada en estadísticas, esperando recarga...');
-        }
-    }
-}
-
 let canalTurnos = null;
 async function suscribirseTurnos() {
     if (canalTurnos) {
@@ -1683,6 +1578,7 @@ async function atenderAhora() {
         window.__atendiendo = false;
         return;
     }
+    }
     
     const payloadUpdate = { started_at: new Date().toISOString() };
     if (barberId) payloadUpdate.barber_id = barberId;
@@ -2087,5 +1983,4 @@ async function handleDoubleClickDelete(event) {
             }
         }
     });
-}
 }
