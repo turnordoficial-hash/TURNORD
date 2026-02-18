@@ -16,6 +16,7 @@ let barberosMap = {};
 let clientesMap = {};
 let barberosActivosList = []; // Cache para lógica de disponibilidad
 let __pushSubsCount = 0;
+let isSubmittingTurn = false; // Flag para evitar doble submit
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -513,6 +514,7 @@ function esDiaOperativo(date = new Date()) {
 
 async function tomarTurno(event) {
     event.preventDefault();
+    if (isSubmittingTurn) return; // Evitar doble clic
     
     // 3️⃣ Seguridad al Insertar Turno
     const { data: { session } } = await supabase.auth.getSession();
@@ -520,6 +522,8 @@ async function tomarTurno(event) {
         mostrarNotificacion("Sesión expirada", "error");
         return;
     }
+
+    isSubmittingTurn = true; // Bloquear
 
     await cargarHoraLimite();
     if (!esDiaOperativo(new Date())) {
@@ -539,20 +543,24 @@ async function tomarTurno(event) {
     
     if (minutosActuales < minutosApertura) {
         mostrarNotificacion(`Aún no hemos abierto. Horario: ${HORA_APERTURA} - ${HORA_LIMITE_TURNOS}`, 'error');
+        isSubmittingTurn = false;
         return;
     }
     if (minutosActuales >= minutosCierre) {
         mostrarNotificacion('Ya no se pueden tomar turnos a esta hora. Intenta mañana.', 'warning');
+        isSubmittingTurn = false;
         return;
     }
     const nombre = document.getElementById('nombre').value.trim();
     const telefono = document.getElementById('telefono').value.trim();
     if (!nombre || !/^[A-Za-zÁÉÍÓÚáéíóúÑñ ]{2,40}$/.test(nombre)) {
         mostrarNotificacion('El nombre solo debe contener letras y espacios (2 a 40 caracteres).', 'error');
+        isSubmittingTurn = false;
         return;
     }
     if (!/^\d{8,15}$/.test(telefono)) {
         mostrarNotificacion('El teléfono debe contener solo números (8 a 15 dígitos).', 'error');
+        isSubmittingTurn = false;
         return;
     }
     const servicio = document.getElementById('servicio').value;
@@ -581,6 +589,7 @@ async function tomarTurno(event) {
                 cancelButtonText: 'Cancelar'
             });
             if (!confirmar.isConfirmed) return;
+            isSubmittingTurn = false;
         }
     }
     // -----------------------------------------------------------------------
@@ -597,10 +606,12 @@ async function tomarTurno(event) {
         .eq('fecha', fechaHoy);
     if (countError) {
         mostrarNotificacion('No se pudo validar el límite de turnos.', 'error');
+        isSubmittingTurn = false;
         return;
     }
     if ((totalHoy || 0) >= LIMITE_TURNOS) {
         mostrarNotificacion(`Se alcanzó el límite de ${LIMITE_TURNOS} turnos para hoy.`, 'warning');
+        isSubmittingTurn = false;
         return;
     }
     const turnoGenerado = await generarNuevoTurno();
@@ -627,6 +638,7 @@ async function tomarTurno(event) {
     }
     if (!turnoUnico) {
         mostrarNotificacion('Error al generar ID de turno único. Intente nuevamente.', 'error');
+        isSubmittingTurn = false;
         return;
     }
 
@@ -645,6 +657,7 @@ async function tomarTurno(event) {
     if (error) {
         mostrarNotificacion('Error al guardar turno: ' + error.message, 'error');
         console.error(error);
+        isSubmittingTurn = false;
         return;
     }
     cerrarModal();
@@ -653,6 +666,7 @@ async function tomarTurno(event) {
     // Notificar al cliente que su turno fue tomado
     await notificarTurnoTomado(telefono, nombre, nuevoTurno);
     
+    isSubmittingTurn = false;
     refrescarUI();
 }
 
@@ -1636,7 +1650,10 @@ function renderCitas() {
               <p class="text-gray-500 dark:text-gray-400 text-xs truncate">${c.cliente_telefono || ''}</p>
               <div class="flex justify-between items-center mt-3">
                 <span class="text-xs text-gray-500 dark:text-gray-400">Hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
-                <span class="text-xs text-gray-500 dark:text-gray-400">${dur} min</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    ${dur} min
+                </span>
               </div>`;
             contHoy.appendChild(card);
         });

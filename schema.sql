@@ -337,15 +337,11 @@ CREATE POLICY citas_update ON public.citas
 -- Función para reordenar turnos masivamente de forma atómica
 CREATE OR REPLACE FUNCTION public.reordenar_turnos(updates jsonb)
 RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  item jsonb;
 BEGIN
-  FOR item IN SELECT * FROM jsonb_array_elements(updates)
-  LOOP
-    UPDATE public.turnos
-    SET orden = (item->>'orden')::int
-    WHERE id = (item->>'id')::bigint;
-  END LOOP;
+  UPDATE public.turnos AS t
+  SET orden = (elem->>'orden')::int
+  FROM jsonb_array_elements(updates) AS elem
+  WHERE t.id = (elem->>'id')::bigint;
 END;
 $$;
 
