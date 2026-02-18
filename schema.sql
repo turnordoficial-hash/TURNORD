@@ -393,7 +393,7 @@ ALTER TABLE public.citas DROP CONSTRAINT IF EXISTS citas_no_overlap;
 ALTER TABLE public.citas
   ADD CONSTRAINT citas_no_overlap EXCLUDE USING gist (
     barber_id WITH =,
-    tstzrange(start_at, end_at, '[]') WITH &&
+    tstzrange(start_at, end_at, '[)') WITH &&
   );
 
 CREATE OR REPLACE FUNCTION public.programar_cita(
@@ -414,7 +414,7 @@ BEGIN
     AND t.estado = 'En atención'
     AND t.started_at IS NOT NULL
     AND t.started_at < p_end
-    AND (t.ended_at IS NULL OR t.ended_at > p_start);
+    AND COALESCE(t.ended_at, t.started_at + INTERVAL '3 hours') > p_start;
 
   IF conflicto_turno > 0 THEN
     RAISE EXCEPTION 'Conflicto con turno en atención para el barbero en el intervalo seleccionado';

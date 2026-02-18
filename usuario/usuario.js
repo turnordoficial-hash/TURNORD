@@ -641,6 +641,86 @@ function simpleSentimentAnalysis(text) {
     return Math.max(-1, Math.min(1, normalizedScore));
 }
 
+// --- GESTIÓN DE CITAS DEL USUARIO ---
+
+async function verificarCitaActiva() {
+    if (!telefonoUsuario || !negocioId) return;
+
+    // Buscamos todos los contenedores con este ID (por si lo pusiste en Inicio y en Citas)
+    const contenedores = document.querySelectorAll('#mensaje-cita');
+    if (contenedores.length === 0) return;
+
+    // Buscar citas futuras o en curso para este usuario
+    const nowISO = new Date().toISOString();
+    const { data: citas, error } = await supabase
+        .from('citas')
+        .select('*, barberos(nombre)')
+        .eq('negocio_id', negocioId)
+        .eq('cliente_telefono', telefonoUsuario)
+        .eq('estado', 'Programada')
+        .gt('start_at', nowISO) // Solo citas futuras
+        .order('start_at', { ascending: true })
+        .limit(1);
+
+    if (error) {
+        console.error('Error buscando citas:', error);
+        return;
+    }
+
+    const html = (citas && citas.length > 0) ? generarHtmlTarjetaCita(citas[0]) : '';
+
+    contenedores.forEach(contenedor => {
+        contenedor.innerHTML = html;
+        if (html) {
+            contenedor.classList.remove('hidden');
+        } else {
+            contenedor.classList.add('hidden');
+        }
+    });
+}
+
+function generarHtmlTarjetaCita(cita) {
+    const fechaObj = new Date(cita.start_at);
+    const fechaStr = fechaObj.toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long' });
+    const horaStr = fechaObj.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+    const nombreBarbero = cita.barberos?.nombre || 'Barbero';
+    // const servicio = cita.servicio || 'Servicio General'; // Descomentar si agregas la columna servicio
+
+    return `
+        <div class="bg-white dark:bg-gray-800 border-l-4 border-purple-600 rounded-r-xl shadow-md p-4 mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 animate-fade-in-up w-full">
+            <div class="flex-1 text-center sm:text-left">
+                <h3 class="text-lg font-bold text-purple-700 dark:text-purple-400 flex items-center justify-center sm:justify-start gap-2">
+                    📅 Cita Reservada
+                </h3>
+                <p class="text-gray-700 dark:text-gray-300 mt-1">
+                    <span class="font-semibold capitalize">${fechaStr}</span> a las <span class="font-bold text-xl">${horaStr}</span>
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Con: ${nombreBarbero}</p>
+            </div>
+            <button onclick="cancelarCitaUsuario(${cita.id})" class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm flex items-center gap-2 whitespace-nowrap shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                Cancelar Cita
+            </button>
+        </div>
+    `;
+}
+
+async function cancelarCitaUsuario(citaId) {
+    if (!confirm('¿Estás seguro de que deseas cancelar tu cita?')) return;
+
+    const { error } = await supabase.from('citas').update({ estado: 'Cancelada' }).eq('id', citaId);
+    
+    if (error) {
+        alert('Error al cancelar: ' + error.message);
+    } else {
+        alert('Cita cancelada correctamente.');
+        verificarCitaActiva(); // Refrescar UI inmediatamente
+    }
+}
+
+// Exponer función al scope global para el botón onclick
+window.cancelarCitaUsuario = cancelarCitaUsuario;
+
 window.addEventListener('DOMContentLoaded', async () => {
     registrarServiceWorker(); // Registrar el service worker al cargar la página
     if (!negocioId) return;
@@ -671,6 +751,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (btnTomarTurno) btnTomarTurno.disabled = true;
     }
     await actualizarTurnoActualYConteo();
+    await verificarCitaActiva(); // Verificar citas al cargar
     document.getElementById('formRegistroNegocio')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nombre = document.getElementById('nombre')?.value.trim();
@@ -797,4 +878,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     }).subscribe();
     supabase.channel(`configuracion-negocio-usuario-${negocioId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'configuracion_negocio', filter: `negocio_id=eq.${negocioId}` }, obtenerConfig).subscribe();
+    
+    // Suscripción a cambios en citas para actualizar la tarjeta en tiempo real
+    supabase.channel(`citas-usuario-${negocioId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` }, async () => {
+            await verificarCitaActiva();
+        }).subscribe();
 });

@@ -7,105 +7,94 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+  <script src="admin/tailwind-config.js"></script>
   <script src="https://cdn.tailwindcss.com" defer></script>
-  <!-- Fuente Premium: Outfit -->
+  <!-- Fuentes: Outfit + Playfair (toque elegante) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
-  <script>
-    window.tailwind = window.tailwind || {};
-    window.tailwind.config = { 
-      darkMode: 'class', 
-      theme: { 
-        extend: { 
-          fontFamily: { sans: ['Outfit', 'sans-serif'], display: ['Bebas Neue', 'sans-serif'] },
-          colors: { 
-            barberRed: '#C1121F',
-            barberBlue: '#003049',
-            dark: { 900: '#09090b', 800: '#18181b', 700: '#27272a' }
-          } 
-        } 
-      } 
-    }
-  </script>
   <style>
-    /* Estilos base */
-    body { background-color: #F3F4F6; }
-    .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #000000 100%); background-attachment: fixed; }
-    
-    .glass-panel {
-        background: #ffffff;
-        border: 1px solid rgba(0, 0, 0, 0.06);
-        box-shadow: 0 6px 24px rgba(0,0,0,0.06);
-    }
-    .dark .glass-panel {
-        background: #18181b;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    /* Fondo premium barber */
+    body {
+      background: #f9fafb;
+      color: #111113;
     }
 
-    /* Tarjeta sólida para dashboard/status cuando haya fondos contrastantes */
-    .card-solid {
-        background: #ffffff;
-        border: 1px solid rgba(0,0,0,0.06);
-        box-shadow: 0 6px 24px rgba(0,0,0,0.06);
-    }
-    .dark .card-solid {
-        background: #18181b;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    .dark body {
+      background: #0B0B0C;
+      color: #E5E7EB;
+      background-image:
+        radial-gradient(1000px 500px at 100% -10%, rgba(193,18,31,0.08), transparent 60%),
+        radial-gradient(1000px 500px at -10% 120%, rgba(193,18,31,0.06), transparent 60%);
+      background-attachment: fixed;
     }
 
-    /* Refuerzo de contraste para banners con texto claro */
-    .banner-text, .banner-title { text-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+    /* Tarjetas premium */
+    .bento-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 
+        0 10px 40px rgba(0,0,0,0.05);
+      transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+      border-radius: 24px;
+    }
 
-    /* Animaciones sutiles */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .dark .bento-card {
+      background: #111113;
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: 
+        0 10px 40px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.03);
     }
-    .animate-fade-in {
-        animation: fadeIn 0.5s ease-out forwards;
-    }
-    
-    /* Animación para slots */
-    .slot-enter { animation: fadeInScale 0.3s ease-out forwards; opacity: 0; transform: scale(0.95); }
-    @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } }
 
-    .slot-selected {
-      background-color: #C1121F !important; /* barberRed */
-      color: white !important;
-      transform: scale(1.05);
-      border-color: #C1121F !important;
+    .bento-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(193,18,31,0.4);
+      box-shadow: 
+        0 20px 60px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(193,18,31,0.2);
     }
+
+    /* Tipografías de titulares */
+    .banner-title, .section-title { font-family: 'Playfair Display', serif; letter-spacing: .2px; }
+    .banner-text { text-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+
+    /* Chips e insignias */
+    .chip { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px); }
+
+    /* Animaciones refinadas */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+    .animate-fade-in { animation: fadeIn .5s ease-out forwards }
+    @keyframes fadeInScale { from { opacity: 0; transform: scale(.96)} to { opacity:1; transform: scale(1)} }
+    .slot-enter { animation: fadeInScale .25s ease-out forwards; opacity:0 }
+
+    .slot-selected { background-color: #C1121F !important; color: #fff !important; transform: scale(1.04); border-color: #C1121F !important }
+
     /* Toast */
-    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
-    .toast {
-        background: white;
-        border-left: 4px solid #22c55e;
-        padding: 16px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        margin-top: 10px;
-        animation: slideIn 0.3s ease-out forwards;
-        display: flex; align-items: center; gap: 12px;
-    }
-    .dark .toast { background: #18181b; color: white; }
-    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 100 }
+    .toast { background: #fff; border-left: 4px solid #22c55e; padding: 14px 16px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.08); margin-top: 10px; animation: slideIn .3s ease-out forwards; display: flex; align-items: center; gap: 12px }
+    .dark .toast { background: #141416; color: #fff }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
 
-    /* FAB Animation */
-    .fab-menu { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: scale(0) translateY(20px); opacity: 0; pointer-events: none; }
-    .fab-menu.active { transform: scale(1) translateY(0); opacity: 1; pointer-events: auto; }
-    .fab-btn { transition: transform 0.3s ease; }
-    .fab-btn.active { transform: rotate(45deg); }
-    
-    /* Shimmer effect for progress bar */
-    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-    .animate-shimmer { animation: shimmer 2s infinite; }
+    /* FAB y menú */
+    .fab-menu { transition: all .28s cubic-bezier(.4,0,.2,1); transform: scale(0) translateY(14px); opacity: 0; pointer-events: none }
+    .fab-menu.active { transform: scale(1) translateY(0); opacity: 1; pointer-events: auto }
+    .fab-btn { transition: transform .28s ease }
+    .fab-btn.active { transform: rotate(45deg) }
 
-    /* Safe area padding for mobile nav */
-    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    /* Barra de progreso estilo barbería */
+    .progress-striped { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 10px, transparent 10px 20px); animation: progress-bar-stripes 1s linear infinite }
+    @keyframes progress-bar-stripes { from { background-position: 1rem 0 } to { background-position: 0 0 } }
+
+    /* Safe area mobile */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom) }
+
+    /* Mobile nav refinado */
+    .mobile-icon { opacity: .6; transition: transform .2s ease, opacity .2s ease }
+    .nav-item.active .mobile-icon { opacity: 1; transform: translateY(-2px) scale(1.08) }
   </style>
 </head>
 <body class="text-slate-800 dark:text-slate-200 transition-colors duration-300 font-sans antialiased selection:bg-barberRed selection:text-white relative">
@@ -127,41 +116,75 @@
   </div>
 
   <!-- Navbar -->
-  <nav class="bg-white dark:bg-dark-900 border-b border-gray-200/50 dark:border-white/5 sticky top-0 z-50 transition-colors duration-300 hidden md:block">
+  <nav class="bg-white dark:bg-[#0B0B0C]
+            border-b border-gray-200 dark:border-white/5
+            sticky top-0 z-50 block">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
-        <div class="flex items-center gap-2">
-          <img src="jbarber/jjj.png" alt="Logo" class="w-9 h-9 rounded-xl shadow-lg shadow-red-500/20 object-cover">
-          <span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white font-display tracking-wide">JBarber<span class="text-barberRed">.</span></span>
+      <div class="flex items-center justify-between h-16 md:h-20">
+        <!-- Logo -->
+        <div class="flex-shrink-0">
+          <a href="#" class="flex items-center gap-2" onclick="mostrarSeccion('inicio'); return false;">
+            <img class="h-8 w-auto rounded-lg shadow-sm" src="jbarber/jjj.png" alt="Logo">
+            <span class="font-display text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              JBarber <span class="text-[#C1121F]">•</span>
+            </span>
+          </a>
         </div>
-        <!-- Profile Dropdown -->
-        <div class="relative">
-          <div class="flex items-center gap-3 cursor-pointer group z-50" onclick="toggleProfileMenu()">
-            <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=C1121F&color=fff" class="w-9 h-9 rounded-full border-2 border-barberRed/50 group-hover:border-barberRed transition-colors object-cover shadow-sm">
-            <span id="nav-name" class="hidden sm:block font-medium text-sm text-gray-700 dark:text-gray-200">Cargando...</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-barberRed hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-          </div>
-          <!-- Dropdown Menu -->
-          <div id="profile-menu" class="hidden absolute top-14 right-0 w-64 bg-white dark:bg-dark-800 rounded-2xl shadow-2xl z-50 border border-gray-100 dark:border-white/5 py-2 transform origin-top-right transition-all ring-1 ring-black/5">
-            <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                <p class="text-sm font-medium text-gray-900 dark:text-white truncate" id="menu-profile-name">Cargando...</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 truncate" id="menu-profile-phone">...</p>
+
+        <!-- Desktop Navigation -->
+        <div class="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-[#111113] p-1 rounded-full border border-gray-200 dark:border-white/5">
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/5 transition-all" data-tab="inicio">Inicio</button>
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/5 transition-all" data-tab="turno">Turno</button>
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/5 transition-all" data-tab="cita">Citas</button>
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/5 transition-all" data-tab="perfil">Perfil</button>
+        </div>
+
+        <!-- Right Side -->
+        <div class="flex items-center gap-4">
+          <!-- Profile -->
+          <div class="relative">
+            <div id="nav-profile-toggle" class="flex items-center gap-3 cursor-pointer group">
+              <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=C1121F&color=fff" class="w-8 h-8 md:w-9 md:h-9 rounded-full ring-2 ring-[#C1121F]/50 group-hover:ring-[#C1121F] transition-all object-cover shadow-md">
+              <span id="nav-name" class="hidden md:block font-medium text-sm text-gray-700 dark:text-gray-200">Cargando...</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 group-hover:text-barberRed transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+            <!-- Dropdown Menu -->
+            <div id="profile-menu"
+     class="hidden absolute top-12 md:top-14 right-0 w-64
+            bg-white dark:bg-[#111113]
+            rounded-2xl
+            shadow-2xl
+            z-50
+            border border-gray-200 dark:border-white/5
+            py-2
+            transform origin-top-right
+            transition-all">
+               <div class="px-4 py-2 border-b border-gray-200 dark:border-white/5">
+              <p class="text-sm font-medium text-gray-900 dark:text-white truncate" id="menu-profile-name">Cargando...</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 truncate" id="menu-profile-phone">...</p>
             </div>
             <div class="py-1">
-                <a href="#" onclick="mostrarSeccion('turno')" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-200 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>Mi Turno</span>
-                </a>
-                <a href="#" onclick="mostrarSeccion('perfil')" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-200 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                    <span>Mi Perfil</span>
-                </a>
+              <a id="menu-go-turno" href="#" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Mi Turno</span>
+              </a>
+              <a id="menu-go-perfil" href="#" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <span>Mi Perfil</span>
+              </a>
             </div>
-            <div class="py-1 border-t border-gray-200 dark:border-gray-700">
-                <a href="#" onclick="logout()" class="flex items-center gap-3 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm text-red-500 dark:text-red-400 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    <span>Cerrar Sesión</span>
-                </a>
+            <!-- Dark Mode Toggle inside Menu -->
+            <div class="py-1 border-t border-gray-200 dark:border-white/5">
+               <button id="theme-toggle-menu" class="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-200 transition-colors">
+                  <div id="theme-icon-container"></div>
+                  <span id="theme-text">Cambiar Tema</span>
+               </button>
+            </div>
+            <div class="py-1 border-t border-gray-200 dark:border-white/5">
+              <a id="menu-logout" href="#" class="flex items-center gap-3 px-4 py-3 hover:bg-red-900/20 text-sm text-red-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                <span>Cerrar Sesión</span>
+              </a>
             </div>
           </div>
         </div>
@@ -169,21 +192,35 @@
     </div>
   </nav>
 
+  <!-- Botón Flotante Modo Oscuro (Solo Inicio) -->
+  <button id="floating-theme-toggle" class="fixed top-20 md:top-24 right-4 z-40 w-10 h-10 bg-white dark:bg-[#111113] border border-gray-200 dark:border-white/10 rounded-full shadow-xl flex items-center justify-center text-gray-900 dark:text-white hover:scale-110 transition-transform hidden">
+    <!-- El icono se inyecta vía JS -->
+  </button>
+
   <main class="max-w-md mx-auto md:max-w-7xl px-4 py-6 space-y-6 relative z-10 pb-24 md:pb-6">
     
     <!-- Banner Marketing (Template para clonar) -->
-    <div id="banner-marketing-template" class="hidden relative overflow-hidden rounded-3xl p-6 md:p-8 shadow-2xl group transition-all duration-500 mb-6 border border-white/10">
+    <div id="banner-marketing-template" class="hidden bento-card relative overflow-hidden p-6 md:p-8 group transition-all duration-500 mb-6 promo-shine">
+      <!-- Línea superior premium -->
+      <div class="absolute top-0 left-0 w-full h-[3px] bg-[#C1121F]"></div>
+      
       <!-- Fondo mejorado para legibilidad -->
-      <div class="absolute inset-0 bg-barberBlue z-0 banner-bg"></div>
-      <div class="absolute -top-24 -right-24 w-64 h-64 bg-barberRed/20 rounded-full blur-3xl group-hover:bg-barberRed/30 transition-all duration-700 z-0"></div>
+      <div class="absolute inset-0 
+            bg-gradient-to-br 
+            from-black 
+            via-[#111113] 
+            to-[#1a1a1f] 
+            z-0 banner-bg">
+      </div>
+      
+      <!-- Glow sutil -->
+      <div class="absolute -top-20 -right-20 w-60 h-60 bg-[#C1121F]/10 blur-3xl rounded-full"></div>
       
       <!-- Contenido -->
       <div class="relative z-10">
-        <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 text-xs font-bold text-white mb-4 shadow-lg">
-          <span class="w-2 h-2 rounded-full bg-barberRed animate-pulse"></span> <span class="banner-badge">Cliente VIP</span>
-        </div>
+        <div class="inline-flex items-center gap-2 bg-[#C1121F]/15 text-[#C1121F] border border-[#C1121F]/30 rounded-full px-3 py-1 text-xs font-bold mb-4 shadow-md"><span class="banner-badge">Cliente VIP</span></div>
         <h2 class="banner-title text-3xl md:text-4xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-md">Bienvenido</h2>
-        <p class="banner-text text-gray-200 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm">Gestiona tus citas y turnos.</p>
+        <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm">Gestiona tus citas y turnos.</p>
       </div>
     </div>
 
@@ -191,6 +228,7 @@
     <div id="tab-inicio-panel" class="animate-fade-in">
         <!-- Aquí se inyectará el contenido dinámico de Inicio -->
         <div id="inicio-promo-container"></div>
+        <div id="inicio-cita-card-container"></div> <!-- Contenedor para tarjeta de cita en inicio -->
         <div id="inicio-status-container" class="grid grid-cols-1 gap-4 mt-6">
             <!-- Cards de estado (se moverán aquí vía JS o duplicadas) -->
         </div>
@@ -211,10 +249,10 @@
 
     <!-- Modal Calificación -->
     <div id="modal-calificacion" class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-70 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white dark:bg-dark-800 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl transform scale-95 transition-all duration-300" id="modal-calificacion-content">
+        <div class="bento-card rounded-3xl p-8 w-full max-w-md mx-4 transform scale-95 transition-all duration-300 relative overflow-hidden" id="modal-calificacion-content">
             <div class="text-center">
-                <div class="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                <div class="w-20 h-20 bg-yellow-50 dark:bg-yellow-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-yellow-500 shadow-sm border border-yellow-100 dark:border-yellow-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
                 </div>
@@ -249,10 +287,22 @@
                     <textarea id="rating-comment" rows="3" placeholder="¿Algún comentario sobre el servicio?" class="w-full p-3 rounded-xl bg-gray-50 dark:bg-dark-900/50 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:ring-2 focus:ring-barberRed outline-none resize-none text-sm"></textarea>
                     
                     <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="cerrarModalCalificacion()" class="flex-1 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Omitir</button>
-                        <button type="submit" class="flex-1 py-3 rounded-xl font-bold bg-red-600 text-white shadow-lg hover:bg-red-700 active:bg-red-700 focus:bg-red-700 transition-colors focus:outline-none">Enviar</button>
+                        <button type="button" id="btn-rating-omit" class="flex-1 py-3.5 rounded-2xl font-bold text-gray-500 hover:bg-white/5 transition-colors text-sm">Omitir</button>
+                        <button type="submit" class="flex-1 py-3.5 rounded-2xl font-bold bg-[#C1121F] text-white shadow-lg hover:bg-[#A40E1A] active:bg-red-800 transition-all transform hover:scale-[1.02] focus:outline-none text-sm">Enviar Opinión</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmación Genérico -->
+    <div id="modal-confirmacion" class="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-70 hidden opacity-0 transition-opacity duration-300">
+        <div class="bento-card rounded-3xl p-8 w-full max-w-sm mx-4 transform scale-95 transition-all duration-300 relative overflow-hidden" id="modal-confirmacion-content">
+            <h3 id="confirm-title" class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirmar</h3>
+            <p id="confirm-message" class="text-gray-500 dark:text-gray-400 text-sm mb-6 whitespace-pre-line">¿Estás seguro?</p>
+            <div class="flex gap-3">
+                <button id="btn-confirm-cancel" class="flex-1 py-3 rounded-xl font-bold text-gray-500 hover:bg-white/5 transition-colors text-sm">Cancelar</button>
+                <button id="btn-confirm-ok" class="flex-1 py-3 rounded-xl font-bold bg-[#C1121F] text-white shadow-lg hover:bg-[#A40E1A] transition-all transform hover:scale-[1.02] text-sm">Confirmar</button>
             </div>
         </div>
     </div>
@@ -260,23 +310,23 @@
   </main>
 
   <!-- Bottom Navigation (Mobile Only) -->
-  <div class="md:hidden fixed bottom-0 left-0 z-50 w-full bg-white dark:bg-dark-900 border-t border-gray-200 dark:border-white/10 pb-safe">
+  <div class="md:hidden fixed bottom-0 left-0 z-50 w-full bg-white dark:bg-[#0B0B0C] border-t border-gray-200 dark:border-white/5 backdrop-blur pb-safe">
     <div class="flex justify-around items-center h-16">
-      <button onclick="mostrarSeccion('inicio')" class="nav-item flex flex-col items-center justify-center w-full h-full text-barberRed transition-colors" data-tab="inicio">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-        <span class="text-[10px] font-bold">Inicio</span>
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="inicio">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+        <span class="text-[11px] font-semibold">Inicio</span>
       </button>
-      <button onclick="mostrarSeccion('turno')" class="nav-item flex flex-col items-center justify-center w-full h-full text-barberRed transition-colors" data-tab="turno">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        <span class="text-[10px] font-bold">Turno</span>
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="turno">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span class="text-[11px] font-semibold">Turno</span>
       </button>
-      <button onclick="mostrarSeccion('cita')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-barberRed transition-colors" data-tab="cita">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-        <span class="text-[10px] font-bold">Citas</span>
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="cita">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        <span class="text-[11px] font-semibold">Citas</span>
       </button>
-      <button onclick="mostrarSeccion('perfil')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-barberRed transition-colors" data-tab="perfil">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-        <span class="text-[10px] font-bold">Perfil</span>
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="perfil">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+        <span class="text-[11px] font-semibold">Perfil</span>
       </button>
     </div>
   </div>
@@ -303,1693 +353,11 @@
         </div>
       </a>
     </div>
-    <button onclick="toggleFab()" id="fab-main" class="fab-btn w-14 h-14 bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-red-700 transition-colors z-50">
+    <button id="fab-main" class="fab-btn w-14 h-14 bg-[#C1121F] hover:bg-[#A40E1A] text-white rounded-full shadow-xl flex items-center justify-center transition-all z-50 ring-2 ring-white/10">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
     </button>
   </div>
 
-  <script>
-    // Variables globales
-    const negocioId = 'barberia005';
-  </script>
-
-  <script type="module">
-    import { ensureSupabase } from './database.js';
-    const supabase = await ensureSupabase();
-    const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
-    let serviciosCache = {};
-    let configCache = null;
-    let diasOperacionNum = [];
-    function animateNumber(el, to, duration = 500) {
-      if (!el) return;
-      const from = parseInt(el.textContent || '0', 10) || 0;
-      const start = performance.now();
-      const step = (now) => {
-        const p = Math.min(1, (now - start) / duration);
-        const val = Math.round(from + (to - from) * p);
-        el.textContent = String(val);
-        if (p < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    }
-    
-    // Contenido Rotativo del Banner
-    const bannerContentDefault = [
-        { title: "✂️ Consejo del día", text: "No te laves el cabello justo después del corte. Espera al menos 24 horas para que el estilo se asiente.", badge: "Tip Pro" },
-        { title: "🤯 ¿Sabías que...?", text: "El cabello crece en promedio 1.25 cm al mes. ¡Mantén tu corte fresco cada 3 semanas!", badge: "Curiosidad" },
-        { title: "💈 Servicio Premium", text: "Prueba nuestro tratamiento de toalla caliente. Relajación total para tu piel.", badge: "Recomendado" },
-        { title: "🌙 Dato Curioso", text: "La barba crece más rápido de noche debido a la relajación del cuerpo.", badge: "Sabías que" },
-        { title: "🔥 Promoción", text: "Trae a un amigo y obtén un 10% de descuento en tu próximo corte.", badge: "Oferta" },
-        { title: "🧔 Cuidado de Barba", text: "Usa aceite para barba diariamente para evitar la picazón y mantenerla suave.", badge: "Tip Barba" },
-        { title: "🚿 Agua Fría", text: "Enjuagar tu cabello con agua fría al final del baño ayuda a cerrar las cutículas y dar brillo.", badge: "Tip Salud" }
-    ];
-
-    function updateBanner(mode = 'default') {
-        const bannerInicio = document.getElementById('banner-inicio');
-        if (!bannerInicio) return;
-
-        let content;
-        const bgDiv = bannerInicio.querySelector('.banner-bg');
-        
-        if (mode === 'active_turn') {
-             content = { 
-                 title: "✂️ Tu barbero está trabajando", 
-                 text: "Estamos avanzando con los turnos. Mantente atento a tu posición.", 
-                 badge: "En Curso 🔥" 
-             };
-        } else if (mode === 'available') {
-             content = {
-                 title: "✅ Barbero disponible",
-                 text: "✂️ Puedes venir ahora mismo. Estamos listos para atenderte sin espera.",
-                 badge: "Sin Espera 🚀"
-             };
-        } else {
-             const idx = Math.floor(Math.random() * bannerContentDefault.length);
-             content = bannerContentDefault[idx];
-        }
-
-        if(bgDiv) bgDiv.className = "absolute inset-0 bg-barberBlue z-0 banner-bg";
-
-        bannerInicio.querySelector('.banner-title').textContent = content.title;
-        bannerInicio.querySelector('.banner-text').textContent = content.text;
-        bannerInicio.querySelector('.banner-badge').textContent = content.badge;
-    }
-    
-    // Clave pública VAPID (Debe coincidir con la de backend)
-    const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
-
-    // Toast Helper
-    function showToast(message, type = 'success') {
-        let container = document.getElementById('toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            document.body.appendChild(container);
-        }
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg><span class="font-medium text-gray-800 dark:text-white">${message}</span>`;
-        container.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 3000);
-    }
-
-    // Verificar sesión
-    if (!clienteId) {
-      window.location.href = 'login_cliente.html';
-    }
-
-    // UI Helpers
-    window.toggleProfileMenu = () => {
-        document.getElementById('profile-menu').classList.toggle('hidden');
-    }
-    window.toggleFab = () => {
-        const menu = document.getElementById('fab-menu');
-        const btn = document.getElementById('fab-main');
-        menu.classList.toggle('active');
-        btn.classList.toggle('active');
-    }
-    window.logout = async () => {
-      localStorage.removeItem(`cliente_id_${negocioId}`);
-      localStorage.removeItem(`cliente_telefono_${negocioId}`);
-      await supabase.auth.signOut();
-      window.location.href = 'login_cliente.html';
-    };
-
-    // Cerrar dropdown si se hace clic afuera
-    window.addEventListener('click', function(e) {
-        const profileMenuContainer = document.querySelector('.relative');
-        const profileMenu = document.getElementById('profile-menu');
-        if (profileMenu && !profileMenu.classList.contains('hidden') && !profileMenuContainer.contains(e.target)) {
-            profileMenu.classList.add('hidden');
-        }
-    });
-
-    // Lógica de Pestañas
-    const turnoBtn = document.getElementById('tab-turno-btn');
-    const citaBtn = document.getElementById('tab-cita-btn');
-    const perfilBtn = document.getElementById('tab-perfil-btn');
-    const activeClasses = 'border-barberRed text-barberRed dark:text-barberRed';
-    const inactiveClasses = 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600';
-
-    // Cache para slots de citas
-    const slotsCache = {};
-    let lastSlotsParams = '';
-
-    const switchTab = (tab) => {
-        const panels = ['inicio', 'turno', 'cita', 'perfil'];
-        panels.forEach(p => {
-            document.getElementById(`tab-${p}-panel`).classList.toggle('hidden', p !== tab);
-        });
-        
-        // Update Mobile Nav
-        document.querySelectorAll('.nav-item').forEach(el => {
-            const isSelected = el.dataset.tab === tab;
-            el.classList.toggle('text-barberRed', isSelected);
-            el.classList.toggle('text-gray-400', !isSelected);
-            el.classList.toggle('hover:text-barberRed', !isSelected);
-        });
-        
-        if(turnoBtn) {
-            turnoBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'turno' ? activeClasses : inactiveClasses}`;
-            citaBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'cita' ? activeClasses : inactiveClasses}`;
-            perfilBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'perfil' ? activeClasses : inactiveClasses}`;
-        }
-    };
-
-    turnoBtn?.addEventListener('click', () => switchTab('turno'));
-    citaBtn?.addEventListener('click', () => switchTab('cita'));
-    perfilBtn?.addEventListener('click', () => switchTab('perfil'));
-    window.mostrarSeccion = (seccion) => {
-        switchTab(seccion);
-        document.getElementById('profile-menu').classList.add('hidden');
-    };
-
-    // Cargar Datos Iniciales
-    async function init() {
-      if (!clienteId) { window.location.href = 'login_cliente.html'; return; }
-      renderStructure(); // Construir estructura dinámica
-      updateBanner(); // Actualizar banner al inicio
-      await cargarPerfil();
-      await cargarServicios();
-      await actualizarEstadoFila();
-      await verificarTurnoActivo();
-      await verificarCitaActiva(); // Verificar citas
-      
-      // Listeners Reactivos para Citas
-      document.getElementById('date-picker')?.addEventListener('change', renderSlotsForSelectedDate);
-      document.getElementById('select-servicio-cita')?.addEventListener('change', renderSlotsForSelectedDate);
-      document.getElementById('select-barbero-cita')?.addEventListener('change', renderSlotsForSelectedDate);
-      document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
-      
-      // Listener para Perfil (Movido aquí para asegurar que el elemento existe)
-      const formPerfil = document.getElementById('form-perfil');
-      if (formPerfil) {
-          formPerfil.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nombre = document.getElementById('edit-nombre').value;
-            const email = document.getElementById('edit-email').value;
-            const { error } = await supabase.from('clientes').update({ nombre, email }).eq('id', clienteId);
-            if (error) alert('Error al actualizar');
-            else {
-              alert('Perfil actualizado');
-              cargarPerfil();
-            }
-          });
-      }
-      
-      // Listener para Perfil (Movido aquí para asegurar que el elemento existe)
-      
-      // Suscripción Realtime Optimizada
-      let refreshTimeout;
-      const safeRefresh = () => {
-          clearTimeout(refreshTimeout);
-          refreshTimeout = setTimeout(() => {
-            actualizarEstadoFila();
-            verificarTurnoActivo();
-            verificarCitaActiva();
-            checkPendingRatings();
-          }, 500); // Debounce de 500ms
-      };
-
-      supabase.channel('cliente-updates-v2')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, 
-          safeRefresh)
-        .subscribe();
-
-      // Inicializar Push Notifications
-      registrarServiceWorker();
-
-      // Ocultar loader
-      const loader = document.getElementById('loading-screen');
-      if(loader) {
-          loader.classList.add('opacity-0', 'pointer-events-none');
-          setTimeout(() => loader.remove(), 500);
-      }
-      
-      // Check inicial de calificaciones pendientes
-      checkPendingRatings();
-    }
-
-    // --- RENDERIZADO DINÁMICO DE ESTRUCTURA ---
-    function renderStructure() {
-        // 1. Clonar Banner a Inicio y Turno
-        const bannerTemplate = document.getElementById('banner-marketing-template');
-        const inicioContainer = document.getElementById('inicio-promo-container');
-        const turnoContainer = document.getElementById('turno-promo-container');
-
-        // Helper para crear banners
-        const createBanner = (title, text, badge) => {
-            const clone = bannerTemplate.cloneNode(true);
-            clone.id = ''; // Remover ID duplicado
-            clone.classList.remove('hidden');
-            clone.querySelector('.banner-title').textContent = title;
-            clone.querySelector('.banner-text').textContent = text;
-            clone.querySelector('.banner-badge').textContent = badge;
-            return clone;
-        };
-        
-        if(bannerTemplate) {
-            // 1. Banner Inicio (Dinámico)
-            const banner1 = bannerTemplate.cloneNode(true);
-            banner1.id = 'banner-inicio';
-            banner1.classList.remove('hidden');
-            inicioContainer.appendChild(banner1);
-        }
-
-        // 2. Dashboard Cards Mejoradas (Estructura Widget)
-        const statusContainer = document.getElementById('inicio-status-container');
-        statusContainer.innerHTML = `
-          <!-- Card 1: Estado -->
-          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-blue-50 rounded-2xl text-barberBlue">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Tu Estado</span>
-            </div>
-            <div id="dash-card-1">
-               <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block tracking-tight">Sin turno</span>
-               <span class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1 block">--</span>
-            </div>
-          </div>
-
-          <!-- Card 2: Tiempo -->
-          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-red-50 rounded-2xl text-barberRed">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Estimado</span>
-            </div>
-            <div id="dash-card-2">
-               <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block tracking-tight">-- min</span>
-               <span class="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1 block">Atención aprox: --:--</span>
-            </div>
-          </div>
-
-          <!-- Card 3: Demanda -->
-          <div class="card-solid p-6 rounded-3xl relative overflow-hidden group transition-all">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-blue-50 rounded-2xl text-barberBlue">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-                </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Demanda</span>
-            </div>
-            <div id="dash-card-3">
-               <span class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 text-sm font-bold">Calculando...</span>
-            </div>
-          </div>
-        `;
-
-        // 3. Construir Panel Turno
-        const turnoPanel = document.getElementById('tab-turno-panel');
-        turnoPanel.innerHTML += `
-            <!-- Mi Turno Activo -->
-            <div id="card-turno-activo" class="hidden bg-white dark:bg-dark-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden mb-8 group transition-all duration-500">
-                <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-green-400 to-green-600"></div>
-                <div class="absolute top-0 right-0 p-4 opacity-10 text-green-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tu Turno en Curso</h3>
-                <div class="flex items-baseline gap-3">
-                  <span id="mi-numero-turno" class="text-6xl font-display font-bold text-gray-900 dark:text-white tracking-wide">--</span>
-                  <span id="mi-estado-turno" class="px-4 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold border border-green-200 dark:border-green-800">En Espera</span>
-                </div>
-                <p id="mi-servicio-turno" class="text-gray-600 dark:text-gray-300 mt-3 font-medium text-lg">Servicio...</p>
-                <div class="mt-6 pt-6 border-t border-gray-100 dark:border-white/5 flex justify-between items-center">
-                  <div id="mi-info-extra" class="text-sm text-gray-500 dark:text-gray-400">Calculando...</div>
-                  <button onclick="cancelarTurno()" class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-sm font-semibold transition-colors">Cancelar Turno</button>
-                </div>
-            </div>
-
-            <!-- Widget Tomar Turno -->
-            <div id="seccion-tomar-turno" class="glass-panel p-8 rounded-3xl shadow-xl">
-                <h3 class="text-3xl font-display font-bold mb-8 flex items-center gap-3 text-gray-900 dark:text-white tracking-wide">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-barberRed" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  Reservar Nuevo Turno
-                </h3>
-                <div id="bloqueado-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30 flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  <span id="bloqueado-texto">Ya tienes un turno activo.</span>
-                </div>
-                <div class="grid grid-cols-1 gap-6">
-                  <div><label class="block text-sm font-semibold mb-2">Servicio</label><select id="select-servicio" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"><option value="">Cargando...</option></select></div>
-                  <div><label class="block text-sm font-semibold mb-2">Barbero</label><select id="select-barbero-turno" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"><option value="">Cargando...</option></select></div>
-                </div>
-                <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl shadow-xl flex justify-center items-center gap-3 text-lg">Confirmar Turno</button>
-            </div>
-        `;
-        
-        // 4. Construir Panel Cita (Reutilizar lógica existente pero inyectar HTML)
-        const citaPanel = document.getElementById('tab-cita-panel');
-        citaPanel.innerHTML = `
-            <!-- Marketing Cita -->
-            <div id="cita-promo-container" class="mb-6"></div>
-            
-            <!-- Mi Cita Activa -->
-            <div id="card-cita-activa" class="hidden bg-gradient-to-br from-barberBlue to-black p-8 rounded-3xl shadow-xl text-white relative overflow-hidden mb-8 group transition-all duration-500">
-                <div class="absolute top-0 right-0 p-4 opacity-20 text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                </div>
-                <h3 class="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">📅 Tu Cita Programada</h3>
-                <div class="flex flex-col gap-1">
-                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide">--</span>
-                  <span id="cita-barbero" class="text-lg font-medium text-blue-100">--</span>
-                </div>
-                <p id="cita-servicio" class="text-white/90 mt-3 font-medium">Cita Reservada</p>
-                <div class="mt-6 pt-6 border-t border-white/20 flex justify-between items-center">
-                  <div class="text-sm text-blue-100">Llega 5 min antes</div>
-                  <button onclick="cancelarCita()" class="text-white/80 hover:text-white text-sm font-semibold transition-colors bg-white/10 px-4 py-2 rounded-lg hover:bg-white/20">Cancelar Cita</button>
-                </div>
-            </div>
-            
-            <!-- Agendar Cita -->
-            <div id="seccion-cita-inteligente" class="glass-panel p-8 rounded-3xl shadow-xl">
-                <h3 class="text-3xl font-display font-bold mb-2 flex items-center gap-2 text-gray-900 dark:text-white tracking-wide">Agendar cita</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-6" id="texto-sugerencia">Calculando mejor hora...</p>
-                <div id="bloqueado-cita-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30">
-                    No puedes agendar cita si tienes un turno activo.
-                </div>
-                <div id="form-cita-container">
-                    <div class="mb-6">
-                      <label class="block text-sm font-semibold mb-2">Selecciona Barbero</label>
-                      <select id="select-barbero-cita" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"><option value="">Cargando...</option></select>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                      <button id="btn-reservar-sugerida" onclick="reservarCitaInteligente()" class="flex-1 px-6 py-4 bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold rounded-2xl shadow-lg focus:outline-none">Reservar esa hora</button>
-                      <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 border border-gray-300 dark:border-white/20 text-gray-900 dark:text-white font-bold rounded-2xl">Ver horarios libres</button>
-                      <button id="btn-reservar-mas-tarde" onclick="reservarMasTarde()" class="hidden flex-1 px-6 py-4 bg-barberRed text-white font-bold rounded-2xl shadow">Reservar para más tarde</button>
-                    </div>
-                    <div id="horarios-libres" class="mt-6 hidden">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label class="block text-sm font-semibold mb-2">Fecha</label><input id="date-picker" type="date" class="w-full p-3 rounded-xl border bg-white/50 dark:bg-dark-800/50"></div>
-                            <div><label class="block text-sm font-semibold mb-2">Servicio</label><select id="select-servicio-cita" class="w-full p-3 rounded-xl border bg-white/50 dark:bg-dark-800/50"><option value="">Selecciona...</option></select></div>
-                        </div>
-                        <div id="rango-horario-display"></div>
-                        <div class="mt-6 bg-gray-50 dark:bg-dark-800/30 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
-                            <div id="slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
-                            <div id="action-container" class="mt-6 hidden flex justify-center animate-fade-in">
-                                <button id="btn-confirmar-reserva" class="bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold py-3 px-8 rounded-xl shadow-lg focus:outline-none">Confirmar Reserva</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // 5. Construir Perfil (Reutilizar existente)
-        const perfilPanel = document.getElementById('tab-perfil-panel');
-        perfilPanel.innerHTML = `
-          <!-- Marketing Perfil -->
-          <div id="perfil-promo-container" class="mb-6"></div>
-
-          <div class="glass-panel p-8 rounded-3xl shadow-xl max-w-2xl mx-auto">
-            <div class="flex flex-col sm:flex-row items-center gap-6">
-              <div class="relative flex-shrink-0">
-                <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 border-white dark:border-dark-800 shadow-2xl object-cover ring-2 ring-barberRed">
-                <button onclick="document.getElementById('avatar-upload').click()" class="absolute bottom-0 right-0 bg-barberRed text-white p-2.5 rounded-full hover:bg-red-700 shadow-lg border-4 border-white dark:border-dark-900 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                </button>
-                <input type="file" id="avatar-upload" class="hidden" accept="image/*" onchange="subirAvatar(this)">
-              </div>
-              <div class="text-center sm:text-left">
-                <h3 id="profile-name" class="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-wide">Cargando...</h3>
-                <p id="profile-phone" class="text-gray-500 dark:text-gray-400 text-lg mt-1">...</p>
-                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs font-bold border border-red-200 dark:border-red-800/30">
-                  Cliente frecuente ⭐
-                </span>
-              </div>
-            </div>
-            <form id="form-perfil" class="mt-10 space-y-6">
-              <div><label class="text-sm font-semibold mb-2 block">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"></div>
-              <div><label class="text-sm font-semibold mb-2 block">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-2xl border bg-white/50 dark:bg-dark-800/50"></div>
-              <button type="submit" class="w-full bg-gray-900 dark:bg-white text-white dark:text-dark-900 font-bold py-4 rounded-2xl shadow-lg flex justify-center items-center gap-2 mt-4">Actualizar Datos</button>
-            </form>
-          </div>
-        `;
-
-        // Inyectar Banners de Marketing Específicos
-        if(bannerTemplate) {
-            const bannerCita = createBanner("Planifica tu Estilo", "Reserva con anticipación y asegura tu lugar con tu barbero favorito.", "Agenda Pro");
-            document.getElementById('cita-promo-container').appendChild(bannerCita);
-
-            const bannerPerfil = createBanner("Tu Identidad", "Mantén tu información actualizada para recibir las mejores ofertas.", "Mi Cuenta");
-            document.getElementById('perfil-promo-container').appendChild(bannerPerfil);
-        }
-    }
-    
-    // --- Lógica Push Notifications ---
-    function registrarServiceWorker() {
-      if ('serviceWorker' in navigator) {
-        const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
-        navigator.serviceWorker.register(swPath).then(async registration => {
-            console.log('SW registrado');
-            // Solicitar permiso si no se tiene
-            if (Notification.permission === 'default') {
-                await solicitarPermisoNotificacion();
-            }
-        }).catch(err => console.error('SW error:', err));
-      }
-    }
-
-    async function solicitarPermisoNotificacion() {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-            await guardarSuscripcion(subscription);
-        }
-    }
-
-    function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-        return outputArray;
-    }
-
-    async function guardarSuscripcion(subscription) {
-        const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-        if(telefono) await supabase.from('push_subscriptions').upsert({ 
-            user_id: telefono, 
-            subscription, 
-            negocio_id: negocioId,
-            endpoint: subscription.endpoint // Guardar el endpoint para borrado seguro
-        }, { onConflict: 'user_id, negocio_id' });
-    }
-
-    // --- LÓGICA DE TIEMPO REAL (CORE) ---
-    function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarbers) {
-        // LÓGICA MATEMÁTICA OFICIAL DE TURNORD
-        const barberos = Math.max(1, activeBarbers);
-        let tiempoTotalMinutos = 0;
-
-        // 1. Sumar tiempo restante de los que están en atención
-        turnosEnAtencion.forEach(t => {
-            const duracion = serviciosCache[t.servicio] || 30; // Duración desde DB
-            const inicio = t.started_at ? new Date(t.started_at) : new Date();
-            const transcurrido = (Date.now() - inicio.getTime()) / 60000;
-            const restante = Math.max(0, duracion - transcurrido);
-            tiempoTotalMinutos += restante;
-        });
-
-        // 2. Sumar duración completa de los que están en espera
-        turnosEnEspera.forEach(t => {
-            const duracion = serviciosCache[t.servicio] || 30;
-            tiempoTotalMinutos += duracion;
-        });
-
-        // 3. Dividir entre barberos activos (Carga distribuida)
-        const tiempoEstimado = tiempoTotalMinutos / barberos;
-        
-        return Math.ceil(tiempoEstimado);
-    }
-
-    async function cargarPerfil() {
-      const { data, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
-      if (error) {
-        console.error('Error cargando perfil:', error);
-        if (error.code === 'PGRST116') { // Not found
-            logout();
-        }
-        return;
-      }
-      if (data) {
-        // Navbar y Menú
-        document.getElementById('nav-name').textContent = data.nombre.split(' ')[0];
-        document.getElementById('menu-profile-name').textContent = data.nombre;
-        document.getElementById('menu-profile-phone').textContent = data.telefono;
-        
-        // Pestaña de Perfil
-        document.getElementById('profile-name').textContent = data.nombre;
-        document.getElementById('profile-phone').textContent = data.telefono;
-        document.getElementById('edit-nombre').value = data.nombre;
-        document.getElementById('edit-email').value = data.email || '';
-        
-        const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
-        document.getElementById('nav-avatar').src = avatarUrl;
-        document.getElementById('profile-avatar').src = avatarUrl;
-      }
-    }
-
-    async function cargarServicios() {
-      const { data } = await supabase.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
-      const select = document.getElementById('select-servicio');
-      select.innerHTML = '<option value="">Selecciona un servicio...</option>';
-      if (data) {
-        data.forEach(s => {
-          serviciosCache[s.nombre] = s.duracion_min;
-          const option = document.createElement('option');
-          option.value = s.nombre;
-          option.textContent = `${s.nombre}`;
-          select.appendChild(option);
-        });
-      }
-      const svcCita = document.getElementById('select-servicio-cita');
-      if (svcCita) {
-        svcCita.innerHTML = '<option value="">Selecciona un servicio...</option>';
-        (data || []).forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.nombre;
-          opt.textContent = s.nombre;
-          svcCita.appendChild(opt);
-        });
-      }
-    }
-
-    async function cargarConfigNegocio() {
-      const { data } = await supabase
-        .from('configuracion_negocio')
-        .select('*')
-        .eq('negocio_id', negocioId)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      configCache = data || null;
-      
-      let diasOp = data?.dias_operacion || [];
-      if (typeof diasOp === 'string') {
-          try { diasOp = JSON.parse(diasOp); } catch (e) { diasOp = []; }
-      }
-      
-      const map = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miércoles':3, 'Jueves':4, 'Viernes':5, 'Sábado':6 };
-      diasOperacionNum = diasOp.map(n => map[n]).filter(v => typeof v === 'number');
-    }
-
-    async function actualizarEstadoFila() {
-      const hoy = new Date().toISOString().slice(0, 10);
-      
-      // Obtener TODOS los turnos activos con sus detalles para cálculo preciso
-      const { data: turnosActivos } = await supabase.from('turnos')
-            .select('id, estado, servicio, started_at, created_at')
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .in('estado', ['En espera', 'En atención']);
-      
-      const enEspera = (turnosActivos || []).filter(t => t.estado === 'En espera');
-      const enAtencion = (turnosActivos || []).filter(t => t.estado === 'En atención');
-
-      // Barberos activos
-      const { count: barberosCount } = await supabase.from('barberos')
-        .select('*', { count: 'exact', head: true })
-        .eq('negocio_id', negocioId)
-        .eq('activo', true);
-      const activeBarbers = barberosCount || 1;
-
-      // Actualizar UI Barberos
-      const ba = document.getElementById('barberos-activos');
-      if(ba) ba.textContent = activeBarbers;
-      const baCita = document.getElementById('barberos-activos-cita');
-      if(baCita) baCita.textContent = activeBarbers;
-
-      // Personas delante (En espera)
-      const personasEnCola = enEspera.length;
-      
-      const pd = document.getElementById('personas-delante');
-      if(pd) animateNumber(pd, personasEnCola);
-      const pdCita = document.getElementById('personas-delante-cita');
-      if(pdCita) animateNumber(pdCita, personasEnCola);
-      
-      // Lógica Banner Estado (Prioritaria)
-      if (!window.hasActiveTurn && !window.hasActiveAppointment) {
-          if (personasEnCola === 0 && enAtencion.length < activeBarbers) {
-              updateBanner('available');
-          } else {
-              updateBanner('default');
-          }
-      }
-
-      // Calcular Tiempo Estimado (Lógica Nueva)
-      const tiempoEstimado = calcularTiempoEsperaReal(enEspera, enAtencion, activeBarbers);
-      
-      let tiempoTexto = "";
-      let estado = 'Fluida';
-      let badgeClass = 'bg-green-100 text-green-700';
-      let demandaTexto = "🟢 Baja";
-
-      if (tiempoEstimado <= 0) {
-          tiempoTexto = "Atención inmediata";
-          estado = 'Libre';
-      } else {
-          tiempoTexto = `${tiempoEstimado} min`;
-          if (tiempoEstimado > 20) { 
-              estado = 'Media'; 
-              badgeClass = 'bg-yellow-100 text-yellow-700'; 
-              demandaTexto = "🟡 Media";
-          }
-          if (tiempoEstimado > 45) { 
-              estado = 'Alta'; 
-              badgeClass = 'bg-red-100 text-red-700'; 
-              demandaTexto = "🔴 Alta";
-          }
-      }
-      
-      const te = document.getElementById('tiempo-espera');
-      if(te) te.textContent = tiempoTexto;
-      const teCita = document.getElementById('tiempo-espera-cita');
-      if(teCita) teCita.textContent = tiempoTexto;
-
-      const badge = document.getElementById('estado-barberia-badge'); 
-      if(badge) {
-          badge.textContent = estado;
-          badge.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
-      }
-
-      // --- ACTUALIZAR NUEVAS TARJETAS (DASHBOARD) ---
-      // Card 1: Tu Estado (Default si no hay turno)
-      const dashCard1 = document.getElementById('dash-card-1');
-      if(dashCard1 && !window.hasActiveTurn && !window.hasActiveAppointment) {
-          dashCard1.innerHTML = `
-             <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${personasEnCola}</span>
-             <span class="text-sm text-gray-500 dark:text-gray-400">Personas en espera</span>
-          `;
-      }
-
-      // Card 2: Tiempo Estimado
-      const dashCard2 = document.getElementById('dash-card-2');
-      if(dashCard2 && !window.hasActiveTurn && !window.hasActiveAppointment) {
-          const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-          dashCard2.innerHTML = `
-             <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${tiempoTexto}</span>
-             <span class="text-sm text-gray-500 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
-          `;
-      }
-
-      // Card 3: Demanda
-      const dashCard3 = document.getElementById('dash-card-3');
-      if(dashCard3) {
-          dashCard3.innerHTML = `
-             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-lg ${badgeClass} dark:bg-opacity-20 text-sm font-bold">
-                ${demandaTexto}
-             </span>
-          `;
-      }
-
-      const badgeCita = document.getElementById('estado-barberia-badge-cita');
-      if(badgeCita) {
-          badgeCita.textContent = estado;
-          badgeCita.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
-      }
-
-      // Sugerencia de cita inteligente
-      const textoSug = document.getElementById('texto-sugerencia');
-      const btnSug = document.getElementById('btn-reservar-sugerida');
-      const btnMasTarde = document.getElementById('btn-reservar-mas-tarde');
-      const ahora = new Date();
-      const sugerida = sugerirHora(ahora, tiempoEstimado, 30, estado);
-      const fmt = sugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      if (estado === 'Alta') {
-        textoSug.textContent = `Alta demanda ahora mismo. Te recomendamos reservar para más tarde (ej: ${fmt}).`;
-        btnSug.classList.add('hidden');
-        btnMasTarde.classList.remove('hidden');
-      } else {
-        textoSug.textContent = `Según la fila actual, tu mejor hora es: ${fmt}`;
-        btnSug.classList.remove('hidden');
-        btnMasTarde.classList.add('hidden');
-      }
-      window.__sugeridaHora__ = sugerida;
-      window.__duracionServicio__ = 30; // Default
-    }
-
-    async function verificarTurnoActivo() {
-      const hoy = new Date().toISOString().slice(0, 10);
-      const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-      
-      const { data } = await supabase.from('turnos')
-        .select('*')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .in('estado', ['En espera', 'En atención'])
-        .eq('telefono', telefono) // Usamos teléfono como link por ahora
-        .maybeSingle();
-
-      const card = document.getElementById('card-turno-activo');
-      const form = document.getElementById('seccion-tomar-turno');
-
-      if (data) {
-        window.hasActiveTurn = true;
-        updateBanner('active_turn'); // Banner estratégico
-        card.classList.remove('hidden');
-        if(form) form.classList.add('hidden'); // Ocultar completamente
-        document.getElementById('mi-numero-turno').textContent = data.turno;
-        document.getElementById('mi-servicio-turno').textContent = data.servicio;
-        document.getElementById('bloqueado-msg').classList.remove('hidden');
-        document.getElementById('bloqueado-texto').textContent = "Ya tienes un turno activo. Cuando finalice, podrás tomar otro 👌";
-        
-        const estadoEl = document.getElementById('mi-estado-turno');
-        const infoExtra = document.getElementById('mi-info-extra');
-
-        // --- ACTUALIZAR DASHBOARD CON DATOS DEL TURNO ---
-        const dashCard1 = document.getElementById('dash-card-1');
-        if(dashCard1) {
-            dashCard1.innerHTML = `
-               <span class="text-4xl font-display font-bold text-barberRed block">${data.turno}</span>
-               <span class="text-sm text-gray-500 dark:text-gray-400 font-bold">TU TURNO ACTUAL</span>
-            `;
-        }
-
-        if (data.estado === 'En atención') {
-            estadoEl.textContent = "En Atención";
-            estadoEl.className = "px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold border border-blue-200 dark:border-blue-800 animate-pulse";
-            
-            // Contexto emocional
-            document.querySelector('#card-turno-activo h3').textContent = "✂️ Te están atendiendo";
-            infoExtra.innerHTML = `<span class="text-lg font-medium text-gray-800 dark:text-white">Relájate y disfruta 😌</span>`;
-            
-            const dashCard2 = document.getElementById('dash-card-2');
-            if(dashCard2) {
-                dashCard2.innerHTML = `
-                   <span class="text-3xl font-display font-bold text-barberBlue dark:text-blue-400 block">AHORA</span>
-                   <span class="text-sm text-gray-500 dark:text-gray-400">Te están atendiendo</span>
-                `;
-            }
-
-        } else {
-            estadoEl.textContent = "En Espera";
-            estadoEl.className = "px-4 py-1.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-bold border border-yellow-200 dark:border-yellow-800";
-            document.querySelector('#card-turno-activo h3').textContent = "🕒 Tu turno está en cola";
-
-            // Calcular espera específica para este usuario
-            const { data: allTurns } = await supabase.from('turnos')
-                .select('id, estado, servicio, started_at, created_at')
-                .eq('negocio_id', negocioId)
-                .eq('fecha', hoy)
-                .in('estado', ['En espera', 'En atención']);
-            
-            const enAtencion = allTurns.filter(t => t.estado === 'En atención');
-            const enEsperaAntes = allTurns.filter(t => t.estado === 'En espera' && t.created_at < data.created_at);
-            
-            const { count: barberosCount } = await supabase.from('barberos').select('*', { count: 'exact', head: true }).eq('negocio_id', negocioId).eq('activo', true);
-            const activeBarbers = barberosCount || 1;
-
-            const personasDelante = enEsperaAntes.length;
-            const tiempoEstimado = calcularTiempoEsperaReal(enEsperaAntes, enAtencion, activeBarbers);
-            
-            let mensajeTiempo = "";
-            if (personasDelante === 0 && enAtencion.length < activeBarbers) {
-                 mensajeTiempo = "🚀 ¡Es tu turno ahora mismo!";
-            } else {
-                 mensajeTiempo = `⏳ Tiempo estimado: ~${tiempoEstimado} min`;
-            }
-
-            const dashCard2 = document.getElementById('dash-card-2');
-            if(dashCard2) {
-                const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                dashCard2.innerHTML = `
-                   <span class="text-4xl font-display font-bold text-gray-900 dark:text-white block">${tiempoEstimado} min</span>
-                   <span class="text-sm text-gray-500 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
-                `;
-            }
-
-            // Barra de Progreso Anti-Ansiedad
-            const porcentaje = Math.max(5, 100 - (personasDelante * 15)); // 15% por persona aprox
-            
-            infoExtra.innerHTML = `
-                <div class="flex flex-col w-full mr-4">
-                    <div class="flex justify-between items-end mb-2">
-                        <span class="font-bold text-lg text-gray-900 dark:text-white">${personasDelante} personas delante</span>
-                        <span class="text-xs font-bold text-barberRed bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">${mensajeTiempo}</span>
-                    </div>
-                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
-                        <div class="bg-barberRed h-full rounded-full transition-all duration-1000 relative" style="width: ${porcentaje}%">
-                            <div class="absolute inset-0 bg-white/30 animate-shimmer"></div>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-400 mt-1 text-right">
-                        ${personasDelante === 0 ? '🚀 ¡Es tu turno ahora mismo!' : 'La fila avanza...'}
-                    </p>
-                </div>
-            `;
-
-            // Notificación inteligente
-            if (personasDelante <= 1 && !window.notificacionCercaEnviada) {
-               sendPushNotification('🔔 ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`);
-               window.notificacionCercaEnviada = true;
-            }
-        }
-        
-        // Bloquear Citas
-        const citaForm = document.getElementById('form-cita-container');
-        const citaMsg = document.getElementById('bloqueado-cita-msg');
-        if(citaForm) citaForm.classList.add('hidden');
-        if(citaMsg) citaMsg.classList.remove('hidden');
-
-      } else {
-        window.hasActiveTurn = false;
-        // updateBanner se maneja en actualizarEstadoFila para mostrar disponibilidad
-        card.classList.add('hidden');
-        if(form) form.classList.remove('hidden');
-        document.getElementById('bloqueado-msg').classList.add('hidden');
-        checkPendingRatings(); // Si no hay turno activo, verificar si acabó uno recientemente
-      }
-    }
-
-    // --- LÓGICA DE CITAS (NUEVA) ---
-    async function verificarCitaActiva() {
-        const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-        if (!telefono) return;
-
-        const nowISO = new Date().toISOString();
-        const { data: cita } = await supabase
-            .from('citas')
-            .select('*, barberos(nombre)')
-            .eq('negocio_id', negocioId)
-            .eq('cliente_telefono', telefono)
-            .neq('estado', 'Cancelada')
-            .gte('start_at', nowISO)
-            .order('start_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-        const cardCita = document.getElementById('card-cita-activa');
-        const seccionTurno = document.getElementById('seccion-tomar-turno');
-        
-        if (cita) {
-            window.hasActiveAppointment = true;
-            cardCita.classList.remove('hidden');
-            
-            // Bloquear Turno
-            if(seccionTurno) seccionTurno.classList.add('hidden');
-            document.getElementById('bloqueado-msg').classList.remove('hidden');
-            document.getElementById('bloqueado-texto').textContent = "Tienes una cita programada. No puedes tomar turno.";
-            
-            const date = new Date(cita.start_at);
-            const today = new Date();
-            const isToday = date.toDateString() === today.toDateString();
-            const dateStr = isToday ? 'Hoy' : date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-            const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            
-            document.getElementById('cita-fecha-hora').textContent = `${dateStr} – ${timeStr}`;
-            
-            let barberName = "Barbero asignado";
-            if (cita.barberos) {
-                 barberName = cita.barberos.nombre;
-            } else if (cita.barber_id) {
-                 const { data: b } = await supabase.from('barberos').select('nombre').eq('id', cita.barber_id).single();
-                 if(b) barberName = b.nombre;
-            }
-            document.getElementById('cita-barbero').textContent = `Barbero: ${barberName}`;
-            cardCita.dataset.id = cita.id;
-
-            // Update Dashboard
-            const dashCard1 = document.getElementById('dash-card-1');
-            if(dashCard1) {
-                 dashCard1.innerHTML = `
-                   <span class="text-4xl font-display font-bold text-barberBlue dark:text-blue-400 block">CITA</span>
-                   <span class="text-sm text-gray-500 dark:text-gray-400 font-bold">PROGRAMADA</span>
-                `;
-            }
-            const dashCard2 = document.getElementById('dash-card-2');
-            if(dashCard2) {
-                 dashCard2.innerHTML = `
-                   <span class="text-3xl font-display font-bold text-gray-900 dark:text-white block">${timeStr}</span>
-                   <span class="text-sm text-gray-500 dark:text-gray-400">Hora de atención</span>
-                `;
-            }
-
-        } else {
-            window.hasActiveAppointment = false;
-            cardCita.classList.add('hidden');
-            // Solo mostrar tomar turno si no hay turno activo tampoco
-            if (!window.hasActiveTurn && seccionTurno) {
-                 seccionTurno.classList.remove('hidden');
-                 const msg = document.getElementById('bloqueado-msg');
-                 if(msg) msg.classList.add('hidden');
-            }
-        }
-    }
-
-    // Helper para notificaciones push
-    async function sendPushNotification(title, body) {
-      const telefono = document.getElementById('profile-phone').textContent;
-      if (!telefono || telefono === '...') return;
-      try {
-        const { error } = await supabase.functions.invoke('send-push-notification', {
-          body: { telefono, negocio_id: negocioId, title, body }
-        });
-        if (error) throw error;
-      } catch (e) {
-        try {
-          const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`
-            },
-            body: JSON.stringify({ telefono, negocio_id: negocioId, title, body })
-          });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-        } catch (e2) {
-          console.error('Error enviando push (fallback):', e2);
-        }
-      }
-    }
-
-    // Acciones
-    window.tomarTurno = async () => {
-      // Solicitar permiso de notificación al interactuar (Mejor práctica UX)
-      if (Notification.permission === 'default') await solicitarPermisoNotificacion();
-
-      // --- VALIDACIONES DE NEGOCIO ---
-      if (configCache) {
-          const ahora = new Date();
-          const dia = ahora.getDay(); // 0=Domingo
-          const hora = ahora.getHours() * 60 + ahora.getMinutes();
-          
-          // 1. Días de operación
-          if (diasOperacionNum.length > 0 && !diasOperacionNum.includes(dia)) {
-              alert('Hoy no laboramos. Por favor revisa nuestros días de operación.');
-              return;
-          }
-
-          // 2. Horario
-          if (configCache.hora_apertura && configCache.hora_cierre) {
-              const [hAp, mAp] = configCache.hora_apertura.split(':').map(Number);
-              const [hCi, mCi] = configCache.hora_cierre.split(':').map(Number);
-              const minAp = hAp * 60 + mAp;
-              const minCi = hCi * 60 + mCi;
-              
-              if (hora < minAp || hora >= minCi) {
-                  alert(`Nuestro horario es de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`);
-                  return;
-              }
-          }
-      }
-
-      // 3. Break (Verificar estado actual)
-      const { data: estadoNegocio } = await supabase.from('estado_negocio').select('en_break, break_end_time').eq('negocio_id', negocioId).maybeSingle();
-      if (estadoNegocio && estadoNegocio.en_break) {
-           const finBreak = new Date(estadoNegocio.break_end_time);
-           if (finBreak > new Date()) {
-               alert(`Estamos en break hasta las ${finBreak.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}.`);
-               return;
-           }
-      }
-      // -------------------------------
-
-      const servicio = document.getElementById('select-servicio').value;
-      if (!servicio) return alert('Selecciona un servicio');
-      const barberSel = document.getElementById('select-barbero-turno').value;
-      if (!barberSel) return alert('Selecciona un barbero');
-
-      const nombre = document.getElementById('profile-name').textContent;
-      const telefono = document.getElementById('profile-phone').textContent;
-      const hoy = new Date().toISOString().slice(0, 10);
-      const hora = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-
-      // --- CAMBIO A RPC SEGURO ---
-      // Ya no generamos el turno en el cliente para evitar duplicados.
-      // Usamos la función registrar_turno en la base de datos.
-      
-      // Insertar
-      const btn = document.querySelector('button[onclick="tomarTurno()"]');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reservando...</span>';
-      }
-
-      try {
-        const { data, error } = await supabase.rpc('registrar_turno', {
-            p_negocio_id: negocioId,
-            p_nombre: nombre,
-            p_telefono: telefono,
-            p_servicio: servicio,
-            p_barber_id: Number(barberSel)
-        });
-
-        if (error) throw error;
-        if (!data.success) throw new Error(data.message);
-
-        const nuevoTurno = data.turno;
-        showToast(`¡Turno ${nuevoTurno} reservado!`);
-        
-        // Enviar notificación
-        sendPushNotification('🎉 ¡Estás en la lista!', `Tu turno ${nuevoTurno} está confirmado. Relájate, nosotros te avisamos.`);
-        
-        if (navigator.vibrate) navigator.vibrate(200);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        verificarTurnoActivo();
-      } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = 'Confirmar Turno';
-        }
-      }
-    };
-
-    // Utilidades de cita inteligente
-    function roundToSlot(date, slotMin = 30) {
-      const d = new Date(date);
-      const mins = d.getMinutes();
-      const rounded = Math.ceil(mins / slotMin) * slotMin;
-      d.setMinutes(rounded, 0, 0);
-      return d;
-    }
-    function sugerirHora(ahora, tiempoEstimado, duracion, estado) {
-      let base = new Date(ahora);
-      if (estado === 'Alta') {
-        base.setMinutes(base.getMinutes() + Math.max(tiempoEstimado, 120));
-      } else {
-        base.setMinutes(base.getMinutes() + Math.max(tiempoEstimado, duracion));
-      }
-      return roundToSlot(base, 30);
-    }
-
-    async function cargarBarberos() {
-      const { data } = await supabase.from('barberos').select('id,nombre,usuario').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
-      const select = document.getElementById('select-barbero-cita');
-      select.innerHTML = '<option value="">Selecciona un barbero...</option>';
-      (data || []).forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.id;
-        opt.textContent = b.nombre || b.usuario;
-        select.appendChild(opt);
-      });
-      const selectTurno = document.getElementById('select-barbero-turno');
-      if (selectTurno) {
-        selectTurno.innerHTML = '<option value="">Selecciona un barbero...</option>';
-        (data || []).forEach(b => {
-          const opt = document.createElement('option');
-          opt.value = b.id;
-          opt.textContent = b.nombre || b.usuario;
-          selectTurno.appendChild(opt);
-        });
-      }
-    }
-
-    window.reservarCitaInteligente = async () => {
-      const telefono = document.getElementById('profile-phone').textContent;
-      const start = window.__sugeridaHora__;
-      const end = new Date(start); 
-      end.setMinutes(end.getMinutes() + (window.__duracionServicio__ || 30));
-      const barberSel = document.getElementById('select-barbero-cita').value;
-      const barberId = barberSel ? Number(barberSel) : null;
-      const btn = document.querySelector('button[onclick="reservarCitaInteligente()"]');
-
-      if (!barberId) { 
-        showToast('No hay barberos seleccionados', 'error'); 
-        return; 
-      }
-
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reservando Cita...</span>';
-      }
-
-      try {
-        const { data, error } = await supabase.rpc('programar_cita', {
-          p_negocio_id: negocioId,
-          p_barber_id: barberId,
-          p_cliente_telefono: telefono,
-          p_start: start.toISOString(),
-          p_end: end.toISOString()
-        });
-
-        if (error) throw error;
-
-        showToast('¡Cita inteligente reservada!');
-        await sendPushNotification('¡Cita Reservada!', `Tu cita inteligente para hoy a las ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ha sido confirmada.`);
-        
-        // Cerrar modal o redirigir
-        setTimeout(() => window.location.reload(), 2000);
-      } catch (e) {
-        showToast('No se pudo reservar la cita: ' + e.message, 'error');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = 'Agendar Cita Inteligente';
-        }
-      }
-    };
-
-    window.reservarMasTarde = async () => {
-      const ahora = new Date();
-      const duracion = window.__duracionServicio__ || 30;
-      const sugerida = sugerirHora(ahora, 120, duracion, 'Alta');
-      window.__sugeridaHora__ = sugerida;
-      document.getElementById('texto-sugerencia').textContent =
-        `Te recomendamos reservar para más tarde: ${sugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-    };
-
-    window.verHorariosLibres = () => {
-      document.getElementById('horarios-libres').classList.remove('hidden');
-      const today = new Date();
-      // Ajustar zona horaria local para el input date
-      const offset = today.getTimezoneOffset();
-      const localDate = new Date(today.getTime() - (offset*60*1000));
-      const d = localDate.toISOString().slice(0,10);
-      const dp = document.getElementById('date-picker');
-      if (!dp.value) dp.value = d;
-      renderSlotsForSelectedDate();
-    };
-
-    // Función auxiliar para verificar disponibilidad
-    function slotDisponible(slotStart, duracion, citas = [], breaks = []) {
-        const slotEnd = new Date(slotStart);
-        slotEnd.setMinutes(slotEnd.getMinutes() + duracion);
-        const startMs = slotStart.getTime();
-        const endMs = slotEnd.getTime();
-
-        // Verificar choques con citas
-        const conflictCita = citas.some(c => {
-            const cStart = new Date(c.start_at).getTime();
-            const cEnd = new Date(c.end_at).getTime();
-            return startMs < cEnd && endMs > cStart;
-        });
-        if (conflictCita) return false;
-
-        // Verificar choques con breaks
-        const conflictBreak = breaks.some(b => {
-            const [bStart, bEnd] = b;
-            return startMs < bEnd && endMs > bStart;
-        });
-        if (conflictBreak) return false;
-
-        return true;
-    }
-
-    async function renderSlotsForSelectedDate() {
-      await cargarConfigNegocio();
-      const dateStr = document.getElementById('date-picker').value;
-      const barberSel = document.getElementById('select-barbero-cita').value;
-      const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
-      
-      const slotsContainer = document.getElementById('slots-container');
-      const rangoDisplay = document.getElementById('rango-horario-display');
-      const actionContainer = document.getElementById('action-container');
-
-      // --- VALIDACIONES PREVIAS (SOLUCIÓN ERROR 400) ---
-      if (!negocioId) { console.error("negocioId es undefined"); return; }
-      if (!barberSel) { 
-          if(slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-amber-600 dark:text-amber-400 font-bold py-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800/30">👆 Por favor selecciona un barbero arriba</div>';
-          return; 
-      }
-      if (!dateStr) { 
-          if(slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">Selecciona una fecha.</div>';
-          return; 
-      }
-      // ------------------------------------------------
-
-      // --- OPTIMIZACIÓN CACHÉ ---
-      const cacheKey = `${dateStr}_${barberSel}`;
-      // Si los parámetros son los mismos y tenemos datos, no recargamos
-      // (A menos que sea una carga inicial forzada)
-      // --------------------------
-      
-      // Resetear selección
-      window.__horaSeleccionada__ = null;
-      if(actionContainer) actionContainer.classList.add('hidden');
-
-      if (!dateStr || !barberSel || !servicioSel) {
-          if(slotsContainer) slotsContainer.innerHTML = '';
-          if(rangoDisplay) rangoDisplay.textContent = '';
-          return;
-      }
-      
-      // Verificar caché
-      if (slotsCache[cacheKey]) {
-          console.log('Usando datos cacheados para slots');
-          renderSlotsFromData(slotsCache[cacheKey], dateStr, serviciosCache[servicioSel] || 30);
-          return;
-      }
-
-      slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 animate-pulse">Buscando disponibilidad...</div>';
-      
-      // --- CARGA DE DATOS (Solo si no hay caché) ---
-      // Ejecutamos todas las promesas en paralelo para mayor velocidad
-      const promises = [];
-      
-      const dur = serviciosCache[servicioSel] || 30;
-      
-      // Configuración de horario
-      const apStr = configCache?.hora_apertura || '08:00';
-      const ciStr = configCache?.hora_cierre || '21:00';
-      const ap = apStr.split(':').map(Number);
-      const ci = ciStr.split(':').map(Number);
-
-      if (rangoDisplay) {
-          rangoDisplay.textContent = `Horario disponible: ${apStr} - ${ciStr}`;
-          rangoDisplay.className = "mt-4 text-center text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 py-2 rounded-lg border border-gray-200 dark:border-white/10";
-      }
-      
-      // Verificar día de operación (Usando fecha local para evitar errores de zona horaria)
-      const startDay = new Date(dateStr + 'T00:00:00');
-      const dayNum = startDay.getDay(); // 0=Domingo
-      
-      if (diasOperacionNum.length && !diasOperacionNum.includes(dayNum)) {
-          slotsContainer.innerHTML = '<div class="col-span-full flex flex-col items-center justify-center text-gray-500 py-8"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>El negocio no opera este día.</span></div>';
-          return;
-      }
-
-      // Definir rango del día para consultas (ISO 8601)
-      const startDayISO = new Date(dateStr + 'T00:00:00').toISOString();
-      const endDayISO = new Date(dateStr + 'T23:59:59').toISOString();
-
-      startDay.setHours(ap[0], ap[1], 0, 0);
-      
-      const endDay = new Date(dateStr + 'T00:00:00');
-      endDay.setHours(ci[0], ci[1], 0, 0);
-      
-      // VALIDACIÓN: Verificar si el cliente ya tiene cita este día
-      const telefono = document.getElementById('profile-phone').textContent;
-      let misCitas = [];
-      if (telefono && telefono !== '...') {
-          // CORRECCIÓN: Usar rango de fechas en lugar de columna 'fecha' que no existe en tabla citas
-          const pMisCitas = supabase
-              .from('citas')
-              .select('id')
-              .eq('negocio_id', negocioId)
-              .eq('cliente_telefono', telefono)
-              .neq('estado', 'Cancelada')
-              .gte('start_at', startDayISO)
-              .lte('start_at', endDayISO);
-          promises.push(pMisCitas.then(r => { misCitas = r.data || []; }));
-      }
-
-      // Obtener citas existentes
-      let citas = [];
-      const pCitas = supabase
-          .from('citas')
-          .select('start_at, end_at')
-          .eq('negocio_id', negocioId)
-          .eq('barber_id', Number(barberSel))
-          .neq('estado', 'Cancelada')
-          .gte('start_at', startDayISO)
-          .lte('start_at', endDayISO);
-      promises.push(pCitas.then(r => { citas = r.data || []; }));
-
-      // Obtener breaks
-      let estadoNegocio = null;
-      const pEstado = supabase.from('estado_negocio').select('weekly_breaks').eq('negocio_id', negocioId).maybeSingle();
-      promises.push(pEstado.then(r => { estadoNegocio = r.data; }));
-      
-      // Obtener turnos activos
-      let turnosActivos = [];
-      const pTurnos = supabase
-          .from('turnos')
-          .select('started_at, hora, servicio')
-          .eq('negocio_id', negocioId)
-          .eq('barber_id', Number(barberSel))
-          .eq('estado', 'En atención')
-          .eq('fecha', dateStr);
-      promises.push(pTurnos.then(r => { turnosActivos = r.data || []; }));
-
-      // Esperar todas las consultas
-      await Promise.all(promises);
-
-      // Validar restricción de cita única
-      if (misCitas.length > 0) {
-          slotsContainer.innerHTML = `
-              <div class="col-span-full flex flex-col items-center justify-center p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-amber-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <h3 class="text-lg font-bold text-amber-800 dark:text-amber-400 mb-1">Ya tienes una cita</h3>
-                  <p class="text-sm text-amber-700 dark:text-amber-300 text-center">Solo se permite una reserva por día.</p>
-              </div>
-          `;
-          return;
-      }
-
-      // Procesar breaks
-      const wb = estadoNegocio?.weekly_breaks || [];
-      const brk = wb.find(x => x.day === dayNum);
-      const breaks = [];
-      if (brk && brk.start && brk.end) {
-        const bs = new Date(dateStr + 'T00:00:00'); const be = new Date(dateStr + 'T00:00:00');
-        const s = brk.start.split(':').map(Number); const e = brk.end.split(':').map(Number);
-        bs.setHours(s[0], s[1], 0, 0); be.setHours(e[0], e[1], 0, 0);
-        breaks.push([bs.getTime(), be.getTime()]);
-      }
-      
-      (turnosActivos || []).forEach(t => {
-          const s = t.started_at ? new Date(t.started_at) : new Date(`${dateStr}T${t.hora}`);
-          const d = serviciosCache[t.servicio] || 30;
-          const e = new Date(s);
-          e.setMinutes(e.getMinutes() + d);
-          breaks.push([s.getTime(), e.getTime()]);
-      });
-
-      // Guardar en caché
-      const dataToCache = { startDay, endDay, citas, breaks, isToday: (dateStr === new Date().toISOString().slice(0,10)) };
-      slotsCache[cacheKey] = dataToCache;
-
-      renderSlotsFromData(dataToCache, dateStr, dur);
-    }
-
-    function renderSlotsFromData(data, dateStr, dur) {
-      const { startDay, endDay, citas, breaks, isToday } = data;
-      const slotsContainer = document.getElementById('slots-container');
-      if (!slotsContainer) return;
-      
-      slotsContainer.innerHTML = '';
-
-      // Generar slots cada 30 min (estándar)
-      const step = 30; 
-      const tmp = new Date(startDay);
-      const now = new Date();
-      
-      while (tmp < endDay) {
-        const currentSlot = new Date(tmp);
-        
-        // Validar si el slot está en el pasado (si es hoy)
-        let isPast = false;
-        if (isToday && currentSlot.getTime() < now.getTime()) isPast = true;
-
-        // Validar que el servicio cabe antes del cierre
-        const slotEnd = new Date(currentSlot);
-        slotEnd.setMinutes(slotEnd.getMinutes() + dur);
-        if (slotEnd > endDay) break;
-
-        // Validar disponibilidad usando la duración del servicio
-        const disponible = !isPast && slotDisponible(currentSlot, dur, citas || [], breaks);
-
-        const btn = document.createElement('button');
-        const baseClass = "slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center";
-        
-        if (disponible) {
-            btn.className = `${baseClass} bg-white dark:bg-dark-800 border-gray-200 dark:border-white/10 hover:bg-barberRed hover:text-white hover:border-barberRed dark:hover:border-barberRed shadow-sm cursor-pointer group`;
-            btn.onclick = () => seleccionarHora(currentSlot, btn);
-        } else {
-            btn.className = `${baseClass} bg-gray-50 dark:bg-dark-900/50 border-transparent text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-60`;
-            btn.disabled = true;
-        }
-        
-        const timeStr = currentSlot.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
-        
-        btn.innerHTML = `
-            <span class="${disponible ? 'text-gray-900 dark:text-white group-hover:text-white' : ''}">${timeStr}</span>
-            ${disponible ? `<span class="text-[10px] text-green-600 dark:text-green-400 font-medium mt-1">Libre</span>` : `<span class="text-[10px] mt-1">Ocupado</span>`}
-        `;
-
-        slotsContainer.appendChild(btn);
-        tmp.setMinutes(tmp.getMinutes() + step); // Avanzar 30 min
-      }
-      
-      if (slotsContainer.children.length === 0) {
-           slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">No hay horarios disponibles.</div>';
-      }
-    }
-
-    function seleccionarHora(date, btnElement) {
-        window.__horaSeleccionada__ = date;
-        
-        // Resetear estilos
-        const container = document.getElementById('slots-container');
-        Array.from(container.children).forEach(c => {
-            if (!c.disabled) {
-                c.classList.remove('slot-selected');
-                c.classList.add('bg-white', 'dark:bg-dark-800'); // Restore default bg
-            }
-        });
-
-        // Aplicar estilo seleccionado
-        btnElement.classList.remove('bg-white', 'dark:bg-dark-800');
-        btnElement.classList.add('slot-selected');
-        
-        // Mostrar botón confirmar
-        const actionContainer = document.getElementById('action-container');
-        actionContainer.classList.remove('hidden');
-        
-        // Scroll suave hacia el botón
-        actionContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    async function confirmarReservaManual() {
-        // Solicitar permiso de notificación al interactuar
-        if (Notification.permission === 'default') {
-            await solicitarPermisoNotificacion();
-        }
-
-        if (!window.__horaSeleccionada__) return;
-        
-        const date = window.__horaSeleccionada__;
-        const barberSel = document.getElementById('select-barbero-cita').value;
-        const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
-        const telefono = document.getElementById('profile-phone').textContent;
-        const dur = serviciosCache[servicioSel] || 30;
-        
-        const slotEnd = new Date(date);
-        slotEnd.setMinutes(slotEnd.getMinutes() + dur);
-        
-        const timeStr = date.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
-        
-        // ✅ Modal Pro en lugar de confirm()
-        confirmarAccion(
-            'Confirmar Cita',
-            `¿Reservar para las ${timeStr}?\nServicio: ${servicioSel} (${dur} min)`,
-            async () => {
-            try {
-                const { error } = await supabase.rpc('programar_cita', {
-                    p_negocio_id: negocioId,
-                    p_barber_id: Number(barberSel),
-                    p_cliente_telefono: telefono,
-                    p_start: date.toISOString(),
-                    p_end: slotEnd.toISOString()
-                });
-                
-                if (error) throw error;
-                
-                showToast('¡Cita reservada con éxito!');
-                
-                // Limpiar caché para forzar recarga la próxima vez
-                Object.keys(slotsCache).forEach(k => delete slotsCache[k]);
-                
-                // Enviar notificación
-                sendPushNotification('¡Cita Confirmada!', `Tu cita para las ${timeStr} ha sido agendada.`);
-
-                // Limpiar selección
-                window.__horaSeleccionada__ = null;
-                document.getElementById('action-container').classList.add('hidden');
-                renderSlotsForSelectedDate(); // Recargar slots
-                
-            } catch (e) {
-                alert('Ese horario acaba de ocuparse o hubo un error. Por favor selecciona otro.');
-                renderSlotsForSelectedDate();
-            }
-        });
-    }
-
-    window.cancelarTurno = async () => {
-      confirmarAccion('Cancelar Turno', '¿Estás seguro de que deseas cancelar tu turno actual?', async () => {
-          const telefono = document.getElementById('profile-phone').textContent;
-          const hoy = new Date().toISOString().slice(0, 10);
-          
-          const { error } = await supabase.from('turnos')
-            .update({ estado: 'Cancelado' })
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .eq('telefono', telefono)
-            .in('estado', ['En espera']);
-            
-          if(error) showToast('Error al cancelar', 'error');
-          else {
-              showToast('Turno cancelado');
-              verificarTurnoActivo();
-          }
-      });
-    };
-
-    window.cancelarCita = async () => {
-        const card = document.getElementById('card-cita-activa');
-        const id = card.dataset.id;
-        if(!id) return;
-        
-        confirmarAccion('Cancelar Cita', '¿Estás seguro de que deseas cancelar tu cita programada?', async () => {
-            const { error } = await supabase.from('citas').update({ estado: 'Cancelada' }).eq('id', id);
-            if(error) showToast('Error al cancelar cita', 'error');
-            else { showToast('Cita cancelada'); verificarCitaActiva(); }
-        });
-    };
-
-    // Subir Avatar (Mejorado con Fallback Robusto)
-    window.subirAvatar = async (input) => {
-      const file = input.files[0];
-      if (!file) return;
-
-      const bucketName = 'avatars';
-      const fileName = `public/${clienteId}-${Date.now()}`;
-      
-      try {
-        // Intentar subir al bucket
-        const { error: uploadError } = await supabase.storage
-          .from(bucketName)
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: true 
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from(bucketName)
-          .getPublicUrl(fileName);
-
-        if (!publicUrl) throw new Error('No se pudo obtener la URL pública.');
-
-        // Actualizar BD con URL del bucket
-        const { error: dbError } = await supabase.from('clientes')
-          .update({ avatar_url: publicUrl })
-          .eq('id', clienteId);
-        
-        if (dbError) throw dbError;
-        
-        alert('Avatar actualizado con éxito.');
-        await cargarPerfil();
-
-      } catch (error) {
-        console.warn('Fallo subida a Storage, intentando fallback Base64:', error);
-        
-        // FALLBACK: Guardar Base64 directamente en la BD
-        // Esto maneja casos donde el bucket no existe, no hay permisos, o cuota excedida.
-        try {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-              const dataUrl = e.target.result;
-              
-              // Intentar guardar en la columna avatar_url
-              const { error: dbError } = await supabase.from('clientes')
-                .update({ avatar_url: dataUrl })
-                .eq('id', clienteId);
-                
-              if (dbError) {
-                console.error('Error guardando Base64:', dbError);
-                alert('No se pudo guardar la imagen. Contacta al administrador.');
-                return;
-              }
-              
-              // Actualizar UI inmediatamente
-              document.getElementById('nav-avatar').src = dataUrl;
-              document.getElementById('profile-avatar').src = dataUrl;
-              alert('Avatar guardado correctamente (modo local).');
-            };
-            reader.readAsDataURL(file);
-            
-        } catch (e2) {
-            console.error('Error fatal al procesar imagen:', e2);
-            alert('No se pudo procesar la imagen.');
-        }
-      }
-    };
-
-    // --- SISTEMA DE CALIFICACIÓN ---
-    async function checkPendingRatings() {
-        const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-        if (!telefono) return;
-
-        // Buscar último turno atendido del cliente
-        const { data: turnos } = await supabase
-            .from('turnos')
-            .select('id, barber_id, servicio, barberos(nombre)')
-            .eq('negocio_id', negocioId)
-            .eq('telefono', telefono)
-            .eq('estado', 'Atendido')
-            .eq('fecha', new Date().toISOString().slice(0, 10)) // FIX: Solo turnos de hoy
-            .order('updated_at', { ascending: false })
-            .limit(1);
-
-        if (turnos && turnos.length > 0) {
-            const turno = turnos[0];
-            
-            // Verificar si ya tiene comentario
-            const { data: comments } = await supabase
-                .from('comentarios')
-                .select('id')
-                .eq('turno_id', turno.id)
-                .maybeSingle();
-            
-            if (!comments) {
-                mostrarModalCalificacion(turno);
-            }
-        }
-    }
-
-    function mostrarModalCalificacion(turno) {
-        const modal = document.getElementById('modal-calificacion');
-        const content = document.getElementById('modal-calificacion-content');
-
-        const barberName = turno.barberos?.nombre || 'el barbero';
-        document.getElementById('rating-barber-name').textContent = barberName;
-        document.getElementById('rating-turno-id').value = turno.id;
-
-        modal.classList.remove('hidden');
-
-        setTimeout(() => {
-            modal.classList.remove('opacity-0');
-            content.classList.remove('scale-95');
-            content.classList.add('scale-100');
-        }, 10);
-    }
-
-    function cerrarModalCalificacion() {
-        const modal = document.getElementById('modal-calificacion');
-        const content = document.getElementById('modal-calificacion-content');
-
-        modal.classList.add('opacity-0');
-        content.classList.remove('scale-100');
-        content.classList.add('scale-95');
-
-        // Reset rating inputs y comentario
-        try {
-            document.querySelectorAll('input[name="rating"]').forEach(r => r.checked = false);
-            const txt = document.getElementById('rating-comment');
-            if (txt) txt.value = '';
-        } catch {}
-
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 300);
-    }
-
-    async function enviarCalificacion(turnoId, rating, comment) {
-        const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-        const nombre = document.getElementById('profile-name').textContent;
-        
-        const { error } = await supabase.from('comentarios').insert([{
-            negocio_id: negocioId,
-            turno_id: turnoId,
-            calificacion: parseInt(rating),
-            comentario: comment,
-            nombre_cliente: nombre,
-            telefono_cliente: telefono
-        }]);
-
-        if (error) {
-            showToast('Error al enviar calificación', 'error');
-        } else {
-            showToast('¡Gracias por tu opinión!');
-            cerrarModalCalificacion();
-        }
-    }
-
-    // Listener envío calificación con validación (UX tipo Booksy)
-    const formCal = document.getElementById('form-calificacion');
-    if (formCal) {
-        formCal.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const selected = document.querySelector('input[name="rating"]:checked');
-            if (!selected) {
-                showToast('Selecciona una calificación primero', 'error');
-                return;
-            }
-            const turnoId = document.getElementById('rating-turno-id').value;
-            const comment = document.getElementById('rating-comment').value;
-            await enviarCalificacion(turnoId, selected.value, comment);
-        });
-    }
-
-    init();
-    cargarBarberos();
-    cargarConfigNegocio();
-    document.querySelectorAll('a[href^="https://wa.me/"]').forEach(a=>a.addEventListener('click',()=>{ if(navigator.vibrate) navigator.vibrate(20) }));
-  </script>
+  <script type="module" src="admin/panel-cliente.js"></script>
 </body>
 </html>

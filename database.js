@@ -27,8 +27,19 @@ async function initializeSupabase() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true
+      },
+      // Fija explícitamente la URL de Edge Functions para evitar URLs vacías
+      functions: {
+        url: `${SUPABASE_URL}/functions/v1`
+      },
+      global: {
+        headers: {
+          apikey: SUPABASE_KEY
+        }
       }
     });
+    // Expone la anon key en el cliente para usos de respaldo en fetch manual
+    supabase.supabaseKey = SUPABASE_KEY;
     supabaseReadyResolve && supabaseReadyResolve(supabase);
   } catch (error) {
     console.error('Error initializing Supabase client:', error);

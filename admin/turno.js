@@ -87,33 +87,45 @@ function getSiguienteTurno() {
 
 function iniciarTimerParaTurno(turno) {
     const timerEl = document.getElementById(`timer-${turno.id}`);
-    const duracionMin = serviciosCache[turno.servicio];
+    const duracionMin = (serviciosCache && serviciosCache[turno.servicio]) ? Number(serviciosCache[turno.servicio]) : 30; // fallback 30 min
 
-    if (!timerEl || !duracionMin || !turno.started_at) {
-        if (timerEl) timerEl.textContent = '--:--';
-        return;
+    if (!timerEl) return;
+
+    // Fallback robusto para start: si no hay started_at aún (race), usa created_at o ahora
+    let startTs = null;
+    if (turno.started_at) {
+        const d = new Date(turno.started_at);
+        if (!isNaN(d)) startTs = d.getTime();
     }
+    if (!startTs && turno.created_at) {
+        const d2 = new Date(turno.created_at);
+        if (!isNaN(d2)) startTs = d2.getTime();
+    }
+    if (!startTs) startTs = Date.now();
 
-    const startTime = new Date(turno.started_at).getTime();
-    const endTime = startTime + duracionMin * 60 * 1000;
+    const endTime = startTs + duracionMin * 60 * 1000;
 
     const updateTimer = () => {
         const ahora = Date.now();
         const restanteMs = Math.max(0, endTime - ahora);
 
+        const minutos = Math.floor(restanteMs / 60000);
+        const segundos = Math.floor((restanteMs % 60000) / 1000);
+        timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+
         if (restanteMs === 0) {
-            timerEl.textContent = '00:00';
             if (activeTurnIntervals[turno.id]) {
                 clearInterval(activeTurnIntervals[turno.id]);
                 delete activeTurnIntervals[turno.id];
             }
-            return;
         }
-
-        const minutos = Math.floor(restanteMs / 60000);
-        const segundos = Math.floor((restanteMs % 60000) / 1000);
-        timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
     };
+
+    // Reset si ya había uno
+    if (activeTurnIntervals[turno.id]) {
+        clearInterval(activeTurnIntervals[turno.id]);
+        delete activeTurnIntervals[turno.id];
+    }
 
     updateTimer();
     activeTurnIntervals[turno.id] = setInterval(updateTimer, 1000);
@@ -1561,11 +1573,7 @@ async function atenderAhora() {
         // CORRECCIÓN CRÍTICA: Usar RPC para convertir la cita en turno real
         // Esto asegura que el tiempo de la cita se sume a la cola de espera
         try {
-            const { error } = await supabase.rpc('atender_cita', {
-                p_cita_id: citaPrioritaria.id,
-                p_negocio_id: negocioId
-            });
-            if (error) throw error;
+            await procesarAtencionCita(citaPrioritaria.id, negocioId);
             mostrarNotificacion('Atendiendo cita programada (Turno generado)', 'success');
         } catch (e) {
             mostrarNotificacion('Error al atender cita: ' + e.message, 'error');
@@ -1744,13 +1752,8 @@ function cerrarModalAccionesCita() {
 async function confirmarAtenderCita() {
     if (!selectedCitaId) return;
     try {
-        // RPC atómica para atender cita (genera turno y actualiza estado en una sola transacción)
-        const { error } = await supabase.rpc('atender_cita', {
-            p_cita_id: selectedCitaId,
-            p_negocio_id: negocioId
-        });
-        
-        if (error) throw error;
+        // FIX: Reemplazo de RPC por lógica cliente
+        await procesarAtencionCita(selectedCitaId, negocioId);
 
         mostrarNotificacion('Cita pasada a atención correctamente', 'success');
         cerrarModalAccionesCita();
@@ -1759,6 +1762,59 @@ async function confirmarAtenderCita() {
         console.error(e);
         mostrarNotificacion('Error al atender cita: ' + e.message, 'error');
     }
+}
+
+async function procesarAtencionCita(citaId, negocioId) {
+    // 1. Obtener la cita
+    const { data: cita, error: errCita } = await supabase
+        .from('citas')
+        .select('*')
+        .eq('id', citaId)
+        .single();
+    if (errCita) throw new Error('Cita no encontrada');
+
+    // 2. Obtener nombre del cliente
+    let nombreCliente = 'Cliente Cita';
+    if (cita.cliente_telefono) {
+        const { data: cliente } = await supabase
+            .from('clientes')
+            .select('nombre')
+            .eq('negocio_id', negocioId)
+            .eq('telefono', cita.cliente_telefono)
+            .maybeSingle();
+        if (cliente) nombreCliente = cliente.nombre;
+    }
+
+    // 3. Crear el turno
+    const { data: resTurno, error: errTurno } = await supabase.rpc('registrar_turno', {
+        p_negocio_id: negocioId,
+        p_nombre: nombreCliente,
+        p_telefono: cita.cliente_telefono || '0000000000',
+        p_servicio: 'Cita Programada',
+        p_barber_id: cita.barber_id
+    });
+
+    let turnoId = null;
+    if (errTurno) throw errTurno;
+
+    if (!resTurno.success) {
+        // Si ya tiene turno, buscamos el activo para actualizarlo
+        if (resTurno.message && resTurno.message.includes('activo')) {
+             const { data: turnoExistente } = await supabase.from('turnos').select('id').eq('negocio_id', negocioId).eq('telefono', cita.cliente_telefono).in('estado', ['En espera', 'En atención']).maybeSingle();
+             if (turnoExistente) turnoId = turnoExistente.id;
+             else throw new Error(resTurno.message);
+        } else {
+            throw new Error(resTurno.message);
+        }
+    } else {
+        turnoId = resTurno.id;
+    }
+
+    // 4. Actualizar estados
+    const { error: errUpdTurno } = await supabase.from('turnos').update({ estado: 'En atención', started_at: new Date().toISOString(), barber_id: cita.barber_id }).eq('id', turnoId);
+    if (errUpdTurno) throw errUpdTurno;
+    const { error: errUpdCita } = await supabase.from('citas').update({ estado: 'Atendida' }).eq('id', citaId);
+    if (errUpdCita) throw errUpdCita;
 }
 
 async function confirmarCancelarCita() {

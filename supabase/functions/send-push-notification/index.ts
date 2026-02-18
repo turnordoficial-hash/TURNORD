@@ -1,15 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import webpush from "npm:web-push";
+import webpush from "npm:web-push@3.6.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+  "Access-Control-Max-Age": "86400",
 };
 
-// Clave pública VAPID (la que compartes en el cliente)
-const VAPID_PUBLIC_KEY =
-  "BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ";
+// Clave pública VAPID desde variables de entorno
+const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -43,10 +44,11 @@ serve(async (req) => {
       }
     }
 
-    const telefono = parsed?.telefono;
-    const negocio_id = parsed?.negocio_id;
+    const telefono = parsed?.telefono?.toString()?.trim();
+    const negocio_id = parsed?.negocio_id?.toString()?.trim();
     const title = parsed?.title;
     const body = parsed?.body;
+    const clickUrl = parsed?.url; // opcional: url de destino personalizada
 
     if (!telefono || !negocio_id) {
       return new Response(JSON.stringify({ error: "telefono y negocio_id requeridos" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
@@ -57,6 +59,9 @@ serve(async (req) => {
     if (!VAPID_PRIVATE_KEY || !VAPID_MAILTO) {
       return new Response(JSON.stringify({ error: "Faltan variables de entorno VAPID_PRIVATE_KEY o VAPID_MAILTO" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
+    if (!VAPID_PUBLIC_KEY) {
+      return new Response(JSON.stringify({ error: "Falta VAPID_PUBLIC_KEY" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    }
     try {
       webpush.setVapidDetails(`mailto:${VAPID_MAILTO}`, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
     } catch (e) {
@@ -66,7 +71,7 @@ serve(async (req) => {
     // Búsqueda mejorada por teléfono, como sugeriste
     const { data, error } = await supabase
       .from("push_subscriptions")
-      .select("subscription, endpoint") // Seleccionamos también el endpoint
+      .select("subscription, endpoint")
       .eq("user_id", telefono)
       .eq("negocio_id", negocio_id);
 
@@ -81,31 +86,54 @@ serve(async (req) => {
       title: title || "¡Es tu turno!",
       body: body || "Un barbero te está esperando",
       icon: "/android-chrome-192x192.png",
-      badge: "/jbarber/jjj.png", // Badge para Android
-      vibrate: [200, 100, 200], // Patrón de vibración
+      badge: "/jbarber/jjj.png",
+      vibrate: [200, 100, 200],
       data: {
-        url: "/panel_cliente.html", // URL en el objeto data
+        url: (typeof clickUrl === 'string' && clickUrl.length > 0) ? clickUrl : "/panel_cliente.html",
       }
     });
 
-    // Iterar sobre todas las suscripciones encontradas para ese teléfono
+    // Iterar sobre todas las suscripciones encontradas para ese teléfono y limpiar inválidas
+    let sent = 0;
+    const invalidEndpoints: string[] = [];
     for (const sub of data) {
       try {
-        await webpush.sendNotification(sub.subscription, payload);
+        // Normalizar/parsear la suscripción si viene en string
+        let subscriptionObj: any = sub?.subscription;
+        if (!subscriptionObj) {
+          if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
+          continue;
+        }
+        if (typeof subscriptionObj === 'string') {
+          try {
+            subscriptionObj = JSON.parse(subscriptionObj);
+          } catch {
+            if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
+            continue;
+          }
+        }
+        if (!subscriptionObj?.endpoint) {
+          if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
+          continue;
+        }
+        await webpush.sendNotification(subscriptionObj, payload);
+        sent++;
       } catch (sendError: any) {
         console.error("Error al enviar notificación a una suscripción:", sendError);
-        // Si la suscripción es inválida (e.g., 410 Gone), la eliminamos
-        if (sendError.statusCode === 410 || sendError.statusCode === 404) {
-          console.log("Eliminando suscripción inválida por endpoint:", sub.endpoint);
-          await supabase
-            .from('push_subscriptions')
-            .delete()
-            .eq('endpoint', sub.endpoint); // Eliminación segura por endpoint
+        if (sendError?.statusCode === 410 || sendError?.statusCode === 404) {
+          if (sub.endpoint) invalidEndpoints.push(sub.endpoint);
         }
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+    if (invalidEndpoints.length > 0) {
+      await supabase
+        .from('push_subscriptions')
+        .delete()
+        .in('endpoint', invalidEndpoints);
+    }
+
+    return new Response(JSON.stringify({ success: true, sent, removed: invalidEndpoints.length }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (err) {
     console.error(err);
     return new Response(JSON.stringify({ error: err?.message || String(err) }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });

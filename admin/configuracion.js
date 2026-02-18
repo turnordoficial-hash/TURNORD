@@ -45,6 +45,11 @@ function limpiarFormulario() {
 }
 
 async function cargarBarberos() {
+  // Asegurar sesión anónima para evitar 401
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) {
+    await supabase.auth.signInAnonymously?.().catch(()=>{});
+  }
   const { data } = await supabase
     .from('barberos')
     .select('id,nombre,usuario,avatar_url,activo')
@@ -107,11 +112,34 @@ async function subirAvatar(usuario) {
   const fileInput = document.getElementById('barber-avatar');
   const f = fileInput?.files?.[0];
   if (!f) return null;
-  const path = `${negocioId}/${usuario}-${Date.now()}-${f.name}`;
-  const { data, error } = await supabase.storage.from('barber_avatars').upload(path, f, { upsert: true });
-  if (error) return null;
+
+  // Verificar sesión: usar token de usuario o anónimo para permisos públicos
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session) {
+    await supabase.auth.signInAnonymously?.().catch(()=>{});
+  } else {
+    // Refrescar sesión para evitar error "exp claim timestamp check failed"
+    await supabase.auth.refreshSession();
+  }
+
+  const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${negocioId}/${usuario}-${Date.now()}-${safeName}`;
+
+  const { data, error } = await supabase
+    .storage
+    .from('barber_avatars')
+    .upload(path, f, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: f.type || 'application/octet-stream'
+    });
+
+  if (error) {
+    console.error('Error subiendo avatar:', error);
+    return null;
+  }
   const { data: pub } = await supabase.storage.from('barber_avatars').getPublicUrl(data.path);
-  return pub.publicUrl || null;
+  return pub?.publicUrl || null;
 }
 
 async function guardarBarbero() {
@@ -125,9 +153,9 @@ async function guardarBarbero() {
   if (uploaded) avatar_url = uploaded;
   const payload = { negocio_id: negocioId, nombre, usuario, password, avatar_url, activo };
   if (id) {
-    const { error } = await supabase.from('barberos').update(payload).eq('id', Number(id));
+    await supabase.from('barberos').update(payload).eq('id', Number(id));
   } else {
-    const { error } = await supabase.from('barberos').insert([payload]);
+    await supabase.from('barberos').insert([payload]);
   }
   limpiarFormulario();
   await cargarBarberos();
