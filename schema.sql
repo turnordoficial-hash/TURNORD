@@ -379,6 +379,7 @@ CREATE TABLE IF NOT EXISTS public.citas (
   start_at TIMESTAMPTZ NOT NULL,
   end_at TIMESTAMPTZ NOT NULL,
   estado TEXT DEFAULT 'Programada',
+  servicio TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -397,7 +398,8 @@ CREATE OR REPLACE FUNCTION public.programar_cita(
   p_barber_id BIGINT,
   p_cliente_telefono TEXT,
   p_start TIMESTAMPTZ,
-  p_end TIMESTAMPTZ
+  p_end TIMESTAMPTZ,
+  p_servicio TEXT DEFAULT NULL
 ) RETURNS public.citas AS $$
 DECLARE
   conflicto_turno INTEGER;
@@ -416,8 +418,8 @@ BEGIN
     RAISE EXCEPTION 'Conflicto con turno en atención para el barbero en el intervalo seleccionado';
   END IF;
 
-  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at)
-  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end)
+  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
+  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
   RETURNING * INTO nueva;
 
   RETURN nueva;
@@ -427,25 +429,32 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ==============================================================================
 -- 9) Tabla: Clientes (Perfil y Auth Personalizado)
 -- ==============================================================================
+
+-- Eliminar tabla antigua si existe para evitar conflicto de tipos (BigInt vs UUID)
+DROP TABLE IF EXISTS public.clientes CASCADE;
+
 CREATE TABLE IF NOT EXISTS public.clientes (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   negocio_id TEXT NOT NULL,
   nombre TEXT NOT NULL,
   telefono TEXT,
-  email TEXT,
-  documento_identidad TEXT NOT NULL, -- Cédula o Código 6 dígitos
-  password TEXT NOT NULL, -- Nota: En producción usar hashing o Supabase Auth
+  email TEXT NOT NULL,
+  documento_identidad TEXT, -- Cédula o Código (Opcional)
   avatar_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad)
+  CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad),
+  CONSTRAINT ux_clientes_negocio_email UNIQUE (negocio_id, email)
 );
 
 -- RLS para Clientes
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Permitir todo a clientes" ON public.clientes;
-CREATE POLICY "Permitir todo a clientes" ON public.clientes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Los usuarios pueden gestionar su propio perfil." ON public.clientes;
+CREATE POLICY "Los usuarios pueden gestionar su propio perfil." ON public.clientes
+  FOR ALL
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- Trigger update timestamp
 DROP TRIGGER IF EXISTS trg_set_timestamp_updated_at_clientes ON public.clientes;
@@ -454,25 +463,6 @@ BEFORE UPDATE ON public.clientes
 FOR EACH ROW EXECUTE FUNCTION public.set_timestamp_updated_at();
 
 COMMIT;
-
-
--- Agrega las columnas faltantes para el ordenamiento y tiempos
-ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS orden INTEGER DEFAULT 0;
-ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
-ALTER TABLE public.turnos ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
-
--- Crea la tabla de citas si no existe
-CREATE TABLE IF NOT EXISTS public.citas (
-  id BIGSERIAL PRIMARY KEY,
-  negocio_id TEXT NOT NULL,
-  barber_id BIGINT,
-  cliente_telefono TEXT,
-  start_at TIMESTAMPTZ NOT NULL,
-  end_at TIMESTAMPTZ NOT NULL,
-  estado TEXT DEFAULT 'Programada',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 
 CREATE OR REPLACE FUNCTION registrar_turno(
   p_negocio_id TEXT,
@@ -545,3 +535,59 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'turno', v_nuevo_turno, 'id', v_turno_id);
 END;
 $$ LANGUAGE plpgsql;
+
+-- Función RPC para obtener email de forma segura, sin exponer otros datos.
+-- SECURITY DEFINER permite a la función saltarse RLS temporalmente para esta consulta específica.
+CREATE OR REPLACE FUNCTION public.get_email_by_document(p_documento_identidad TEXT, p_negocio_id TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_email TEXT;
+BEGIN
+  SELECT email INTO v_email
+  FROM public.clientes
+  WHERE documento_identidad = p_documento_identidad AND public.clientes.negocio_id = p_negocio_id;
+  RETURN v_email;
+END;
+$$;
+
+-- Función RPC para verificar si un documento ya existe de forma segura.
+CREATE OR REPLACE FUNCTION public.documento_existe(p_documento_identidad TEXT, p_negocio_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.clientes
+    WHERE documento_identidad = p_documento_identidad AND public.clientes.negocio_id = p_negocio_id
+  );
+END;
+$$;
+
+-- ==============================================================================
+-- 10) Trigger para creación automática de perfil (Solución Error 403 RLS)
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'nombre',
+    NEW.raw_user_meta_data->>'telefono',
+    NEW.raw_user_meta_data->>'negocio_id'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Asegurar que el trigger no se duplique
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

@@ -2,10 +2,47 @@ import { ensureSupabase } from '../database.js';
 
 const negocioId = 'barberia005';
 const supabase = await ensureSupabase();
+
+// FIX: Handle Invalid Refresh Token error on startup
+const { error: authError } = await supabase.auth.getSession();
+if (authError && (authError.message.includes('Refresh Token') || authError.message.includes('Invalid'))) {
+    console.error('Session error:', authError);
+    localStorage.removeItem(`cliente_id_${negocioId}`);
+    localStorage.removeItem(`cliente_telefono_${negocioId}`);
+    window.location.href = 'login_cliente.html';
+}
+
 const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
 let serviciosCache = {};
 let configCache = null;
 let diasOperacionNum = [];
+
+// --- SISTEMA DE CACHÉ ROBUSTO ---
+const CACHE_TTL = {
+  PROFILE: 60,   // 1 hora
+  SERVICES: 1440, // 24 horas
+  CONFIG: 60,    // 1 hora
+  BARBERS: 60    // 1 hora
+};
+
+function getCache(key) {
+  const item = localStorage.getItem(`cache_${negocioId}_${key}`);
+  if (!item) return null;
+  try {
+    const { data, expiry } = JSON.parse(item);
+    if (Date.now() > expiry) {
+      localStorage.removeItem(`cache_${negocioId}_${key}`);
+      return null;
+    }
+    return data;
+  } catch (e) { return null; }
+}
+
+function setCache(key, data, ttlMinutes) {
+  const expiry = Date.now() + (ttlMinutes * 60 * 1000);
+  localStorage.setItem(`cache_${negocioId}_${key}`, JSON.stringify({ data, expiry }));
+}
+// --------------------------------
 
 function animateNumber(el, to, duration = 500) {
   if (!el) return;
@@ -122,6 +159,21 @@ window.logout = async () => {
   localStorage.removeItem(`cliente_id_${negocioId}`);
   localStorage.removeItem(`cliente_telefono_${negocioId}`);
   await supabase.auth.signOut();
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        try {
+          await supabase.from('push_subscriptions')
+            .delete()
+            .eq('endpoint', sub.endpoint)
+            .eq('negocio_id', negocioId);
+        } catch {}
+        await sub.unsubscribe();
+      }
+    }
+  } catch {}
   window.location.href = 'login_cliente.html';
 };
 
@@ -240,8 +292,8 @@ function setupStaticEventHandlers() {
 const turnoBtn = document.getElementById('tab-turno-btn');
 const citaBtn = document.getElementById('tab-cita-btn');
 const perfilBtn = document.getElementById('tab-perfil-btn');
-const activeClasses = 'border-barberRed text-barberRed dark:text-barberRed font-bold';
-const inactiveClasses = 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600';
+const activeClasses = 'border-black dark:border-white text-black dark:text-white font-bold';
+const inactiveClasses = 'border-transparent text-black/50 hover:text-black hover:border-black/10 dark:text-white/50 dark:hover:text-white dark:hover:border-white/10';
 
 const slotsCache = {};
 let lastSlotsParams = '';
@@ -258,26 +310,27 @@ const switchTab = (tab) => {
   // Mobile Bottom Nav
   document.querySelectorAll('.nav-item').forEach(el => {
     const isSelected = el.dataset.tab === tab;
-    el.classList.toggle('text-barberRed', isSelected);
+    el.classList.toggle('text-black', isSelected);
+    el.classList.toggle('dark:text-white', isSelected);
     el.classList.toggle('scale-110', isSelected);
-    el.classList.toggle('text-gray-400', !isSelected);
+    el.classList.toggle('text-black/40', !isSelected);
+    el.classList.toggle('dark:text-white/40', !isSelected);
     if (isSelected) {
-      if (tab === 'inicio') el.classList.add('text-blue-600');
-      if (tab === 'turno') el.classList.add('text-red-600');
-      if (tab === 'cita') el.classList.add('text-purple-600');
-      if (tab === 'perfil') el.classList.add('text-green-600');
+      // Removed specific colors for monochrome look
     } else {
-      el.classList.remove('text-blue-600', 'text-red-600', 'text-purple-600', 'text-green-600');
+      // Clean up
     }
   });
 
   // Desktop Top Nav
   document.querySelectorAll('.nav-link').forEach(el => {
     const isSelected = el.dataset.tab === tab;
-    el.classList.toggle('bg-[#C1121F]', isSelected);
-    el.classList.toggle('text-white', isSelected); // Botón activo siempre blanco
-    el.classList.toggle('text-gray-400', !isSelected);
-    if (!isSelected) el.classList.add('hover:text-white');
+    el.classList.toggle('bg-black', isSelected);
+    el.classList.toggle('dark:bg-white', isSelected);
+    el.classList.toggle('text-white', isSelected);
+    el.classList.toggle('dark:text-black', isSelected);
+    el.classList.toggle('text-black/60', !isSelected);
+    el.classList.toggle('dark:text-white/60', !isSelected);
   });
 
   // Controlar visibilidad del botón flotante de tema (Solo en Inicio)
@@ -316,6 +369,12 @@ async function init() {
   await actualizarEstadoFila();
   await verificarTurnoActivo();
   await verificarCitaActiva();
+
+  if (localStorage.getItem('cita_reservada') === 'true') {
+    localStorage.removeItem('cita_reservada');
+    switchTab('inicio');
+    showToast('¡Cita reservada con éxito!', 'success');
+  }
 
   document.getElementById('date-picker')?.addEventListener('change', renderSlotsForSelectedDate);
   document.getElementById('select-servicio-cita')?.addEventListener('change', renderSlotsForSelectedDate);
@@ -361,6 +420,11 @@ async function init() {
   }
 
   checkPendingRatings();
+  
+  // Auto-actualizar minutos cada 30 segundos
+  setInterval(() => {
+      actualizarEstadoFila();
+  }, 30000);
 }
 
 function renderStructure() {
@@ -389,40 +453,55 @@ function renderStructure() {
   if (statusContainer) {
     statusContainer.innerHTML = `
           <div class="bento-card p-6 relative overflow-hidden group">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl text-[#C1121F]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-white/60">Tu Estado</span>
+            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9L15,11L21,5V3M19,5L15,9L17,11L21,7V5M19,7L17,9L19,11L21,9V7M19,9L18,10L19,11L20,10V9M19,11L19,11L19,11L19,11M12,10.5C12,9.67 11.33,9 10.5,9C9.67,9 9,9.67 9,10.5C9,11.33 9.67,12 10.5,12C11.33,12 12,11.33 12,10.5M10.5,7C10.5,7 10.5,7 10.5,7M10.5,14C10.5,14 10.5,14 10.5,14M7.5,10.5C7.5,9.67 6.83,9 6,9C5.17,9 4.5,9.67 4.5,10.5C4.5,11.33 5.17,12 6,12C6.83,12 7.5,11.33 7.5,10.5M6,7C6,7 6,7 6,7M6,14C6,14 6,14 6,14"/></svg>
             </div>
-            <div id="dash-card-1">
-               <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">Sin turno</span>
-               <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">No estás en la fila</span>
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Tu Estado</span>
+                </div>
+                <div id="dash-card-1">
+                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">Sin turno</span>
+                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">No estás en la fila</span>
+                </div>
             </div>
           </div>
 
           <div class="bento-card p-6 relative overflow-hidden group">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl text-[#C1121F]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-white/60">Estimado</span>
+            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/></svg>
             </div>
-            <div id="dash-card-2">
-               <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">-- min</span>
-               <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Tiempo de espera</span>
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Estimado</span>
+                </div>
+                <div id="dash-card-2">
+                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">-- min</span>
+                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Tiempo de espera</span>
+                </div>
             </div>
           </div>
 
           <div class="bento-card p-6 relative overflow-hidden group">
-            <div class="flex justify-between items-start mb-4">
-                <div class="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl text-[#C1121F]">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-                </div>
-                <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-white/60">Demanda</span>
+            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M16,11.78L20.24,4.45L21.97,5.45L19.23,10.22L21.23,13.68L19.5,14.68L17.5,11.22L15.5,14.68L13.77,13.68L15.77,10.22L13.03,5.45L14.76,4.45L19,11.78M12,5V19H10V5H12M16,19H14V11H16V19M8,19H6V11H8V19M4,19H2V11H4V19M16,7H14V5H16V7M8,7H6V5H8V7M4,7H2V5H4V7Z"/></svg>
             </div>
-            <div id="dash-card-3">
-               <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-white/80 text-lg font-bold animate-pulse">Calculando...</span>
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Demanda</span>
+                </div>
+                <div id="dash-card-3">
+                   <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-black/80 dark:text-white/80 text-lg font-bold animate-pulse">Calculando...</span>
+                </div>
             </div>
           </div>
         `;
@@ -431,25 +510,25 @@ function renderStructure() {
   const turnoPanel = document.getElementById('tab-turno-panel');
   if (turnoPanel) {
     turnoPanel.innerHTML = `
-            <div id="card-turno-activo" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #C1121F; background: linear-gradient(90deg, rgba(193,18,31,0.08), transparent 40%);">
-                <div class="absolute top-0 right-0 p-4 opacity-10 text-[#C1121F]">
+            <div id="card-turno-activo" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #000; background: linear-gradient(90deg, rgba(0,0,0,0.03), transparent 40%);">
+                <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
                 </div>
-                <h3 class="text-sm font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider mb-2">Tu Turno en Curso</h3>
+                <h3 class="text-sm font-bold text-black/50 dark:text-white/50 uppercase tracking-wider mb-2">Tu Turno en Curso</h3>
                 <div class="flex items-baseline gap-3">
-                  <span id="mi-numero-turno" class="text-7xl font-display font-bold text-gray-900 dark:text-white tracking-wide">--</span>
+                  <span id="mi-numero-turno" class="text-7xl font-display font-bold text-[#111111] dark:text-white tracking-wide">--</span>
                   <span id="mi-estado-turno" class="px-4 py-1.5 rounded-full bg-yellow-500/10 text-yellow-400 text-xs font-bold border border-yellow-500/20">En Espera</span>
                 </div>
-                <p id="mi-servicio-turno" class="text-gray-700 dark:text-white/80 mt-3 font-medium text-lg">Servicio...</p>
-                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-white/5 flex justify-between items-center">
-                  <div id="mi-info-extra" class="text-sm text-gray-500 dark:text-white/60 w-full">Calculando...</div>
-                  <button onclick="cancelarTurno()" class="bg-[#C1121F]/10 text-[#C1121F] hover:bg-[#C1121F]/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-[#C1121F]/20">Cancelar</button>
+                <p id="mi-servicio-turno" class="text-black/80 dark:text-white/80 mt-3 font-medium text-lg">Servicio...</p>
+                <div class="mt-6 pt-6 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
+                  <div id="mi-info-extra" class="text-sm text-black/60 dark:text-white/60 w-full">Calculando...</div>
+                  <button onclick="cancelarTurno()" class="bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-black/10 dark:border-white/10">Cancelar</button>
                 </div>
             </div>
 
             <div id="seccion-tomar-turno" class="bento-card p-8">
-                <h3 class="text-3xl font-display font-bold mb-8 flex items-center gap-3 text-gray-900 dark:text-white tracking-wide">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#C1121F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <h3 class="text-3xl font-display font-bold mb-8 flex items-center gap-3 text-[#111111] dark:text-white tracking-wide">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   Reservar Nuevo Turno
                 </h3>
                 <div id="bloqueado-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30 flex items-center gap-3">
@@ -457,10 +536,10 @@ function renderStructure() {
                   <span id="bloqueado-texto">Ya tienes un turno activo.</span>
                 </div>
                 <div class="grid grid-cols-1 gap-6">
-                  <div><label class="block text-sm font-semibold mb-2 text-gray-500 dark:text-white/60">Servicio</label><select id="select-servicio" class="w-full p-4 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"><option value="">Cargando...</option></select></div>
-                  <div><label class="block text-sm font-semibold mb-2 text-gray-500 dark:text-white/60">Barbero</label><select id="select-barbero-turno" class="w-full p-4 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"><option value="">Cargando...</option></select></div>
+                  <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Servicio</label><select id="select-servicio" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
+                  <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Barbero</label><select id="select-barbero-turno" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
                 </div>
-                <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-[#C1121F] hover:bg-[#A40E1A] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#C1121F]/20 flex justify-center items-center gap-3 text-lg transition-all">Confirmar Turno</button>
+                <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-3 text-lg transition-all">Confirmar Turno</button>
             </div>
         `;
   }
@@ -470,52 +549,52 @@ function renderStructure() {
     citaPanel.innerHTML = `
             <div id="cita-promo-container" class="mb-6"></div>
             
-            <div id="card-cita-activa" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #C1121F; background: linear-gradient(90deg, rgba(193,18,31,0.08), transparent 40%);">
-                <div class="absolute top-0 right-0 p-4 opacity-10 text-[#C1121F]">
+            <div id="card-cita-activa" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #000; background: linear-gradient(90deg, rgba(0,0,0,0.03), transparent 40%);">
+                <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
-                <h3 class="text-sm font-bold text-[#C1121F] uppercase tracking-wider mb-2">📅 Tu Cita Programada</h3>
+                <h3 class="text-sm font-bold text-black dark:text-white uppercase tracking-wider mb-2">📅 Tu Cita Programada</h3>
                 <div class="flex flex-col gap-1">
-                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide text-gray-900 dark:text-white">--</span>
-                  <span id="cita-barbero" class="text-lg font-medium text-gray-700 dark:text-white/80">--</span>
+                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide text-[#111111] dark:text-white">--</span>
+                  <span id="cita-barbero" class="text-lg font-medium text-black/80 dark:text-white/80">--</span>
                 </div>
-                <p id="cita-servicio" class="text-gray-500 dark:text-white/60 mt-3 font-medium">Cita Reservada</p>
-                <div class="mt-6 pt-6 border-t border-gray-200 dark:border-white/5 flex justify-between items-center">
-                  <div class="text-sm text-gray-500 dark:text-white/60">Llega 5 min antes</div>
-                  <button onclick="cancelarCita()" class="bg-[#C1121F]/10 text-[#C1121F] hover:bg-[#C1121F]/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-[#C1121F]/20">Cancelar Cita</button>
+                <p id="cita-servicio" class="text-black/60 dark:text-white/60 mt-3 font-medium">Cita Reservada</p>
+                <div class="mt-6 pt-6 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
+                  <div class="text-sm text-black/60 dark:text-white/60">Llega 5 min antes</div>
+                  <button onclick="cancelarCita()" class="bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-black/10 dark:border-white/10">Cancelar Cita</button>
                 </div>
             </div>
             
             <div id="seccion-cita-inteligente" class="bento-card p-8">
-                <h3 class="text-3xl font-display font-bold mb-2 flex items-center gap-2 text-gray-900 dark:text-white tracking-wide">Agendar cita</h3>
-                <p class="text-sm text-gray-500 dark:text-white/60 mb-6" id="texto-sugerencia">Consulta disponibilidad y reserva.</p>
+                <h3 class="text-3xl font-display font-bold mb-2 flex items-center gap-2 text-[#111111] dark:text-white tracking-wide">Agendar cita</h3>
+                <p class="text-sm text-black/60 dark:text-white/60 mb-6" id="texto-sugerencia">Consulta disponibilidad y reserva.</p>
                 <div id="bloqueado-cita-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30">
                     No puedes agendar cita si tienes un turno activo.
                 </div>
                 <div id="form-cita-container">
                     <div class="flex flex-col sm:flex-row gap-3">
-                      <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 bg-[#C1121F] hover:bg-[#A40E1A] text-white font-bold rounded-xl shadow-lg shadow-[#C1121F]/20 focus:outline-none transition-all">Ver horarios libres</button>
+                      <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold rounded-xl shadow-lg focus:outline-none transition-all">Ver horarios libres</button>
                     </div>
                     <div id="horarios-libres" class="mt-6 hidden">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div><label class="block text-sm font-semibold mb-2 text-gray-500 dark:text-white/60">Fecha</label><input id="date-picker" type="date" class="w-full p-3 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"></div>
-                            <div><label class="block text-sm font-semibold mb-2 text-gray-500 dark:text-white/60">Barbero</label><select id="select-barbero-cita" class="w-full p-3 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"><option value="">Cargando...</option></select></div>
-                            <div><label class="block text-sm font-semibold mb-2 text-gray-500 dark:text-white/60">Servicio</label><select id="select-servicio-cita" class="w-full p-3 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"><option value="">Selecciona...</option></select></div>
+                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Fecha</label><input id="date-picker" type="date" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Barbero</label><select id="select-barbero-cita" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
+                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Servicio</label><select id="select-servicio-cita" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Selecciona...</option></select></div>
                         </div>
                         
-                        <div id="barber-info-card" class="hidden mt-4 flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm transition-all animate-fade-in">
+                        <div id="barber-info-card" class="hidden mt-4 flex items-center gap-4 p-4 bg-[#F8F8F9] dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm transition-all animate-fade-in">
                             <img id="barber-avatar-display" src="" class="w-12 h-12 rounded-full object-cover border-2 border-barberRed shadow-sm">
                             <div>
-                                <p id="barber-name-display" class="font-bold text-gray-900 dark:text-white text-lg leading-tight"></p>
-                                <p class="text-xs text-gray-500 dark:text-white/60 font-medium uppercase tracking-wider">Barbero seleccionado</p>
+                                <p id="barber-name-display" class="font-bold text-[#111111] dark:text-white text-lg leading-tight"></p>
+                                <p class="text-xs text-black/60 dark:text-white/60 font-medium uppercase tracking-wider">Barbero seleccionado</p>
                             </div>
                         </div>
 
                         <div id="rango-horario-display"></div>
-                        <div class="mt-6 bg-gray-50 dark:bg-black/30 p-6 rounded-2xl border border-gray-200 dark:border-white/5">
+                        <div class="mt-6 bg-[#F8F8F9] dark:bg-black/30 p-6 rounded-2xl border border-black/5 dark:border-white/5">
                             <div id="slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
                             <div id="action-container" class="mt-6 hidden flex justify-center animate-fade-in">
-                                <button id="btn-confirmar-reserva" class="bg-[#C1121F] text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-[#C1121F]/20 focus:outline-none hover:bg-[#A40E1A] transition-colors">Confirmar Reserva</button>
+                                <button id="btn-confirmar-reserva" class="bg-black dark:bg-white text-white dark:text-black font-bold py-3 px-8 rounded-xl shadow-lg focus:outline-none hover:bg-black/80 dark:hover:bg-white/90 transition-colors">Confirmar Reserva</button>
                             </div>
                         </div>
                     </div>
@@ -532,24 +611,24 @@ function renderStructure() {
           <div class="bento-card p-8 max-w-2xl mx-auto">
             <div class="flex flex-col sm:flex-row items-center gap-6">
               <div class="relative flex-shrink-0">
-                <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 bg-white dark:bg-[#111113] border-gray-200 dark:border-[#111113] shadow-2xl object-cover ring-2 ring-barberRed">
-                <button onclick="document.getElementById('avatar-upload').click()" class="absolute bottom-0 right-0 bg-[#C1121F] text-white p-2.5 rounded-full hover:bg-[#A40E1A] shadow-lg border-4 border-white dark:border-[#111113] transition-colors">
+                <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 bg-white dark:bg-[#111113] border-black/5 dark:border-[#111113] shadow-2xl object-cover ring-2 ring-black/10 dark:ring-white/10">
+                <button onclick="document.getElementById('avatar-upload').click()" class="absolute bottom-0 right-0 bg-black dark:bg-white text-white dark:text-black p-2.5 rounded-full hover:bg-black/80 dark:hover:bg-white/90 shadow-lg border-4 border-white dark:border-[#111113] transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </button>
                 <input type="file" id="avatar-upload" class="hidden" accept="image/*" onchange="subirAvatar(this)">
               </div>
               <div class="text-center sm:text-left">
-                <h3 id="profile-name" class="text-4xl font-display font-bold text-gray-900 dark:text-white tracking-wide">Cargando...</h3>
-                <p id="profile-phone" class="text-gray-500 dark:text-white/60 text-lg mt-1">...</p>
-                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-[#C1121F]/10 text-[#C1121F] text-xs font-bold border border-[#C1121F]/20">
+                <h3 id="profile-name" class="text-4xl font-display font-bold text-[#111111] dark:text-white tracking-wide">Cargando...</h3>
+                <p id="profile-phone" class="text-black/60 dark:text-white/60 text-lg mt-1">...</p>
+                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-black/5 dark:bg-white/10 text-black dark:text-white text-xs font-bold border border-black/10 dark:border-white/10">
                   Cliente frecuente ⭐
                 </span>
               </div>
             </div>
             <form id="form-perfil" class="mt-10 space-y-6">
-              <div><label class="text-sm font-semibold mb-2 block text-gray-500 dark:text-white/60">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"></div>
-              <div><label class="text-sm font-semibold mb-2 block text-gray-500 dark:text-white/60">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-xl border bg-gray-50 dark:bg-[#111113] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white focus:border-[#C1121F] focus:ring-1 focus:ring-[#C1121F] transition outline-none"></div>
-              <button type="submit" class="w-full bg-[#C1121F] hover:bg-[#A40E1A] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#C1121F]/20 flex justify-center items-center gap-2 mt-4 transition-all">Actualizar Datos</button>
+              <div><label class="text-sm font-semibold mb-2 block text-black/60 dark:text-white/60">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+              <div><label class="text-sm font-semibold mb-2 block text-black/60 dark:text-white/60">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+              <button type="submit" class="w-full bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-2 mt-4 transition-all">Actualizar Datos</button>
             </form>
           </div>
         `;
@@ -567,25 +646,64 @@ function renderStructure() {
 }
 
 function registrarServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
-    navigator.serviceWorker.register(swPath).then(async () => {
-      if (Notification.permission === 'default') {
-        await solicitarPermisoNotificacion();
+  if (!('serviceWorker' in navigator)) return;
+  const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
+  navigator.serviceWorker.register(swPath)
+    .then(async () => {
+      try {
+        if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
+          await crearOSincronizarSuscripcionPush();
+        }
+      } catch (err) {
+        console.error('SW error al sincronizar suscripción push:', err);
       }
-    }).catch(err => console.error('SW error:', err));
-  }
+    })
+    .catch(err => console.error('SW error:', err));
 }
 
-async function solicitarPermisoNotificacion() {
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({
+async function crearOSincronizarSuscripcionPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
-    await guardarSuscripcion(subscription);
+  }
+  await guardarSuscripcion(subscription);
+}
+
+async function solicitarPermisoNotificacion() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('Las notificaciones push no son soportadas por este navegador.');
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    console.log('Permiso para notificaciones previamente denegado por el usuario.');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    try {
+      await crearOSincronizarSuscripcionPush();
+    } catch (err) {
+      console.error('Error al sincronizar la suscripción push:', err);
+    }
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    console.log('Permiso para notificaciones no concedido.');
+    return;
+  }
+
+  try {
+    await crearOSincronizarSuscripcionPush();
+  } catch (err) {
+    console.error('Error al crear la suscripción push:', err);
   }
 }
 
@@ -629,20 +747,7 @@ function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarber
   return Math.ceil(tiempoEstimado);
 }
 
-async function cargarPerfil() {
-  const { data, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
-  if (error) {
-    if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) {
-      console.warn('Carga de perfil interrumpida (navegación o recarga).');
-      return;
-    }
-    console.error('Error cargando perfil:', error);
-    if (error.code === 'PGRST116') {
-      logout();
-    }
-    return;
-  }
-  if (data) {
+function renderProfile(data) {
     const navName = document.getElementById('nav-name');
     if (navName) navName.textContent = data.nombre.split(' ')[0];
     const menuProfileName = document.getElementById('menu-profile-name');
@@ -664,16 +769,33 @@ async function cargarPerfil() {
     if (navAvatar) navAvatar.src = avatarUrl;
     const profileAvatar = document.getElementById('profile-avatar');
     if (profileAvatar) profileAvatar.src = avatarUrl;
+}
+
+async function cargarPerfil() {
+  // 1. Renderizar desde caché inmediatamente
+  const cached = getCache('profile');
+  if (cached) renderProfile(cached);
+
+  // 2. Obtener datos frescos
+  const { data, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
+  
+  if (error) {
+    if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) return;
+    console.error('Error cargando perfil:', error);
+    if (error.code === 'PGRST116') logout();
+    return;
+  }
+  
+  if (data) {
+    setCache('profile', data, CACHE_TTL.PROFILE);
+    renderProfile(data);
   }
 }
 
-async function cargarServicios() {
-  const { data } = await supabase.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+function renderServices(data) {
   const select = document.getElementById('select-servicio');
   if (select) {
     select.innerHTML = '<option value="">Selecciona un servicio...</option>';
-  }
-  if (data && select) {
     data.forEach(s => {
       serviciosCache[s.nombre] = s.duracion_min;
       const option = document.createElement('option');
@@ -694,7 +816,34 @@ async function cargarServicios() {
   }
 }
 
+async function cargarServicios() {
+  const cached = getCache('servicios');
+  if (cached) {
+    cached.forEach(s => serviciosCache[s.nombre] = s.duracion_min);
+    renderServices(cached);
+  }
+
+  const { data } = await supabase.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+  if (data) {
+    setCache('servicios', data, CACHE_TTL.SERVICES);
+    renderServices(data);
+  }
+}
+
+function processConfig(data) {
+  configCache = data || null;
+  let diasOp = data?.dias_operacion || [];
+  if (typeof diasOp === 'string') {
+    try { diasOp = JSON.parse(diasOp); } catch (e) { diasOp = []; }
+  }
+  const map = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
+  diasOperacionNum = diasOp.map(n => map[n]).filter(v => typeof v === 'number');
+}
+
 async function cargarConfigNegocio() {
+  const cached = getCache('config');
+  if (cached) processConfig(cached);
+
   const { data } = await supabase
     .from('configuracion_negocio')
     .select('*')
@@ -702,15 +851,11 @@ async function cargarConfigNegocio() {
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  configCache = data || null;
-
-  let diasOp = data?.dias_operacion || [];
-  if (typeof diasOp === 'string') {
-    try { diasOp = JSON.parse(diasOp); } catch (e) { diasOp = []; }
+  
+  if (data) {
+    setCache('config', data, CACHE_TTL.CONFIG);
+    processConfig(data);
   }
-
-  const map = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
-  diasOperacionNum = diasOp.map(n => map[n]).filter(v => typeof v === 'number');
 }
 
 async function actualizarEstadoFila() {
@@ -791,24 +936,38 @@ async function actualizarEstadoFila() {
   const dashCard1 = document.getElementById('dash-card-1');
   if (dashCard1 && !window.hasActiveTurn && !window.hasActiveAppointment) {
     dashCard1.innerHTML = `
-             <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">${personasEnCola}</span>
-             <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Personas en espera</span>
+             <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${personasEnCola}</span>
+             <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Personas en espera</span>
           `;
   }
 
   const dashCard2 = document.getElementById('dash-card-2');
   if (dashCard2 && !window.hasActiveTurn && !window.hasActiveAppointment) {
     const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    let detalleAtencion = '';
+    if (enAtencion.length > 0) {
+        const citasCount = enAtencion.filter(t => t.servicio === 'Cita Programada').length;
+        const turnosCount = enAtencion.length - citasCount;
+        let partes = [];
+        if (citasCount > 0) partes.push(`${citasCount} Cita${citasCount > 1 ? 's' : ''}`);
+        if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
+        detalleAtencion = `<span class="text-xs text-blue-600 dark:text-blue-400 font-bold block mt-1 animate-pulse">En curso: ${partes.join(' y ')}</span>`;
+    }
+
     dashCard2.innerHTML = `
-             <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">${tiempoTexto}</span>
-             <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Atención aprox: ${horaAprox}</span>
+             <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${tiempoTexto}</span>
+             <div class="mt-2">
+                <span class="text-sm text-black/60 dark:text-white/60 font-medium block">Atención aprox: ${horaAprox}</span>
+                ${detalleAtencion}
+             </div>
           `;
   }
 
   const dashCard3 = document.getElementById('dash-card-3');
   if (dashCard3) {
     dashCard3.innerHTML = `
-             <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl ${badgeClass} bg-opacity-10 border border-gray-200 dark:border-white/10 text-lg font-bold">
+             <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl ${badgeClass} bg-opacity-10 border border-black/5 dark:border-white/10 text-lg font-bold">
                 ${demandaTexto}
              </span>
           `;
@@ -860,27 +1019,38 @@ async function verificarTurnoActivo() {
 
     const dashCard1 = document.getElementById('dash-card-1');
     if (dashCard1) {
+      const isEnAtencion = data.estado === 'En atención';
       dashCard1.innerHTML = `
-               <span class="text-7xl font-display font-bold text-[#C1121F] block tracking-wide leading-none">${data.turno}</span>
-               <span class="text-sm text-gray-500 dark:text-white/60 font-bold mt-2 block">TU TURNO ACTUAL</span>
+        <div class="flex justify-between items-end">
+            <div>
+                <span class="text-7xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">${data.turno}</span>
+                <span class="text-sm text-black/60 dark:text-white/60 font-bold mt-2 block">TU TURNO ACTUAL</span>
+            </div>
+            ${!isEnAtencion ? `
+            <button onclick="cancelarTurno()" class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 text-xs font-bold transition-colors px-4 py-2 rounded-lg border border-red-200 dark:border-red-800/50 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                Cancelar
+            </button>
+            ` : ''}
+        </div>
             `;
     }
 
     if (data.estado === 'En atención') {
       if (estadoEl) {
         estadoEl.textContent = 'En Atención ⚡';
-        estadoEl.className = 'px-4 py-1.5 rounded-full bg-[#C1121F]/10 text-[#C1121F] text-xs font-bold border border-[#C1121F]/20 animate-pulse';
+        estadoEl.className = 'px-4 py-1.5 rounded-full bg-black/10 dark:bg-white/10 text-black dark:text-white text-xs font-bold border border-black/20 dark:border-white/20 animate-pulse';
       }
       const h3 = card.querySelector('h3');
       if (h3) h3.textContent = '🔥 Te están atendiendo';
       if (infoExtra) {
-        infoExtra.innerHTML = '<span class="text-lg font-medium text-gray-900 dark:text-white">Relájate y disfruta 😌</span>';
+        infoExtra.innerHTML = '<span class="text-lg font-medium text-[#111111] dark:text-white">Relájate y disfruta 😌</span>';
       }
       const dashCard2 = document.getElementById('dash-card-2');
       if (dashCard2) {
         dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-[#C1121F] block tracking-wide leading-none">AHORA</span>
-                   <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Te están atendiendo</span>
+                   <span class="text-5xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">AHORA</span>
+                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Te están atendiendo</span>
                 `;
       }
     } else {
@@ -916,9 +1086,23 @@ async function verificarTurnoActivo() {
       const dashCard2 = document.getElementById('dash-card-2');
       if (dashCard2) {
         const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        let detalleAtencion = '';
+        if (enAtencion.length > 0) {
+            const citasCount = enAtencion.filter(t => t.servicio === 'Cita Programada').length;
+            const turnosCount = enAtencion.length - citasCount;
+            let partes = [];
+            if (citasCount > 0) partes.push(`${citasCount} Cita${citasCount > 1 ? 's' : ''}`);
+            if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
+            detalleAtencion = `<span class="text-xs text-blue-600 dark:text-blue-400 font-bold block mt-1 animate-pulse">En curso: ${partes.join(' y ')}</span>`;
+        }
+
         dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">${tiempoEstimado} min</span>
-                   <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Atención aprox: ${horaAprox}</span>
+                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${tiempoEstimado} min</span>
+                   <div class="mt-2">
+                      <span class="text-sm text-black/60 dark:text-white/60 font-medium block">Atención aprox: ${horaAprox}</span>
+                      ${detalleAtencion}
+                   </div>
                 `;
       }
 
@@ -928,14 +1112,14 @@ async function verificarTurnoActivo() {
         infoExtra.innerHTML = `
                 <div class="flex flex-col w-full mr-4">
                     <div class="flex justify-between items-end mb-3">
-                        <span class="font-bold text-lg text-gray-900 dark:text-white">${personasDelante} personas delante</span>
-                        <span class="text-xs font-bold text-[#C1121F] bg-[#C1121F]/10 px-2 py-1 rounded">${mensajeTiempo}</span>
+                        <span class="font-bold text-lg text-[#111111] dark:text-white">${personasDelante} personas delante</span>
+                        <span class="text-xs font-bold text-black dark:text-white bg-black/10 dark:bg-white/10 px-2 py-1 rounded">${mensajeTiempo}</span>
                     </div>
-                    <div class="w-full bg-gray-200 dark:bg-black/50 rounded-full h-4 overflow-hidden shadow-inner border border-gray-300 dark:border-white/10">
-                        <div class="bg-[#C1121F] h-full rounded-full transition-all duration-1000 relative progress-striped shadow-lg" style="width: ${porcentaje}%">
+                    <div class="w-full bg-gray-200 dark:bg-black/50 rounded-full h-4 overflow-hidden shadow-inner border border-black/5 dark:border-white/10">
+                        <div class="bg-black dark:bg-white h-full rounded-full transition-all duration-1000 relative progress-striped shadow-lg" style="width: ${porcentaje}%">
                         </div>
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-white/60 mt-1 text-right">
+                    <p class="text-xs text-black/60 dark:text-white/60 mt-1 text-right">
                         ${personasDelante === 0 ? '🚀 ¡Es tu turno ahora mismo!' : 'La fila avanza...'}
                     </p>
                 </div>
@@ -1017,34 +1201,34 @@ async function verificarCitaActiva() {
     cardCita.dataset.id = cita.id;
 
     const cardHTML = `
-                <div class="bento-card p-6 relative overflow-hidden mb-6 animate-fade-in" style="border-left: 4px solid #C1121F;">
-                    <div class="absolute top-0 right-0 p-4 opacity-10 text-[#C1121F] pointer-events-none">
+                <div class="bento-card p-6 relative overflow-hidden mb-6 animate-fade-in" style="border-left: 4px solid #000;">
+                    <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 transform rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
                     
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
-                            <div class="bg-[#C1121F]/10 border border-[#C1121F]/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-[#C1121F]">
+                            <div class="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-black dark:text-white">
                                 📅 Cita Confirmada
                             </div>
                             <div class="text-right">
-                                <p class="text-xs text-gray-500 dark:text-white/60 uppercase tracking-wider font-bold">Barbero</p>
-                                <p class="font-bold text-gray-900 dark:text-white text-lg leading-none">${barberName}</p>
+                                <p class="text-xs text-black/60 dark:text-white/60 uppercase tracking-wider font-bold">Barbero</p>
+                                <p class="font-bold text-[#111111] dark:text-white text-lg leading-none">${barberName}</p>
                             </div>
                         </div>
 
                         <div class="mb-6">
-                            <p class="text-5xl font-display font-bold tracking-tight text-gray-900 dark:text-white mb-1">${timeStr}</p>
-                            <p class="text-lg text-gray-700 dark:text-white/80 font-medium capitalize">${dateStr}</p>
+                            <p class="text-5xl font-display font-bold tracking-tight text-[#111111] dark:text-white mb-1">${timeStr}</p>
+                            <p class="text-lg text-black/80 dark:text-white/80 font-medium capitalize">${dateStr}</p>
                         </div>
 
-                        <div class="flex items-center justify-between border-t border-gray-200 dark:border-white/10 pt-4">
+                        <div class="flex items-center justify-between border-t border-black/5 dark:border-white/10 pt-4">
                             <div>
-                                <p class="text-xs text-gray-500 dark:text-white/60 uppercase tracking-wider font-bold">Cliente</p>
-                                <p class="font-bold text-gray-900 dark:text-white">${nombreCliente}</p>
-                                <p class="text-xs text-[#C1121F] mt-0.5">${servicioTexto}</p>
+                                <p class="text-xs text-black/60 dark:text-white/60 uppercase tracking-wider font-bold">Cliente</p>
+                                <p class="font-bold text-[#111111] dark:text-white">${nombreCliente}</p>
+                                <p class="text-xs text-black/80 dark:text-white/80 mt-0.5">${servicioTexto}</p>
                             </div>
-                            <button onclick="cancelarCita(${cita.id})" class="bg-[#C1121F]/10 hover:bg-[#C1121F]/20 text-[#C1121F] text-xs font-bold px-4 py-2.5 rounded-xl transition-colors border border-[#C1121F]/20 flex items-center gap-2">
+                            <button onclick="cancelarCita(${cita.id})" class="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors border border-black/10 dark:border-white/10 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 Cancelar
                             </button>
@@ -1062,15 +1246,15 @@ async function verificarCitaActiva() {
     const dashCard1 = document.getElementById('dash-card-1');
     if (dashCard1) {
       dashCard1.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-[#C1121F] block tracking-wide leading-none">CITA</span>
-                   <span class="text-sm text-gray-500 dark:text-white/60 font-bold mt-2 block">PROGRAMADA</span>
+                   <span class="text-5xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">CITA</span>
+                   <span class="text-sm text-black/60 dark:text-white/60 font-bold mt-2 block">PROGRAMADA</span>
                 `;
     }
     const dashCard2 = document.getElementById('dash-card-2');
     if (dashCard2) {
       dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-gray-900 dark:text-white block tracking-wide leading-none">${timeStr}</span>
-                   <span class="text-sm text-gray-500 dark:text-white/60 font-medium mt-2 block">Hora de atención</span>
+                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${timeStr}</span>
+                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Hora de atención</span>
                 `;
     }
   } else {
@@ -1250,11 +1434,11 @@ function sugerirHora(ahora, tiempoEstimado, duracion, estado) {
   return roundToSlot(base, 30);
 }
 
-async function cargarBarberos() {
-  const { data } = await supabase.from('barberos').select('id,nombre,usuario,avatar_url').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
+function renderBarbersList(data) {
   window.barbersData = data || [];
   const select = document.getElementById('select-barbero-cita');
   if (select) {
+    const val = select.value;
     select.innerHTML = '<option value="">Selecciona un barbero...</option>';
     (data || []).forEach(b => {
       const opt = document.createElement('option');
@@ -1262,9 +1446,11 @@ async function cargarBarberos() {
       opt.textContent = b.nombre || b.usuario;
       select.appendChild(opt);
     });
+    if (val) select.value = val;
   }
   const selectTurno = document.getElementById('select-barbero-turno');
   if (selectTurno) {
+    const val = selectTurno.value;
     selectTurno.innerHTML = '<option value="">Selecciona un barbero...</option>';
     (data || []).forEach(b => {
       const opt = document.createElement('option');
@@ -1272,6 +1458,19 @@ async function cargarBarberos() {
       opt.textContent = b.nombre || b.usuario;
       selectTurno.appendChild(opt);
     });
+    if (val) selectTurno.value = val;
+  }
+}
+
+async function cargarBarberos() {
+  const cached = getCache('barberos');
+  if (cached) renderBarbersList(cached);
+
+  const { data } = await supabase.from('barberos').select('id,nombre,usuario,avatar_url').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
+  
+  if (data) {
+    setCache('barberos', data, CACHE_TTL.BARBERS);
+    renderBarbersList(data);
   }
 }
 
@@ -1442,7 +1641,7 @@ async function renderSlotsForSelectedDate() {
 
   if (rangoDisplay) {
     rangoDisplay.textContent = `Horario disponible: ${apStr} - ${ciStr}`;
-    rangoDisplay.className = 'mt-4 text-center text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-black/30 py-2 rounded-lg border border-gray-200 dark:border-white/10';
+    rangoDisplay.className = 'mt-4 text-center text-sm font-medium text-black/60 dark:text-white/60 bg-[#F8F8F9] dark:bg-black/30 py-2 rounded-lg border border-black/5 dark:border-white/10';
   }
 
   const startDay = new Date(dateStr + 'T00:00:00');
@@ -1577,7 +1776,7 @@ function renderSlotsFromData(data, dateStr, dur) {
     const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm';
 
     if (disponible) {
-      btn.className = `${baseClass} bg-gray-50 dark:bg-transparent border-gray-200 dark:border-white/10 hover:border-barberRed dark:hover:bg-barberRed/10 cursor-pointer group`;
+      btn.className = `${baseClass} bg-[#F8F8F9] dark:bg-transparent border-black/5 dark:border-white/10 hover:border-black/20 dark:hover:bg-white/10 cursor-pointer group`;
       btn.onclick = () => seleccionarHora(currentSlot, btn);
     } else {
       btn.className = `${baseClass} bg-gray-100 dark:bg-[#1E1E22] border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50`;
@@ -1587,7 +1786,7 @@ function renderSlotsFromData(data, dateStr, dur) {
     const timeStr = currentSlot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
     btn.innerHTML = `
-            <span class="${disponible ? 'text-gray-900 dark:text-gray-200 group-hover:text-barberRed' : ''}">${timeStr}</span>
+            <span class="${disponible ? 'text-[#111111] dark:text-gray-200 group-hover:text-black dark:group-hover:text-white' : ''}">${timeStr}</span>
             ${disponible ? `<span class="text-[10px] text-green-600 dark:text-green-400 font-medium mt-1">Libre</span>` : '<span class="text-[10px] mt-1">Ocupado</span>'}
         `;
 
@@ -1596,7 +1795,7 @@ function renderSlotsFromData(data, dateStr, dur) {
   }
 
   if (slotsContainer.children.length === 0) {
-    slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">No hay horarios disponibles.</div>';
+    slotsContainer.innerHTML = '<div class="col-span-full text-center text-black/50 dark:text-white/50 py-4">No hay horarios disponibles.</div>';
   }
 }
 
@@ -1608,7 +1807,7 @@ function seleccionarHora(date, btnElement) {
     Array.from(container.children).forEach(c => {
       if (!c.disabled) {
         c.classList.remove('slot-selected');
-        c.classList.remove('bg-barberRed', 'text-white', 'border-barberRed');
+        c.classList.remove('bg-black', 'dark:bg-white', 'text-white', 'dark:text-black', 'border-black', 'dark:border-white');
       }
     });
   }
@@ -1633,6 +1832,11 @@ async function confirmarReservaManual() {
   const date = window.__horaSeleccionada__;
   const barberSel = document.getElementById('select-barbero-cita').value;
 
+  if (!date) {
+    showToast('Error: Debes seleccionar una hora.', 'error');
+    return;
+  }
+
   if (!barberSel) {
     showToast('Error: Debes seleccionar un barbero.', 'error');
     return;
@@ -1640,6 +1844,11 @@ async function confirmarReservaManual() {
 
   const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
   const phoneEl = document.getElementById('profile-phone');
+
+  if (!servicioSel) {
+    showToast('Error: Debes seleccionar un servicio.', 'error');
+    return;
+  }
   const telefono = phoneEl ? phoneEl.textContent : '';
   const dur = serviciosCache[servicioSel] || 30;
 
@@ -1658,12 +1867,13 @@ async function confirmarReservaManual() {
           p_barber_id: Number(barberSel),
           p_cliente_telefono: telefono,
           p_start: date.toISOString(),
-          p_end: slotEnd.toISOString()
+          p_end: slotEnd.toISOString(),
+          p_servicio: servicioSel
         });
 
         if (error) throw error;
 
-        showToast('¡Cita reservada con éxito!');
+        localStorage.setItem('cita_reservada', 'true');
 
         if (typeof confetti === 'function') {
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#111113', '#ffffff'] });
@@ -1673,10 +1883,7 @@ async function confirmarReservaManual() {
 
         sendPushNotification('¡Cita Confirmada!', `Tu cita para las ${timeStr} ha sido agendada.`);
 
-        window.__horaSeleccionada__ = null;
-        const actionContainer = document.getElementById('action-container');
-        if (actionContainer) actionContainer.classList.add('hidden');
-        renderSlotsForSelectedDate();
+        window.location.reload();
       } catch (e) {
         console.error(e);
         const msg = (e.message && e.message.length < 150) ? e.message : 'Ese horario acaba de ocuparse o hubo un error. Por favor selecciona otro.';

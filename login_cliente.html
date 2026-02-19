@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acceso Clientes - TurnoRD</title>
+  <title>Acceso Clientes - Jbarber</title>
   <meta name="description" content="Inicia sesión en JBarber para gestionar tus turnos y citas.">
   
   <!-- Open Graph para compartir la App -->
@@ -36,13 +36,12 @@
   <style>
     body { 
         font-family: 'Outfit', sans-serif;
-        background-color: #F9FAFB;
-        background-image: radial-gradient(#E5E7EB 1px, transparent 1px);
-        background-size: 32px 32px;
+        background: radial-gradient(circle at 20% 20%, rgba(193,18,31,0.05), transparent 40%),
+                    #F8F8F9;
     }
     .dark body {
-        background-color: #09090b;
-        background-image: radial-gradient(#1f2937 1px, transparent 1px);
+        background: radial-gradient(circle at 80% 80%, rgba(193,18,31,0.08), transparent 40%),
+                    #0B0B0C;
     }
     .font-display { font-family: 'Bebas Neue', sans-serif; }
     
@@ -81,6 +80,12 @@
         to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-up { animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-5px); }
+      40%,80% { transform: translateX(5px); }
+    }
     
     @keyframes modalIn {
         from { opacity: 0; transform: scale(0.95) translateY(10px); }
@@ -88,7 +93,9 @@
     }
     .animate-modal { animation: modalIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
   </style>
-  <!-- Modal Instrucciones iOS -->
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
   <div id="modalIOS" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-[60] px-4 transition-all duration-300">
     <div class="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-sm p-6 relative shadow-2xl border border-gray-200 dark:border-zinc-800 animate-modal text-center">
       <button onclick="document.getElementById('modalIOS').classList.add('hidden'); document.getElementById('modalIOS').classList.remove('flex')" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 text-2xl">&times;</button>
@@ -100,10 +107,8 @@
       <button onclick="document.getElementById('modalIOS').classList.add('hidden'); document.getElementById('modalIOS').classList.remove('flex')" class="bg-gray-900 dark:bg-white text-white dark:text-black font-bold py-3 px-8 rounded-xl w-full">Entendido</button>
     </div>
   </div>
-</head>
-<body class="min-h-screen flex items-center justify-center p-4">
 
-  <div class="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden relative animate-fade-up">
+  <div class="w-full max-w-md bg-white/90 dark:bg-[#111113]/90 backdrop-blur-sm rounded-3xl border border-black/5 dark:border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.12)] hover:shadow-[0_25px_70px_rgba(0,0,0,0.18)] transition-all duration-500 overflow-hidden relative animate-fade-up">
     <!-- Barber Stripe Header -->
     <div class="h-3 w-full barber-stripes"></div>
     
@@ -128,8 +133,8 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     </div>
-                    <input type="text" id="usuario_login" required placeholder="Cédula o código" 
-                        class="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-zinc-800/50 border-b-2 border-gray-200 dark:border-zinc-700 rounded-t-xl focus:bg-white dark:focus:bg-zinc-800 focus:border-barberRed outline-none transition-all font-medium text-gray-900 dark:text-white placeholder-gray-400">
+                    <input type="text" id="usuario_login" required placeholder="Cédula o código" autocomplete="username"
+                        class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300 pl-11 pr-4">
                 </div>
             </div>
 
@@ -139,16 +144,22 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                     </div>
-                    <input type="password" id="password_login" required placeholder="••••••••" 
-                        class="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-zinc-800/50 border-b-2 border-gray-200 dark:border-zinc-700 rounded-t-xl focus:bg-white dark:focus:bg-zinc-800 focus:border-barberRed outline-none transition-all font-medium text-gray-900 dark:text-white placeholder-gray-400">
+                    <input type="password" id="password_login" required placeholder="••••••••" autocomplete="current-password"
+                        class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300 pl-11 pr-12">
+                    <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        <svg id="eyeOffIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a10.05 10.05 0 015.393-6.125M17.55 4.45a10.052 10.052 0 012.093 7.55M1 1l22 22" /></svg>
+                    </button>
                 </div>
             </div>
 
-            <button type="submit" id="btnSubmit" class="w-full bg-gray-900 dark:bg-white text-white dark:text-black font-bold py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-3 group">
+            <button type="submit" id="btnSubmit" class="w-full bg-black dark:bg-white text-white dark:text-black font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_10px_25px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_10px_30px_rgba(255,255,255,0.15)] active:scale-[0.98] flex items-center justify-center gap-3 group">
                 <span id="btnText">INICIAR SESIÓN</span>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
             </button>
         </form>
+
+        <p id="loginError" class="hidden text-sm text-red-600 dark:text-red-400 text-center font-medium mt-3"></p>
 
         <div class="mt-8 pt-6 border-t border-gray-100 dark:border-zinc-800 text-center">
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">¿Eres nuevo en JBarber?</p>
@@ -159,7 +170,7 @@
     </div>
   </div>
 
-  <button id="btn-install-pwa" class="hidden fixed bottom-6 right-6 z-50 bg-barberRed text-white px-4 py-3 rounded-full shadow-2xl hover:scale-105 transition-transform font-bold flex items-center gap-2 animate-bounce-in">
+  <button id="btn-install-pwa" class="hidden fixed bottom-6 right-6 z-50 bg-barberRed text-white px-4 py-3 rounded-full shadow-2xl hover:scale-105 hover:shadow-[0_10px_30px_rgba(193,18,31,0.4)] transition-all font-bold flex items-center gap-2 animate-bounce-in">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
@@ -167,7 +178,7 @@
   </button>
 
   <div id="modalRegistro" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 px-4 transition-all duration-300">
-    <div class="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-lg p-8 relative shadow-2xl border border-gray-200 dark:border-zinc-800 animate-modal max-h-[90vh] overflow-y-auto">
+    <div class="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-lg p-8 relative shadow-[0_10px_40px_rgba(0,0,0,0.18)] border border-gray-200 dark:border-zinc-800 animate-modal max-h-[90vh] overflow-y-auto">
       <button onclick="cerrarModalRegistro()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 text-2xl">&times;</button>
       
       <h2 class="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Crea tu perfil en segundos</h2>
@@ -177,24 +188,20 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1 dark:text-gray-300">Nombre Completo</label>
-            <input type="text" id="reg_nombre" required class="w-full p-3 border rounded-xl bg-black/60 border-gray-700 text-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40 outline-none transition-all duration-300">
+            <input type="text" id="reg_nombre" required class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1 dark:text-gray-300">Teléfono</label>
-            <input type="tel" id="reg_telefono" required pattern="[0-9]{8,15}" class="w-full p-3 border rounded-xl bg-black/60 border-gray-700 text-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40 outline-none transition-all duration-300">
+            <input type="tel" id="reg_telefono" required pattern="[0-9]{8,15}" class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300">
           </div>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1 dark:text-gray-300">Correo Electrónico</label>
-          <input type="email" id="reg_email" required class="w-full p-3 border rounded-xl bg-black/60 border-gray-700 text-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40 outline-none transition-all duration-300">
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1 dark:text-gray-300">Usuario (Cédula o Código 6 dígitos)</label>
-          <input type="text" id="reg_documento" required class="w-full p-3 border rounded-xl bg-black/60 border-gray-700 text-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40 outline-none transition-all duration-300" placeholder="Ej: 40212345678">
+          <input type="email" id="reg_email" required class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300">
         </div>
         <div>
           <label class="block text-sm font-medium mb-1 dark:text-gray-300">Contraseña</label>
-          <input type="password" id="reg_password" required minlength="4" class="w-full p-3 border rounded-xl bg-black/60 border-gray-700 text-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40 outline-none transition-all duration-300">
+          <input type="password" id="reg_password" required minlength="4" class="w-full p-3 border rounded-xl bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white focus:border-barberRed focus:ring-2 focus:ring-barberRed/30 outline-none transition-all duration-300">
         </div>
         <button type="submit" id="btnRegSubmit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-blue-600/20">
           <span id="btnRegText">Crear Cuenta</span>
@@ -204,7 +211,7 @@
   </div>
 
   <script type="module">
-    import { supabase } from './database.js';
+    import { ensureSupabase } from './database.js';
     const negocioId = 'barberia005';
 
     // Lógica PWA para Login
@@ -243,44 +250,116 @@
         document.body.style.animation = '';
     };
 
+    // Show/Hide Password
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password_login');
+    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeOffIcon = document.getElementById('eyeOffIcon');
+    const loginErrorEl = document.getElementById('loginError');
+
+    if (togglePassword) {
+      togglePassword.addEventListener('click', () => {
+          const isPassword = passwordInput.type === 'password';
+          passwordInput.type = isPassword ? 'text' : 'password';
+          eyeIcon.classList.toggle('hidden', isPassword);
+          eyeOffIcon.classList.toggle('hidden', !isPassword);
+      });
+    }
+
+    // Reset error animation
+    if (loginErrorEl) {
+      loginErrorEl.addEventListener('animationend', () => loginErrorEl.classList.remove('animate-[shake_0.4s]'));
+    }
+
     // Login
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const usuario = document.getElementById('usuario_login').value.trim();
+      const usuarioInput = document.getElementById('usuario_login').value.trim();
       const pass = document.getElementById('password_login').value.trim();
       const btn = document.getElementById('btnSubmit');
       const btnText = document.getElementById('btnText');
-
+      const errorMsg = document.getElementById('loginError');
+  
       btn.disabled = true;
       btn.classList.add('opacity-70', 'cursor-not-allowed');
       btnText.textContent = 'Verificando...';
-
+      if (errorMsg) {
+        errorMsg.classList.add('hidden');
+        errorMsg.textContent = '';
+      }
+  
       try {
-        const { data, error } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('negocio_id', negocioId)
-          .eq('documento_identidad', usuario)
-          .eq('password', pass) // Nota: En producción usar hash
-          .maybeSingle();
+        const client = await ensureSupabase();
+  
+        let emailToLogin = usuarioInput;
+        let perfilData = null;
 
-        if (error) throw error;
-        if (!data) throw new Error('Credenciales incorrectas');
+        // Si NO es un email, intentamos buscar el perfil por documento
+        if (!usuarioInput.includes('@')) {
+            // Usamos una función RPC segura (SECURITY DEFINER) para obtener el email sin exponer datos.
+            const { data: rpcData, error: rpcError } = await client.rpc('get_email_by_document', {
+                p_documento_identidad: usuarioInput,
+                p_negocio_id: negocioId
+            });
 
-        // Guardar sesión cliente
-        localStorage.setItem(`cliente_id_${negocioId}`, data.id);
-        localStorage.setItem(`cliente_nombre_${negocioId}`, data.nombre);
-        localStorage.setItem(`cliente_telefono_${negocioId}`, data.telefono);
-        localStorage.setItem(`cliente_avatar_${negocioId}`, data.avatar_url || '');
+            if (rpcError) throw rpcError;
+            if (!rpcData) throw new Error('Usuario no encontrado. Verifique su cédula o código.');
+            
+            emailToLogin = rpcData;
+        } else {
+            emailToLogin = usuarioInput;
+        }
 
-        // Redirigir al nuevo panel
+        // 2. Iniciar sesión con el email (ya sea ingresado o encontrado)
+        const { data: signInData, error: signInError } = await client.auth.signInWithPassword({
+          email: emailToLogin,
+          password: pass
+        });
+  
+        if (signInError) throw signInError;
+        if (!signInData || !signInData.user) throw new Error('Credenciales incorrectas.');
+  
+        // 3. Buscar el perfil usando el ID de usuario autenticado (Más robusto)
+        // Esto asegura que obtenemos los datos correctos incluso si entramos por email directo
+        const { data: perfilAuth, error: errAuth } = await client
+            .from('clientes')
+            .select('id, nombre, telefono, avatar_url')
+            .eq('id', signInData.user.id) // Usar ID de auth
+            .maybeSingle();
+        
+        // Si encontramos perfil por ID, lo usamos. Si no, usamos el que teníamos (si había)
+        const perfilFinal = perfilAuth || perfilData;
+
+        if (perfilFinal) {
+            localStorage.setItem(`cliente_id_${negocioId}`, perfilFinal.id);
+            localStorage.setItem(`cliente_nombre_${negocioId}`, perfilFinal.nombre);
+            localStorage.setItem(`cliente_telefono_${negocioId}`, perfilFinal.telefono);
+            localStorage.setItem(`cliente_avatar_${negocioId}`, perfilFinal.avatar_url || '');
+        } else {
+            // Fallback: Si no hay perfil en tabla clientes, guardamos al menos el ID de auth
+            localStorage.setItem(`cliente_id_${negocioId}`, signInData.user.id);
+        }
+  
         window.location.href = 'panel_cliente.html';
-
+  
       } catch (error) {
-        alert(error.message || 'Error al iniciar sesión');
+        console.error('Error Login:', error);
+        if (errorMsg) {
+          if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_grant')) {
+            errorMsg.textContent = 'Credenciales incorrectas. Verifica tu usuario y contraseña.';
+          } else if (error.message.includes('Email not confirmed')) {
+            errorMsg.textContent = 'Correo no confirmado. Revisa tu bandeja de entrada.';
+          } else if (error.status === 429 || error.message.includes('rate limit') || error.message.includes('Too Many Requests')) {
+            errorMsg.textContent = 'Demasiados intentos. Espera un momento (60s) antes de intentar.';
+          } else {
+            errorMsg.textContent = error.message || 'Error al iniciar sesión';
+          }
+          errorMsg.classList.remove('hidden');
+          errorMsg.classList.add('animate-[shake_0.4s]');
+        }
         btn.disabled = false;
         btn.classList.remove('opacity-70', 'cursor-not-allowed');
-        btnText.textContent = 'Ingresar';
+        btnText.textContent = 'INICIAR SESIÓN';
       }
     });
 
@@ -290,9 +369,14 @@
       const nombre = document.getElementById('reg_nombre').value.trim();
       const telefono = document.getElementById('reg_telefono').value.trim();
       const email = document.getElementById('reg_email').value.trim();
-      const documento = document.getElementById('reg_documento').value.trim();
       const pass = document.getElementById('reg_password').value.trim();
       
+      // Validación de formato de teléfono (Solo números, 8-15 dígitos)
+      if (!/^\d{8,15}$/.test(telefono)) {
+        alert('El teléfono debe contener solo números (8 a 15 dígitos).');
+        return;
+      }
+
       const btn = document.getElementById('btnRegSubmit');
       const btnText = document.getElementById('btnRegText');
 
@@ -300,40 +384,40 @@
       btnText.textContent = 'Creando cuenta...';
 
       try {
-        // 1. Verificar si ya existe el documento
-        const { data: existente, error: errorCheck } = await supabase
-          .from('clientes')
-          .select('id')
-          .eq('negocio_id', negocioId)
-          .eq('documento_identidad', documento)
-          .maybeSingle();
+        const client = await ensureSupabase();
 
-        if (errorCheck) throw errorCheck;
-        if (existente) throw new Error('Este usuario/cédula ya está registrado');
+        // 2. Crear el usuario en Supabase Auth enviando datos al Trigger
+        const { data: { user }, error: authError } = await client.auth.signUp({
+          email,
+          password: pass,
+          options: {
+            data: {
+              nombre: nombre,
+              telefono: telefono,
+              negocio_id: negocioId
+            }
+          }
+        });
 
-        // 2. Insertar nuevo cliente
-        const { data, error } = await supabase
-          .from('clientes')
-          .insert([{
-            negocio_id: negocioId,
-            nombre,
-            telefono,
-            email,
-            documento_identidad: documento,
-            password: pass // En producción: usar hashing
-          }])
-          .select()
-          .single();
+        if (authError) throw authError;
+        if (!user) throw new Error('No se pudo crear el usuario.');
 
-        if (error) throw error;
+        // El perfil en 'clientes' se crea automáticamente por el Trigger en la base de datos.
 
-        alert('¡Cuenta creada con éxito! Ya puedes iniciar sesión.');
-        cerrarModalRegistro();
-        document.getElementById('usuario_login').value = documento;
+        alert('¡Cuenta creada con éxito! Revisa tu correo para confirmar y luego inicia sesión.');
+        window.cerrarModalRegistro();
+        document.getElementById('usuario_login').value = email;
         document.getElementById('password_login').value = pass;
 
       } catch (error) {
-        alert(error.message || 'Error al registrarse');
+        console.error('Error Registro:', error);
+        if (error.message && error.message.includes('email rate limit')) {
+            alert('Has solicitado demasiados correos de verificación. Por favor, revisa tu bandeja de entrada o espera 15 minutos antes de intentar de nuevo.');
+        } else if (error.status === 429 || error.message.includes('rate limit') || error.message.includes('Too Many Requests')) {
+            alert('Demasiados intentos. Por seguridad, espera un momento.');
+        } else {
+            alert(error.message || 'Error al registrarse');
+        }
       } finally {
         btn.disabled = false;
         btnText.textContent = 'Crear Cuenta';

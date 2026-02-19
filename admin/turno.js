@@ -9,6 +9,7 @@ let LIMITE_TURNOS = 50;
 let ALLOWED_DAYS = [1, 2, 3, 4, 5, 6];
 let activeTurnIntervals = {};
 let serviciosCache = {};
+let preciosCache = {}; // Cache para precios de servicios
 let isRefreshing = false; // Bandera para evitar ejecuciones simultáneas
 let citasHoy = [];
 let citasFuturas = [];
@@ -175,12 +176,16 @@ async function cargarServicios() {
     try {
         const { data, error } = await supabase
             .from('servicios')
-            .select('nombre,duracion_min')
+            .select('nombre,duracion_min,precio')
             .eq('negocio_id', negocioId)
             .eq('activo', true);
         if (error) throw error;
         serviciosCache = {};
-        (data || []).forEach(s => { serviciosCache[s.nombre] = s.duracion_min; });
+        preciosCache = {};
+        (data || []).forEach(s => { 
+            serviciosCache[s.nombre] = s.duracion_min; 
+            preciosCache[s.nombre] = s.precio;
+        });
         const sel = document.getElementById('servicio');
         if (sel && data && data.length) {
             sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
@@ -1179,9 +1184,21 @@ function abrirModalPago(turnId) {
     activeTurnIdForPayment = turnId;
     const modal = document.getElementById('modalPago');
     if (modal) {
+        // Buscar el turno para obtener el servicio y precio
+        const turno = enAtencionCache.find(t => t.id == turnId) || dataRender.find(t => t.id == turnId);
+        const inputMonto = document.getElementById('montoCobrado');
+        
+        if (inputMonto) {
+            if (turno && turno.servicio && preciosCache[turno.servicio] !== undefined) {
+                inputMonto.value = preciosCache[turno.servicio];
+            } else {
+                inputMonto.value = '';
+            }
+        }
+
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        document.getElementById('montoCobrado').focus();
+        if (inputMonto) inputMonto.focus();
     }
 }
 

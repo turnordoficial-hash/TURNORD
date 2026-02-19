@@ -34,20 +34,22 @@ function getDeadlineKey(turno) {
 // Es seguro exponerla en el lado del cliente.
 const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
 
-/**
- * Registra el Service Worker.
- */
 function registrarServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
-    navigator.serviceWorker.register(swPath)
-      .then(registration => {
-        console.log('Service Worker registrado con éxito:', registration);
-      })
-      .catch(error => {
-        console.error('Error al registrar el Service Worker:', error);
-      });
-  }
+  if (!('serviceWorker' in navigator)) return;
+  const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
+  navigator.serviceWorker.register(swPath)
+    .then(async () => {
+      try {
+        if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
+          await crearOSincronizarSuscripcionPush();
+        }
+      } catch (error) {
+        console.error('Error al sincronizar suscripción push tras registrar el Service Worker:', error);
+      }
+    })
+    .catch(error => {
+      console.error('Error al registrar el Service Worker:', error);
+    });
 }
 
 /**
@@ -90,36 +92,52 @@ async function guardarSuscripcion(subscription) {
   }
 }
 
+async function crearOSincronizarSuscripcionPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+  await guardarSuscripcion(subscription);
+}
 
-/**
- * Solicita permiso para notificaciones y crea la suscripción push.
- */
 async function solicitarPermisoNotificacion() {
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.warn('Las notificaciones push no son soportadas por este navegador.');
-        return;
-    }
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('Las notificaciones push no son soportadas por este navegador.');
+    return;
+  }
 
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-        console.log('Permiso para notificaciones no concedido.');
-        return;
-    }
+  if (Notification.permission === 'denied') {
+    console.log('Permiso para notificaciones previamente denegado por el usuario.');
+    return;
+  }
 
-    console.log('Permiso para notificaciones concedido.');
-
+  if (Notification.permission === 'granted') {
     try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-
-        console.log('Suscripción push obtenida:', subscription);
-        await guardarSuscripcion(subscription);
+      await crearOSincronizarSuscripcionPush();
     } catch (error) {
-        console.error('Error al suscribirse a las notificaciones push:', error);
+      console.error('Error al sincronizar la suscripción push:', error);
     }
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    console.log('Permiso para notificaciones no concedido.');
+    return;
+  }
+
+  console.log('Permiso para notificaciones concedido.');
+
+  try {
+    await crearOSincronizarSuscripcionPush();
+  } catch (error) {
+    console.error('Error al suscribirse a las notificaciones push:', error);
+  }
 }
 
 /**

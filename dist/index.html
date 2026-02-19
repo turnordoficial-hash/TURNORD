@@ -4,6 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>JBarber • Barbería Premium</title>
+<meta name="description" content="Reserva tu turno en JBarber sin hacer filas. La mejor experiencia de barbería en República Dominicana. Cortes, barba y estilo premium.">
+<meta name="keywords" content="barbería, turnos, app, corte de pelo, república dominicana, jbarber, estilo">
+<meta name="author" content="JBarber">
+
+<!-- Open Graph / Facebook / WhatsApp -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tu-dominio.com/">
+<meta property="og:title" content="JBarber • Tu estilo, sin esperas">
+<meta property="og:description" content="Reserva tu turno en segundos y olvídate de las filas. Descarga la App hoy.">
+<meta property="og:image" content="/assets/j1-CozQ4W5X.jpg">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="https://tu-dominio.com/">
+<meta property="twitter:title" content="JBarber • Barbería Premium">
+<meta property="twitter:description" content="Reserva tu turno en segundos y olvídate de las filas.">
+<meta property="twitter:image" content="jbarber/j1.jpg">
 
 <!-- Base dinámico -->
 <script>
@@ -25,11 +42,12 @@
 </script>
 
 <!-- Favicons -->
-<link rel="icon" type="image/x-icon" href="/assets/favicon-CWZvxXhx.ico" />
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16-B5MxQ7zQ.png" />
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32-BiW2B3fk.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-FApahFAp.png">
-<link rel="manifest" href="/assets/site-BwHFeIBa.webmanifest">
+<link rel="icon" type="image/png" href="/assets/jjj-D3cvWLYa.png" />
+<link rel="apple-touch-icon" href="/assets/jjj-D3cvWLYa.png" />
+<link rel="shortcut icon" href="/assets/jjj-D3cvWLYa.png" type="image/png"/>
+<link rel="manifest" href="/assets/manifest-C8KeGD9f.json">
+<meta name="theme-color" content="#C1121F">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -80,6 +98,105 @@
   }
   .animate-float { animation: float-y 3s ease-in-out infinite; }
   
+  /* Nuevas Micro-animaciones 2D Premium */
+  @keyframes pulse-soft {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(193, 18, 31, 0)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 5px rgba(193, 18, 31, 0.4)); }
+  }
+  .animate-pulse-soft { animation: pulse-soft 3s infinite ease-in-out; }
+
+  @keyframes float-phone {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float-phone { animation: float-phone 4s ease-in-out infinite; }
+
+  @keyframes snip-cut {
+    0%, 100% { transform: rotate(0deg); }
+    10% { transform: rotate(-25deg); }
+    20% { transform: rotate(0deg); }
+  }
+  .animate-snip-cut { animation: snip-cut 5s infinite ease-in-out; transform-origin: center; }
+
+  @keyframes shine-badge {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.1) rotate(3deg); }
+  }
+  .animate-shine { animation: shine-badge 4s infinite ease-in-out; }
+
+  /* Gallery Grid Styles */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  .gallery-card {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    cursor: pointer;
+    transform: translateY(0);
+    transition: all .4s ease;
+  }
+  .gallery-card img, .gallery-card video {
+    width: 100%;
+    height: 320px;
+    object-fit: cover;
+    transition: all .6s ease;
+  }
+  .gallery-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 20px 60px rgba(193, 18, 31, 0.35);
+  }
+  .gallery-card:hover img, .gallery-card:hover video {
+    transform: scale(1.1);
+  }
+  .gallery-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    display: flex;
+    align-items: flex-end;
+    padding: 20px;
+    opacity: 0;
+    transition: .4s;
+  }
+  .gallery-card:hover .gallery-overlay {
+    opacity: 1;
+  }
+  .gallery-overlay span {
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    transform: translateY(20px);
+    transition: .4s;
+  }
+  .gallery-card:hover .gallery-overlay span {
+    transform: translateY(0);
+  }
+
+  /* Barber Stripes Animation */
+  @keyframes barberpole {
+    from { background-position: 0 0; }
+    to { background-position: 40px 40px; }
+  }
+  .barber-stripes {
+    background-image: linear-gradient(45deg, 
+      #C1121F 25%, 
+      #ffffff 25%, 
+      #ffffff 50%, 
+      #003049 50%, 
+      #003049 75%, 
+      #ffffff 75%, 
+      #ffffff 100%
+    );
+    background-size: 40px 40px;
+    animation: barberpole 3s linear infinite;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  .dark .barber-stripes {
+      background-image: linear-gradient(45deg, #C1121F 25%, #18181b 25%, #18181b 50%, #003049 50%, #003049 75%, #18181b 75%, #18181b 100%);
+  }
 </style>
 
 <!-- Inicializar modo oscuro -->
@@ -91,27 +208,38 @@ function inicializarModoOscuro() {
 inicializarModoOscuro();
 </script>
 
+  <script type="module" crossorigin src="/assets/index-Baydc6--.js"></script>
 </head>
 
-<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300">
-  <header class="fixed top-0 w-full z-50 bg-barberBlack text-white">
+<body class="bg-barberWhite text-gray-800 dark:text-gray-100 font-['Outfit'] transition-colors duration-300">
+  <header class="fixed top-0 w-full z-50 bg-barberBlack/95 backdrop-blur-md text-white border-b border-white/10 transition-all duration-300">
     <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <!-- Logo -->
       <div class="flex items-center gap-3 font-extrabold text-lg">
-        <span class="w-8 h-8 bg-barberRed flex items-center justify-center rounded">J</span>
-        JBarber
+        <img src="/assets/jjj-D3cvWLYa.png" alt="Logo" class="w-8 h-8 rounded object-cover shadow-lg shadow-red-900/20">
+        <span class="tracking-tight">JBarber</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a href="login_cliente.html" class="px-4 py-2 bg-barberRed rounded font-bold hover:opacity-90">
-          Tomar turno
-        </a>
-        <a href="login_cliente.html" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Agendar cita
-        </a>
-        <a href="#servicios" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Servicios
-        </a>
-        <button id="btn-install-header" class="px-4 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">
-          Descargar app
+
+      <!-- Desktop Nav -->
+      <div class="hidden md:flex items-center gap-4">
+        <button class="install-trigger px-5 py-2 bg-barberRed rounded-full font-bold hover:bg-red-700 transition shadow-lg shadow-red-900/20 text-sm text-white">
+          📲 Descargar y Tomar Turno
+        </button>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button id="mobile-menu-btn" class="md:hidden p-2 text-white hover:text-barberRed transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu (Hidden by default) -->
+    <div id="mobile-menu" class="hidden md:hidden bg-barberBlack border-t border-white/10 absolute w-full left-0 top-16 shadow-2xl animate-fade-up">
+      <div class="flex flex-col p-6 space-y-4">
+        <button class="install-trigger block w-full text-center px-4 py-3 bg-barberRed rounded-xl font-bold hover:bg-red-700 transition text-white shadow-lg">
+          📲 Descargar y Tomar Turno
         </button>
       </div>
     </div>
@@ -129,28 +257,28 @@ inicializarModoOscuro();
 
   <section class="relative min-h-[90vh] pt-24">
     <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?q=80&w=2074&auto=format&fit=crop" alt="Barbería" class="absolute inset-0 w-full h-full object-cover">
-    <div class="absolute inset-0 bg-gradient-to-r from-black/60 to-white/40"></div>
+    <div class="absolute inset-0 bg-gradient-to-r from-black/80 to-black/40"></div>
     <div class="relative z-10 max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-10 items-center">
       <div>
-        <h1 class="text-6xl md:text-7xl font-extrabold text-white leading-tight">
-          Estilo.<br>
-          Precisión.<br>
-          <span class="text-barberRed">JBarber.</span>
+        <h1 class="text-6xl md:text-7xl font-extrabold text-white leading-tight font-['Bebas_Neue'] tracking-wide">
+          Tu estilo habla antes que tú.<br>
+          <span class="text-barberRed">Reserva sin esperar.</span>
         </h1>
         <p class="mt-4 text-barberWhite max-w-md">
-          Barbería moderna donde tu tiempo se respeta.
-          Turnos en vivo, citas rápidas y atención premium.
+          Descarga la app, mira la fila en tiempo real y llega justo cuando te toca.
         </p>
-        <div class="mt-6 flex flex-wrap gap-4">
-          <a href="login_cliente.html" class="px-6 py-3 bg-barberRed text-white font-bold rounded hover:scale-105 transition">
-            Tomar turno
-          </a>
-          <a href="login_cliente.html" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
-            Agendar cita
-          </a>
-          <button id="btn-install-hero" class="px-6 py-3 border-2 border-barberWhite text-barberWhite font-bold rounded hover:bg-barberWhite hover:text-barberBlack transition">
-            Descargar app
+        <div class="mt-6 flex flex-col gap-3">
+          <div class="bg-barberRed text-white px-4 py-2 rounded-full text-sm inline-block animate-pulse">🔥 Disponible hoy • Sin filas</div>
+          <button class="install-trigger px-8 py-4 bg-white text-barberBlack font-extrabold rounded-full hover:scale-105 transition-all shadow-xl flex items-center justify-center gap-3">
+            📲 Descargar y Tomar Turno
           </button>
+          <p id="fila-live" class="text-sm text-yellow-300 mt-2 font-semibold flex items-center gap-2">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            Consultando disponibilidad...
+          </p>
+          <p class="text-sm text-white/80">
+            ✔ Sin registro complicado • ✔ Toma turno en menos de 30 segundos • ✔ 1,000+ clientes ya la usan
+          </p>
         </div>
       </div>
     </div>
@@ -167,44 +295,44 @@ inicializarModoOscuro();
 
       <div class="max-w-6xl mx-auto px-6 relative z-10">
         <div class="text-center mb-16 animate-fade-up">
-          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white">¿Por qué JBarber?</h2>
+          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">¿Por qué JBarber?</h2>
           <p class="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">No es solo un corte. Es una experiencia hecha para ti.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <!-- Card 1 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.1s;">
-            <div class="w-14 h-14 bg-barberRed/20 rounded-xl flex items-center justify-center mb-6 text-barberRed group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div class="w-14 h-14 bg-barberRed/20 rounded-xl flex items-center justify-center mb-6 text-barberRed transition-transform duration-300 group-hover:scale-110 group-hover:bg-barberRed group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-pulse-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Turnos en tiempo real</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Turnos en tiempo real</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Tu tiempo vale oro.</strong> Mira la fila en vivo y llega exactamente cuando te toca.</p>
           </div>
 
           <!-- Card 2 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.2s;">
-            <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 text-blue-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+            <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 text-blue-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-float-phone" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">App móvil</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">App móvil</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Todo JBarber en tu bolsillo.</strong> Notificaciones, historial y control total desde tu celular.</p>
           </div>
 
           <!-- Card 3 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.3s;">
-            <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 text-purple-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" /></svg>
+            <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 text-purple-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-snip-cut" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Barberos profesionales</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Barberos profesionales</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Manos expertas.</strong> Técnica, precisión y estilo en cada detalle. Resultados que se notan.</p>
           </div>
 
           <!-- Card 4 -->
           <div class="group p-8 bg-gray-50 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl hover:bg-white dark:hover:bg-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl animate-fade-up" style="animation-delay: 0.4s;">
-            <div class="w-14 h-14 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-6 text-yellow-400 group-hover:scale-110 transition-transform duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+            <div class="w-14 h-14 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-6 text-yellow-400 transition-transform duration-300 group-hover:scale-110 group-hover:bg-yellow-500 group-hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 animate-shine" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3">Atención premium</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 font-['Bebas_Neue'] tracking-wide">Atención premium</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed"><strong class="block text-gray-800 dark:text-gray-200 mb-1">Se siente la diferencia.</strong> Una experiencia cómoda, rápida y pensada solo para ti.</p>
           </div>
         </div>
@@ -222,13 +350,13 @@ inicializarModoOscuro();
             </svg>
           </div>
           <div>
-            <h3 class="text-2xl font-bold text-white">¡Tu estilo te espera!</h3>
+            <h3 class="text-2xl font-bold text-white font-['Bebas_Neue'] tracking-wide">¡Tu estilo te espera!</h3>
             <p class="text-white/90">No esperes más, la silla está lista.</p>
           </div>
         </div>
         <a href="login_cliente.html" class="group relative px-8 py-4 bg-white text-barberRed font-extrabold rounded-full shadow-xl hover:shadow-2xl transition-all hover:scale-105 overflow-hidden">
           <span class="relative z-10 flex items-center gap-2">
-            TOMAR TURNO
+            TOMAR TURNO AHORA 🔥
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </span>
         </a>
@@ -240,7 +368,7 @@ inicializarModoOscuro();
       <div class="max-w-5xl mx-auto px-6">
         <div class="text-center mb-16 animate-fade-up">
           <span class="text-barberRed font-bold tracking-widest uppercase text-xs">Nuestro Menú</span>
-          <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mt-2">Servicios <span class="text-transparent bg-clip-text bg-gradient-to-r from-barberRed to-barberBlue dark:from-white dark:to-gray-500">Premium</span></h2>
+          <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mt-2 font-['Bebas_Neue'] tracking-wide">Servicios <span class="text-transparent bg-clip-text bg-gradient-to-r from-barberRed to-barberBlue dark:from-white dark:to-gray-500">Premium</span></h2>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -248,11 +376,11 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1593702295093-d4a3c1b78f02?q=80&w=1200&auto=format&fit=crop" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/assets/j1-CozQ4W5X.jpg" alt="Corte clásico" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">✂️</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Corte Clásico</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Corte Clásico</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Estilo atemporal con tijera y máquina, acabado perfecto.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -262,11 +390,11 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1604917877939-8f5951b47f9c?q=80&w=1200&auto=format&fit=crop" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/assets/j11-BbJifDqT.jpg" alt="Fade" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-barberBlue rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">💈</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Fade / Degradado</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Fade / Degradado</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Transiciones perfectas y modernas para un look nítido.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -276,11 +404,11 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1584582845222-cbb760e09bf9?q=80&w=1200&auto=format&fit=crop" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/assets/j6-CDGb6Tr0.jpg" alt="Barba" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">🧔</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Barba</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Barba</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">Perfilado, toalla caliente y cuidado de la piel.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -290,11 +418,11 @@ inicializarModoOscuro();
           <div class="group relative bg-white dark:glass-card rounded-2xl overflow-hidden shadow-lg dark:shadow-none hover:border-barberRed/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] dark:hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]">
             <div class="h-48 overflow-hidden relative">
               <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent z-10 opacity-80"></div>
-              <img src="https://images.unsplash.com/photo-1605653238859-725b1c7d6f62?q=80&w=1200&auto=format&fit=crop" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
+              <img src="/assets/j2-C4TqFMlb.jpg" alt="Combo" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110">
             </div>
             <div class="p-6 relative z-20 -mt-12">
               <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg mb-4 group-hover:scale-110 transition-transform">👑</div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Corte + Barba</h3>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">Corte + Barba</h3>
               <p class="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">La experiencia completa para renovar tu imagen.</p>
               <a href="login_cliente.html" class="inline-block text-sm font-bold text-barberRed hover:text-white transition-colors">Reservar ➝</a>
             </div>
@@ -303,12 +431,118 @@ inicializarModoOscuro();
       </div>
     </section>
 
+    <!-- Galería Premium (Grid) -->
+    <section class="py-24 bg-white dark:bg-barberBlack transition-colors duration-500">
+      <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+              <h2 class="text-4xl font-extrabold font-['Bebas_Neue'] tracking-wide text-gray-900 dark:text-white">
+                Galería Premium
+              </h2>
+              <p class="text-gray-500 mt-2">
+                Trabajos reales. Resultados reales.
+              </p>
+            </div>
+
+            <div class="gallery-grid">
+              <div class="gallery-card">
+                <img src="/assets/j1-CozQ4W5X.jpg" alt="Corte Premium" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Corte Premium</span>
+                </div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="/assets/j11-BbJifDqT.jpg" alt="Fade moderno" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Fade moderno</span>
+                </div>
+              </div>
+              
+              <div class="gallery-card">
+                <img src="/assets/j12-BorBFnJK.jpg" alt="Corte Premium" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Corte Premium</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="/assets/j13-3mCaB8XX.jpg" alt="Estilo Moderno" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Estilo Moderno</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="/assets/j2-C4TqFMlb.jpg" alt="Diseño exclusivo" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Diseño exclusivo</span>
+                </div>
+              </div>
+              
+              <div class="gallery-card">
+                <img src="/assets/j6-CDGb6Tr0.jpg" alt="Barba premium" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Barba premium</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="/assets/j3-CsfD12Fl.jpg" alt="Ambiente VIP" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Ambiente VIP</span>
+                </div>
+              </div>
+              <div class="gallery-card">
+                <img src="/assets/j1-CozQ4W5X.jpg" alt="Estilo Urbano" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay">
+                  <span>Estilo Urbano</span>
+                </div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="/assets/j15-CtX5uGNt.jpg" alt="Tendencia" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay"><span>Tendencia</span></div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="/assets/j16-BKzRpGlu.jpg" alt="Precisión" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay"><span>Precisión</span></div>
+              </div>
+
+              <div class="gallery-card">
+                <img src="/assets/j17-ClxyfN_v.jpg" alt="Arte" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay"><span>Arte</span></div>
+              </div>
+
+                <div class="gallery-card">
+                <img src="/assets/j18-Cb7NClny.jpg" alt="Tendencia" loading="lazy" onclick="openLightbox(this.src)">
+                <div class="gallery-overlay"><span>Tendencia</span></div>
+              </div>
+
+            </div>
+
+            <!-- Video Section -->
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="gallery-card h-64 md:h-80">
+                <video src="/assets/j7-9-FLkGTi.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>En Movimiento</span></div>
+              </div>
+              <div class="gallery-card h-64 md:h-80">
+                <video src="/assets/j4-DjFzKqT3.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>En Acción</span></div>
+              </div>
+              <div class="gallery-card h-64 md:h-80">
+                <video src="/assets/j5-C04P3iec.mp4" class="w-full h-full object-cover" muted loop playsinline autoplay></video>
+                <div class="gallery-overlay"><span>Técnica</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
     <!-- Cómo funciona -->
     <section class="w-full py-24 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-white/5 transition-colors duration-500">
       <div class="max-w-5xl mx-auto px-6">
         <div class="text-center mb-16">
-          <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">¿Cómo funciona <span class="text-barberRed">TurnoRD</span>?</h2>
-          <p class="text-gray-600 dark:text-gray-400 mt-4">Tu corte en 3 simples pasos.</p>
+          <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">¿Cómo funciona <span class="text-barberRed">TurnoRD</span>?</h2>
+          <p class="text-gray-600 dark:text-gray-400 mt-4">Llega cuando te toca, no cuando te llaman.</p>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
@@ -322,7 +556,7 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">1. Regístrate</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">1. Regístrate</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Crea tu perfil en segundos desde tu celular.</p>
           </div>
 
@@ -333,7 +567,7 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">2. Reserva</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">2. Reserva</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Elige tu barbero y toma un turno o agenda cita.</p>
           </div>
 
@@ -344,8 +578,42 @@ inicializarModoOscuro();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm8.486-8.486a5 5 0 11-7.071 7.071 5 5 0 017.071-7.071z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">3. Relájate</h3>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2 font-['Bebas_Neue'] tracking-wide">3. Relájate</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm px-4">Llega justo a tiempo y disfruta el servicio.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonios Reales -->
+    <section class="w-full py-24 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-white/5 transition-colors duration-500 relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-barberRed to-transparent opacity-50"></div>
+      <div class="max-w-6xl mx-auto px-6 relative z-10">
+        <div class="text-center mb-16 animate-fade-up">
+          <h2 class="text-4xl md:text-5xl font-extrabold mb-4 text-gray-900 dark:text-white font-['Bebas_Neue'] tracking-wide">Lo que dicen nuestros clientes</h2>
+          <p class="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Historias reales de cortes reales.</p>
+        </div>
+
+        <div class="relative max-w-4xl mx-auto bg-white dark:bg-white/5 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-12 border border-gray-100 dark:border-white/10">
+          <!-- Comillas decorativas -->
+          <div class="absolute top-8 left-8 text-6xl text-barberRed opacity-20 font-serif">“</div>
+          
+          <div id="testimonial-carousel" class="relative min-h-[200px] flex items-center justify-center">
+            <!-- Loading -->
+            <div class="animate-pulse flex flex-col items-center">
+              <div class="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+              <div class="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+
+          <!-- Controles -->
+          <div class="flex justify-center gap-4 mt-8">
+            <button id="prev-testimonio" class="p-3 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-barberRed hover:text-white transition-all duration-300 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 dark:text-gray-300 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <button id="next-testimonio" class="p-3 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-barberRed hover:text-white transition-all duration-300 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600 dark:text-gray-300 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -361,11 +629,21 @@ inicializarModoOscuro();
             <div class="w-8 h-8 bg-barberRed rounded-lg flex items-center justify-center text-white font-bold">J</div>
             <span class="font-extrabold">JBarber</span>
           </div>
-          <p class="text-sm text-gray-300">Barbería premium. Estilo y precisión.</p>
+          <p class="text-sm text-gray-300">Más que un corte, una experiencia.</p>
+          <ul class="mt-4 space-y-2 text-sm text-gray-300">
+            <li>⚡ Sin filas eternas</li>
+            <li>📲 Turnos desde tu celular</li>
+            <li>⏱️ Llega justo a tiempo</li>
+          </ul>
+          <p class="text-xs text-gray-400 mt-4">
+            ⭐ Más de 1,000 clientes satisfechos
+          </p>
+          <p class="mt-6 text-sm text-gray-300 italic">“Tu tiempo vale más que una fila.”</p>
           <div class="mt-4 flex gap-3">
-            <button id="btn-install-footer" class="px-5 py-2 bg-barberRed text-white font-bold rounded hover:opacity-90">Descargar App</button>
-            <a href="login_cliente.html" class="px-5 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">Agendar cita</a>
-            <a href="login_cliente.html" class="px-5 py-2 border border-white/30 rounded hover:bg-white hover:text-black transition">Tomar turno</a>
+            <button class="install-trigger px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-full hover:bg-white hover:text-barberBlack transition-all shadow-lg flex items-center gap-2 group">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              📲 Descargar y Tomar Turno
+            </button>
           </div>
         </div>
         <div>
@@ -379,13 +657,25 @@ inicializarModoOscuro();
           </ul>
         </div>
         <div>
-          <h4 class="font-bold mb-3">Redes</h4>
-          <p class="text-sm text-gray-300">Instagram • Facebook</p>
+          <h4 class="font-bold mb-3">Síguenos</h4>
+          <div class="flex gap-4">
+            <a href="#" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gradient-to-tr hover:from-yellow-400 hover:via-red-500 hover:to-purple-500 transition-all duration-300 group" aria-label="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M7.6,4A3.6,3.6 0 0,0 4,7.6V16.4C4,18.39 5.61,20 7.6,20H16.4A3.6,3.6 0 0,0 20,16.4V7.6C20,5.61 18.39,4 16.4,4H7.6M17.25,5.5A1.25,1.25 0 0,1 18.5,6.75A1.25,1.25 0 0,1 17.25,8A1.25,1.25 0 0,1 16,6.75A1.25,1.25 0 0,1 17.25,5.5M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z"/>
+              </svg>
+            </a>
+            <a href="https://wa.me/18295877564" target="_blank" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-[#25D366] transition-all duration-300" aria-label="WhatsApp">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
       <div class="text-center text-xs text-gray-500 mt-6">&copy; 2025 JBarber • TurnoRD</div>
+    
     </footer>
-  </div>
+  
 
   <!-- WhatsApp Button -->
   <a href="https://wa.me/18295877564" target="_blank" class="fixed bottom-6 right-6 z-50 flex items-center justify-center w-16 h-16 bg-[#25D366] text-white rounded-full shadow-[0_0_20px_rgba(37,211,102,0.5)] hover:shadow-[0_0_30px_rgba(37,211,102,0.8)] hover:scale-110 transition-all duration-300 animate-bounce-in group">
@@ -396,6 +686,17 @@ inicializarModoOscuro();
     </span>
   </a>
 
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="fixed inset-0 z-[100] bg-black/95 hidden items-center justify-center p-4 opacity-0 transition-opacity duration-300 backdrop-blur-sm">
+    <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white text-5xl hover:text-barberRed transition-colors">&times;</button>
+    <div class="relative max-w-4xl w-full flex flex-col items-center">
+        <img id="lightbox-img" src="/assets/jjj-D3cvWLYa.png" class="w-full h-auto max-h-[70vh] object-contain rounded-lg shadow-2xl border border-white/10">
+        <a href="login_cliente.html" class="mt-8 px-10 py-4 bg-barberRed text-white font-bold rounded-full text-xl shadow-[0_0_30px_rgba(193,18,31,0.6)] hover:scale-105 transition-transform flex items-center gap-3 animate-bounce-in">
+            RESERVAR ESTE ESTILO 🔥
+        </a>
+    </div>
+  </div>
+
   <!-- Script modo oscuro -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -405,41 +706,7 @@ inicializarModoOscuro();
         localStorage.setItem('modoOscuro', isDarkMode);
       });
 
-      // Lógica del botón de instalación PWA
-      let deferredPrompt;
-      const installBtn = document.getElementById('btn-install-app');
-      const installBtnCta = document.getElementById('btn-install-app-cta');
-      const installBtnHeader = document.getElementById('btn-install-header');
-      const installBtnHero = document.getElementById('btn-install-hero');
-      const installBtnFooter = document.getElementById('btn-install-footer');
-      
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installBtn?.classList.remove('hidden');
-      });
-
-      installBtn?.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          console.log(`Resultado instalación: ${outcome}`);
-          deferredPrompt = null;
-          if(outcome === 'accepted') installBtn.classList.add('hidden');
-        }
-      });
-      const triggerInstall = async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          if(outcome === 'accepted') installBtn?.classList.add('hidden');
-        }
-      };
-      installBtnCta?.addEventListener('click', triggerInstall);
-      installBtnHeader?.addEventListener('click', triggerInstall);
-      installBtnHero?.addEventListener('click', triggerInstall);
-      installBtnFooter?.addEventListener('click', triggerInstall);
+      const negocioId = 'barberia005';
       const slides = document.querySelectorAll('#testimonialsCarousel .carousel-slide');
       const dots = document.querySelectorAll('#testimonialsCarousel .dot');
       if (slides.length) {
@@ -455,29 +722,75 @@ inicializarModoOscuro();
         }, 4000);
       }
 
-      const abejon = document.getElementById('abejon');
-      const carga = document.getElementById('abejon-carga');
-      let dir = 1, x = 0;
-      setInterval(() => {
-        x += dir * 4;
-        if (x > 260 || x < 0) dir *= -1;
-        abejon.style.transform = `translateX(${x}px) perspective(600px) rotateY(${10 * dir}deg)`;
-        carga.style.transform = `translateX(${x}px)`;
-      }, 60);
-
-      // Lógica inteligente para botones "Tomar Turno" / "Agendar Cita"
-      const negocioId = 'barberia005';
-      const authLinks = document.querySelectorAll('a[href="login_cliente.html"]');
-      authLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
-          // Si ya existe sesión, ir directo al panel
-          window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
-        });
+      // --- LÓGICA DE INSTALACIÓN PWA (CORREGIDA) ---
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+      let deferredPrompt;
+      
+      // Escuchar el evento de instalación lo antes posible
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('App lista para instalar');
       });
+
+      // Asignar acción a TODOS los botones de descarga/instalación
+      const installButtons = document.querySelectorAll('.install-trigger, a[download][href="login_cliente.html"]');
+      installButtons.forEach(btn => {
+          btn.addEventListener('click', async () => {
+              try {
+                  if (deferredPrompt) {
+                      // Si se puede instalar, mostramos el prompt nativo
+                      deferredPrompt.prompt();
+                      const { outcome } = await deferredPrompt.userChoice;
+                      deferredPrompt = null;
+                      // Tras el prompt, si no se instaló o en cualquier caso, garantizamos el flujo hacia login_cliente.html
+                      // para empezar el proceso de acceso inmediatamente.
+                      if (outcome !== 'accepted') {
+                        window.location.href = 'login_cliente.html';
+                        return;
+                      }
+                      // Si el usuario aceptó, algunos navegadores no abren inmediatamente la app instalada.
+                      // Redirigimos también al flujo de login para esta sesión actual.
+                      window.location.href = 'login_cliente.html';
+                      return;
+                  }
+
+                  // Si no hay prompt disponible (ya instalada o no compatible), llevar directo a login_cliente.html
+                  // Si prefieres saltar al panel si ya existe sesión, descomenta las 2 líneas siguientes y comenta la redirección fija.
+                  // const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
+                  // window.location.href = clienteId ? 'panel_cliente.html' : 'login_cliente.html';
+                  window.location.href = 'login_cliente.html';
+                  return;
+              } finally {
+                  const overlay = document.getElementById('downloadOverlay');
+                  overlay?.classList.remove('hidden');
+                  overlay?.classList.add('flex');
+                  setTimeout(() => {
+                    overlay?.classList.add('hidden');
+                    overlay?.classList.remove('flex');
+                  }, 2000);
+              }
+          });
+      });
+
     });
   </script>
 
+  <div id="downloadOverlay" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm items-center justify-center p-6">
+    <div class="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-8 text-center shadow-2xl">
+      <img src="/assets/jjj-D3cvWLYa.png" alt="JBarber" class="w-16 h-16 rounded-lg mx-auto mb-4 shadow-lg shadow-red-500/30 object-cover">
+      <h3 class="text-white font-extrabold text-2xl tracking-tight">Se está descargando JBarber</h3>
+      <p class="text-white/80 text-sm mt-2">Mantén la ventana abierta mientras preparamos tu acceso.</p>
+      <div class="mt-4 flex items-center justify-center gap-2 text-white/80">
+        <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
+          <path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75"></path>
+        </svg>
+        <span class="text-sm">Descargando…</span>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -85,8 +85,8 @@ serve(async (req) => {
     const payload = JSON.stringify({
       title: title || "¡Es tu turno!",
       body: body || "Un barbero te está esperando",
-      icon: "/android-chrome-192x192.png",
-      badge: "/jbarber/jjj.png",
+      icon: "jbarber/jjj.png",
+      badge: "imegenlogin/favicon-32x32.png",
       vibrate: [200, 100, 200],
       data: {
         url: (typeof clickUrl === 'string' && clickUrl.length > 0) ? clickUrl : "/panel_cliente.html",
