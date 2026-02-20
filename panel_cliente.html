@@ -7,6 +7,13 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+  
+  <!-- Optimización de Carga -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://wjvwjirhxenotvdewbmm.supabase.co">
+
   <!-- Inicializar Dark Mode antes de render -->
   <script>
     if (localStorage.getItem('modoOscuro') === 'true') {
@@ -18,18 +25,52 @@
     import { ensureSupabase } from './database.js';
     async function verificarSesion() {
       const supabase = await ensureSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         window.location.href = 'login_cliente.html';
+        return null; // No user, stop here
+      }
+      return user;
+    }
+
+    async function ensureProfileExists(user) {
+      if (!user) return;
+
+      const supabase = await ensureSupabase();
+      const negocioId = 'barberia005';
+
+      // Check if a profile exists for the user
+      const { data: profile, error } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      // If profile exists or there was a non-406 error, do nothing.
+      if (profile || (error && error.code !== 'PGRST116')) {
+        return;
+      }
+
+      // Profile does not exist, let's create it.
+      console.warn(`Profile for user ${user.id} not found. Creating a fallback profile.`);
+      const { error: insertError } = await supabase.from('clientes').insert({
+        id: user.id,
+        email: user.email,
+        nombre: user.user_metadata?.nombre || 'Cliente',
+        telefono: user.user_metadata?.telefono,
+        negocio_id: negocioId,
+      });
+
+      if (insertError) {
+        console.error('Error creating fallback profile:', insertError);
       }
     }
-    verificarSesion();
+
+    verificarSesion().then(ensureProfileExists);
   </script>
   <script src="admin/tailwind-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Fuentes: Outfit + Playfair (toque elegante) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -52,29 +93,100 @@
 
     /* Tarjetas premium */
     .bento-card {
-      background: #ffffff;
-      border: 1px solid rgba(0,0,0,0.05);
+      background: linear-gradient(145deg, #ffffff, #f1f1f1);
+      border: 1px solid rgba(0,0,0,0.04);
       box-shadow: 
-        0 1px 2px rgba(0,0,0,0.04);
+        0 4px 20px rgba(0,0,0,0.05),
+        0 1px 2px rgba(0,0,0,0.03);
       transition: all 0.3s ease-in-out;
       border-radius: 24px;
     }
 
     .dark .bento-card {
-      background: #111113;
-      border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: none;
+      background: linear-gradient(145deg, #111113, #0e0e10);
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: 
+        0 8px 30px rgba(0,0,0,0.6);
     }
 
     .bento-card:hover {
-      transform: translateY(-4px);
-      border-color: rgba(0,0,0,0.1);
-      box-shadow: 
-        0 4px 12px rgba(0,0,0,0.08);
+      transform: translateY(-6px);
     }
     
-    .dark .bento-card:hover {
-       border-color: rgba(255,255,255,0.2);
+    :root {
+      --primary: #C1121F;
+      --primary-soft: rgba(193,18,31,0.1);
+      --barberBlack: #0B0B0B;
+      --barberRed: #C1121F;
+      --barberBlue: #003049;
+      --barberWhite: #F8F9FA;
+    }
+    .dark {
+      --primary: #3B82F6;
+      --primary-soft: rgba(59,130,246,0.15);
+    }
+    .title-text { color: #111111; }
+    .dark .title-text { color: #F5F5F5; }
+    .subtitle-text { color: rgba(0,0,0,0.6); }
+    .dark .subtitle-text { color: rgba(255,255,255,0.7); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { filter: brightness(0.9); }
+    .icon-active { color: var(--primary); }
+    .barber-hero {
+      background: radial-gradient(circle at top left, rgba(193,18,31,0.16) 0, transparent 55%), radial-gradient(circle at bottom right, rgba(0,48,73,0.22) 0, transparent 55%), linear-gradient(145deg, #0B0B0B, #111827);
+    }
+    .barber-hero-light {
+      background: radial-gradient(circle at top left, rgba(193,18,31,0.12) 0, transparent 55%), radial-gradient(circle at bottom right, rgba(0,48,73,0.16) 0, transparent 55%), linear-gradient(145deg, #FFFFFF, #F8F9FA);
+    }
+    .barber-chip {
+      background: rgba(11,11,11,0.9);
+      color: #F8F9FA;
+    }
+    .dark .barber-chip {
+      background: rgba(248,249,250,0.07);
+      color: #F8F9FA;
+    }
+    .barber-promo-card {
+      background: linear-gradient(135deg, rgba(193,18,31,0.08), rgba(0,48,73,0.06));
+      border: 1px solid rgba(193,18,31,0.18);
+    }
+    .dark .barber-promo-card {
+      background: linear-gradient(135deg, rgba(193,18,31,0.24), rgba(0,48,73,0.3));
+      border-color: rgba(248,249,250,0.12);
+    }
+    .barber-poster-2d {
+      transform-origin: center;
+      transition: transform .4s ease, box-shadow .4s ease;
+    }
+    .barber-poster-2d:hover {
+      transform: translateY(-8px) scale(1.03);
+      box-shadow: 0 25px 60px rgba(0,0,0,0.35);
+    }
+    .barber-poster-3d {
+      transform-style: preserve-3d;
+      perspective: 1000px;
+      transition: transform .5s ease, box-shadow .5s ease;
+    }
+    .barber-poster-3d:hover {
+      transform: rotateX(8deg) rotateY(-10deg) translateY(-10px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+    }
+    .barber-pill {
+      background: rgba(11,11,11,0.85);
+      color: #F8F9FA;
+    }
+    .dark .barber-pill {
+      background: rgba(248,249,250,0.1);
+      color: #F8F9FA;
+    }
+    
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(0,0,0,0.08), transparent);
+      margin: 30px 0;
+    }
+    .dark .section-divider {
+      background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
     }
 
     /* Tipografías de titulares */
@@ -89,6 +201,18 @@
     .animate-fade-in { animation: fadeIn .5s ease-out forwards }
     @keyframes fadeInScale { from { opacity: 0; transform: scale(.96)} to { opacity:1; transform: scale(1)} }
     .slot-enter { animation: fadeInScale .25s ease-out forwards; opacity:0 }
+    
+    /* Tap Feedback para Móvil */
+    .tap-scale { transition: transform 0.15s ease; }
+    .tap-scale:active { transform: scale(0.96); }
+
+    /* Transición de Pestañas */
+    .tab-panel {
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s ease;
+    }
+    .tab-panel.active { opacity: 1; transform: translateY(0); }
 
     .slot-selected { background-color: #C1121F !important; color: #fff !important; transform: scale(1.04); border-color: #C1121F !important }
 
@@ -114,6 +238,71 @@
     /* Mobile nav refinado */
     .mobile-icon { opacity: .6; transition: transform .2s ease, opacity .2s ease }
     .nav-item.active .mobile-icon { opacity: 1; transform: translateY(-2px) scale(1.08) }
+
+    /* --- MEJORAS VISUALES PREMIUM --- */
+    
+    /* Textura de Ruido (Efecto Papel/Premium) */
+    .bg-noise {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; opacity: 0.04;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* Navegación Flotante (Dock Style) */
+    .floating-dock {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15);
+    }
+    .dark .floating-dock {
+        background: rgba(20, 20, 23, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+    }
+    @keyframes logoReveal {
+      0% { opacity: 0; transform: scale(.8); filter: blur(10px); }
+      60% { transform: scale(1.05); }
+      100% { opacity: 1; transform: scale(1); filter: blur(0); }
+    }
+    .logo-animate {
+      animation: logoReveal .8s ease-out forwards;
+    }
+    .promo-shine::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(120deg, transparent, rgba(255,255,255,.4), transparent);
+      transform: skewX(-20deg);
+      pointer-events: none;
+    }
+    .promo-shine:hover::after {
+      animation: shine 1s forwards;
+    }
+    @keyframes shine {
+      to { left: 150%; }
+    }
+    @keyframes ambientGlow {
+      0%, 100% { opacity: .6; }
+      50% { opacity: 1; }
+    }
+    .ambient-light {
+      animation: ambientGlow 4s ease-in-out infinite;
+    }
+    @keyframes poleSpin {
+      from { transform: rotateY(0deg); }
+      to { transform: rotateY(360deg); }
+    }
+    .barber-pole-3d {
+      animation: poleSpin 6s linear infinite;
+      transform-style: preserve-3d;
+    }
+    .page-enter {
+      animation: fadeIn .4s ease forwards;
+    }
   </style>
 </head>
 <body class="text-[#111111] dark:text-[#F5F5F5] transition-colors duration-300 font-sans antialiased selection:bg-black selection:text-white dark:selection:bg-white dark:selection:text-black relative">
@@ -147,6 +336,9 @@
     .animate-float-fast { animation: float-fast 4s ease-in-out infinite; }
   </style>
 
+  <!-- Textura Premium -->
+  <div class="bg-noise"></div>
+
   <!-- Decoración de Fondo (Barbería) -->
   <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-5 dark:opacity-10">
       <!-- Tijeras -->
@@ -170,40 +362,31 @@
     </div>
   </div>
 
-  <!-- Navbar -->
-  <nav class="bg-white dark:bg-[#0B0B0C]
-            border-b border-gray-200 dark:border-white/5
-            sticky top-0 z-50 block">
+  <nav class="bg-[#0B0B0B] border-b border-black/40 sticky top-0 z-50 block">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16 md:h-20">
-        <!-- Logo -->
         <div class="flex-shrink-0">
           <a href="#" class="flex items-center gap-2" onclick="mostrarSeccion('inicio'); return false;">
-            <img class="h-8 w-auto rounded-lg shadow-sm" src="jbarber/jjj.png" alt="Logo">
-            <span class="font-display text-xl md:text-2xl font-bold tracking-tight text-[#111111] dark:text-white">
-              JBarber <span class="text-[#C1121F]">•</span>
+            <img class="logo-animate h-9 w-auto rounded-lg shadow-sm" src="jbarber/jjj.png" alt="Logo">
+            <span class="font-display text-xl md:text-2xl font-bold tracking-tight text-white">
+              JBarber <span class="text-[#C1121F]">•</span> Flow
             </span>
           </a>
         </div>
 
-        <!-- Desktop Navigation -->
-        <div class="hidden md:flex items-center gap-1 bg-[#F8F8F9] dark:bg-[#111113] p-1 rounded-full border border-black/5 dark:border-white/10">
-           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-white/10 transition-all" data-tab="inicio">Inicio</button>
-           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-white/10 transition-all" data-tab="turno">Turno</button>
-           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-white/10 transition-all" data-tab="cita">Citas</button>
-           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-white/10 transition-all" data-tab="perfil">Perfil</button>
+        <div class="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10">
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all" data-tab="inicio">Inicio</button>
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all" data-tab="cita">Agendar</button>
+           <button class="nav-link px-5 py-2 rounded-full text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all" data-tab="perfil">Perfil</button>
         </div>
 
-        <!-- Right Side -->
         <div class="flex items-center gap-4">
-          <!-- Profile -->
           <div class="relative">
             <div id="nav-profile-toggle" class="flex items-center gap-3 cursor-pointer group">
               <img id="nav-avatar" src="https://ui-avatars.com/api/?name=U&background=C1121F&color=fff" class="w-8 h-8 md:w-9 md:h-9 rounded-full ring-2 ring-[#C1121F]/50 group-hover:ring-[#C1121F] transition-all object-cover shadow-md">
-              <span id="nav-name" class="hidden md:block font-medium text-sm text-[#111111] dark:text-[#F5F5F5]">Cargando...</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-black/40 dark:text-white/40 group-hover:text-black dark:group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+              <span id="nav-name" class="hidden md:block font-medium text-sm text-white">Cargando...</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white/50 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </div>
-            <!-- Dropdown Menu -->
             <div id="profile-menu"
      class="hidden absolute top-12 md:top-14 right-0 w-64
             bg-white dark:bg-[#111113]
@@ -219,10 +402,6 @@
               <p class="text-xs text-black/60 dark:text-white/60 truncate" id="menu-profile-phone">...</p>
             </div>
             <div class="py-1">
-              <a id="menu-go-turno" href="#" class="flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 text-sm text-black/80 dark:text-white/80 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <span>Mi Turno</span>
-              </a>
               <a id="menu-go-perfil" href="#" class="flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 text-sm text-black/80 dark:text-white/80 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 <span>Mi Perfil</span>
@@ -248,50 +427,95 @@
   </nav>
 
   <!-- Botón Flotante Modo Oscuro (Solo Inicio) -->
-  <button id="floating-theme-toggle" class="fixed top-20 md:top-24 right-4 z-40 w-10 h-10 bg-white dark:bg-[#111113] border border-gray-200 dark:border-white/10 rounded-full shadow-xl flex items-center justify-center text-gray-900 dark:text-white hover:scale-110 transition-transform hidden">
+  <button id="floating-theme-toggle" class="tap-scale fixed top-20 md:top-24 right-4 z-40 w-10 h-10 bg-white dark:bg-[#111113] border border-gray-200 dark:border-white/10 rounded-full shadow-xl flex items-center justify-center text-gray-900 dark:text-white hover:scale-110 transition-transform">
     <!-- El icono se inyecta vía JS -->
   </button>
 
   <main class="max-w-md mx-auto md:max-w-7xl px-4 py-6 space-y-6 relative z-10 pb-24 md:pb-6">
     
-    <!-- Banner Marketing (Template para clonar) -->
     <div id="banner-marketing-template" class="hidden bento-card relative overflow-hidden p-6 md:p-8 group transition-all duration-500 mb-6 promo-shine">
-      <!-- Línea superior premium -->
-      <div class="absolute top-0 left-0 w-full h-[3px] bg-[#C1121F]"></div>
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
       
-      <!-- Fondo mejorado para legibilidad -->
-      <div class="absolute inset-0 
-            bg-gradient-to-br 
-            from-black 
-            via-[#111113] 
-            to-[#1a1a1f] 
-            z-0 banner-bg">
-      </div>
+      <div class="absolute inset-0 bg-gradient-to-br from-barberBlack via-[#1A1A1F] to-[#0F0F12] z-0 banner-bg"></div>
       
-      <!-- Glow sutil -->
-      <div class="absolute -top-20 -right-20 w-60 h-60 bg-[#C1121F]/10 blur-3xl rounded-full"></div>
+      <div class="absolute -top-20 -right-20 w-60 h-60 bg-barberRed/20 blur-3xl rounded-full"></div>
       
-      <!-- Contenido -->
-      <div class="relative z-10">
-        <div class="inline-flex items-center gap-2 bg-[#C1121F]/15 text-[#C1121F] border border-[#C1121F]/30 rounded-full px-3 py-1 text-xs font-bold mb-4 shadow-md"><span class="banner-badge">Cliente VIP</span></div>
-        <h2 class="banner-title text-3xl md:text-4xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-md">Bienvenido</h2>
-        <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm">Gestiona tus citas y turnos.</p>
+      <div class="relative z-10 banner-content-wrapper">
       </div>
     </div>
 
-    <!-- Contenedores de Pestañas -->
-    <div id="tab-inicio-panel" class="animate-fade-in">
-        <!-- Aquí se inyectará el contenido dinámico de Inicio -->
+    <div id="tab-inicio-panel" class="animate-fade-in space-y-6">
+        <section class="rounded-3xl overflow-hidden relative barber-hero-light dark:barber-hero px-6 py-7 md:px-10 md:py-10 text-[#0B0B0B] dark:text-white shadow-xl">
+          <div class="absolute inset-0 pointer-events-none opacity-10">
+            <div class="ambient-light absolute -top-10 -right-10 w-52 h-52 rounded-full bg-barberRed/40 blur-3xl"></div>
+            <div class="ambient-light absolute -bottom-10 -left-10 w-60 h-60 rounded-full bg-barberBlue/35 blur-3xl"></div>
+          </div>
+          <div class="relative z-10 grid md:grid-cols-[1.6fr,1.1fr] gap-8 items-center">
+            <div class="space-y-4">
+              <div class="inline-flex items-center gap-2 barber-pill px-4 py-1 rounded-full text-[11px] font-semibold tracking-wide uppercase">
+                <span>Flow dominicano</span>
+                <span class="w-1 h-1 rounded-full bg-[#C1121F]"></span>
+                <span>Reserva sin hacer fila</span>
+              </div>
+              <h1 class="text-3xl md:text-4xl xl:text-5xl font-display font-bold leading-tight tracking-tight">
+                Cita lista pa' la calle,<br>
+                sin buidero ni fila.
+              </h1>
+              <p class="text-sm md:text-base max-w-xl text-black/70 dark:text-gray-200">
+                Elige tu hora, tu barbero y llega fresh. Tu turno se respeta y el tiempo también.
+              </p>
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <button onclick="switchTab('cita')" class="tap-scale inline-flex items-center justify-center px-6 py-3 rounded-full bg-[#C1121F] text-white text-sm md:text-base font-bold shadow-xl shadow-red-900/30 hover:scale-[1.02] transition-transform gap-2">
+                  <span>Agendar ahora</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                </button>
+                <button onclick="switchTab('inicio')" class="tap-scale inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-white/90 dark:bg-white/5 text-xs md:text-sm font-semibold border border-black/5 dark:border-white/10 text-black dark:text-white">
+                  Ver mi estado en la fila
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center justify-center">
+              <div class="relative w-full max-w-xs">
+                <div class="absolute -top-6 -left-4 px-3 py-1 rounded-full barber-chip text-[11px] font-semibold shadow-lg flex items-center gap-1">
+                  <span class="text-[#C1121F]">●</span>
+                  Disponible hoy
+                </div>
+                <div class="absolute -bottom-6 -right-2 px-3 py-1 rounded-full bg-white/90 dark:bg-black text-[11px] font-semibold shadow-lg flex items-center gap-1">
+                  <span class="text-xs">⏱</span>
+                  Evita esperas largas
+                </div>
+                <div class="barber-poster-3d rounded-3xl bg-[#0B0B0B] border border-white/10 overflow-hidden shadow-2xl">
+                  <div class="relative h-52 bg-gradient-to-br from-barberRed via-[#111827] to-barberBlue flex items-end">
+                    <div class="absolute inset-0 opacity-20 barber-pole-bg-animated"></div>
+                    <div class="relative z-10 p-5 space-y-2">
+                      <p class="text-xs uppercase tracking-[0.2em] text-gray-200">Session ready</p>
+                      <p class="text-xl font-display font-bold text-white leading-tight">Barbería JBarber</p>
+                      <p class="text-[11px] text-gray-200/90">Flow limpio, navaja fina y cita asegurada.</p>
+                    </div>
+                  </div>
+                  <div class="bg-[#0B0B0B] px-5 py-4 flex items-center justify-between">
+                    <div>
+                      <p class="text-[11px] uppercase text-gray-400 font-semibold tracking-wide">Próxima ventana</p>
+                      <p class="text-sm font-semibold text-white">Hoy • agenda tu flow</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-[11px] text-gray-400 font-semibold">Desde</p>
+                      <p class="text-lg font-black text-[#C1121F]">RD$ 0</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-center py-3 bg-black/80">
+                    <div class="w-10 h-10 rounded-full overflow-hidden border border-white/30 flex items-center justify-center barber-pole-3d">
+                      <div class="w-8 h-8 rounded-full barber-pole-bg-animated"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         <div id="inicio-promo-container"></div>
-        <div id="inicio-cita-card-container"></div> <!-- Contenedor para tarjeta de cita en inicio -->
-        <div id="inicio-status-container" class="grid grid-cols-1 gap-4 mt-6">
-            <!-- Cards de estado (se moverán aquí vía JS o duplicadas) -->
-        </div>
-    </div>
-
-    <div id="tab-turno-panel" class="hidden animate-fade-in">
-        <div id="turno-promo-container"></div>
-        <!-- Contenido Turno -->
+        <div id="inicio-cita-card-container"></div>
+        <div id="inicio-status-container" class="grid grid-cols-1 gap-4 mt-4"></div>
     </div>
 
     <div id="tab-cita-panel" class="hidden animate-fade-in">
@@ -365,21 +589,17 @@
   </main>
 
   <!-- Bottom Navigation (Mobile Only) -->
-  <div class="md:hidden fixed bottom-0 left-0 z-50 w-full bg-white dark:bg-[#0B0B0C] border-t border-black/5 dark:border-white/10 backdrop-blur pb-safe">
-    <div class="flex justify-around items-center h-16">
-      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="inicio">
+  <div class="md:hidden fixed bottom-6 left-4 right-4 z-50">
+    <div class="floating-dock rounded-2xl flex justify-around items-center h-16 px-2">
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-black/60 dark:text-white/70 transition-all" data-tab="inicio">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
         <span class="text-[11px] font-semibold">Inicio</span>
       </button>
-      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="turno">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        <span class="text-[11px] font-semibold">Turno</span>
-      </button>
-      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="cita">
+      <button class="nav-item tap-scale flex flex-col items-center justify-center w-full h-full text-black/60 dark:text-white/70 transition-all" data-tab="cita">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-        <span class="text-[11px] font-semibold">Citas</span>
+        <span class="text-[11px] font-semibold">Agendar</span>
       </button>
-      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-500 transition-all" data-tab="perfil">
+      <button class="nav-item flex flex-col items-center justify-center w-full h-full text-black/60 dark:text-white/70 transition-all" data-tab="perfil">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1 mobile-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
         <span class="text-[11px] font-semibold">Perfil</span>
       </button>

@@ -384,6 +384,9 @@ CREATE TABLE IF NOT EXISTS public.citas (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Migración: Asegurar que la columna servicio exista si la tabla ya fue creada anteriormente
+ALTER TABLE public.citas ADD COLUMN IF NOT EXISTS servicio TEXT;
+
 ALTER TABLE public.citas ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.citas DROP CONSTRAINT IF EXISTS citas_no_overlap;
@@ -591,3 +594,44 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+-- Función RPC mejorada con bloqueo transaccional para evitar Doble Reserva
+CREATE OR REPLACE FUNCTION public.programar_cita(
+  p_negocio_id TEXT,
+  p_barber_id BIGINT,
+  p_cliente_telefono TEXT,
+  p_start TIMESTAMPTZ,
+  p_end TIMESTAMPTZ,
+  p_servicio TEXT DEFAULT NULL
+) RETURNS public.citas AS $$
+DECLARE
+  conflicto_turno INTEGER;
+  nueva public.citas;
+BEGIN
+  -- 1. BLOQUEO FUERTE: Bloquear el registro del barbero para serializar transacciones
+  -- Esto obliga a que las reservas para este barbero se procesen una por una.
+  PERFORM 1 FROM public.barberos WHERE id = p_barber_id FOR UPDATE;
+
+  -- 2. Validar conflicto con turnos en atención (Bloqueo dinámico)
+  SELECT COUNT(*) INTO conflicto_turno
+  FROM public.turnos t
+  WHERE t.negocio_id = p_negocio_id
+    AND t.barber_id = p_barber_id
+    AND t.estado = 'En atención'
+    AND t.started_at IS NOT NULL
+    -- Verificar solapamiento de rangos de tiempo
+    AND tstzrange(t.started_at, COALESCE(t.ended_at, t.started_at + INTERVAL '3 hours')) && tstzrange(p_start, p_end);
+
+  IF conflicto_turno > 0 THEN
+    RAISE EXCEPTION 'El barbero está atendiendo un turno en este momento y no puede recibir citas.';
+  END IF;
+
+  -- 3. Insertar cita (La restricción EXCLUDE en la tabla citas manejará solapamientos de citas)
+  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
+  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
+  RETURNING * INTO nueva;
+
+  RETURN nueva;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

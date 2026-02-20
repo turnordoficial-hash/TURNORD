@@ -75,6 +75,10 @@
     .turn-card-espera.opacity-50 {
       cursor: grabbing;
     }
+    /* Estilos para la Agenda Inteligente */
+    .timeline-hour { height: 80px; } /* 1 hora = 80px */
+    .timeline-grid { background-size: 100% 80px; background-image: linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px); }
+    .dark .timeline-grid { background-image: linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px); }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200" data-negocio-id="barberia005">
@@ -156,7 +160,7 @@
     <main class="flex-1 md:ml-0 p-4 sm:p-6 pt-4 w-full max-w-full overflow-x-hidden">
       <div class="max-w-[1600px] mx-auto w-full space-y-3">
         <div class="flex justify-between items-center mb-6 mt-2">
-          <h1 class="text-2xl font-bold">Gestión de Turnos</h1>
+          <h1 class="text-2xl font-bold">Agenda Inteligente</h1>
           <div class="text-sm text-gray-600 dark:text-gray-400">
             <span id="fecha-actual"></span> | <span id="hora-actual"></span>
             <div class="mt-1 text-green-600 dark:text-green-400 font-black text-lg flex items-center gap-2">
@@ -166,8 +170,8 @@
           </div>
         </div>
 
-        <!-- Tarjetas de información -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 w-full">
+        <!-- Tarjetas de información (OCULTAS POR REQUERIMIENTO NO COLA) -->
+        <div class="hidden grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 w-full">
         <!-- Turno actual -->
         <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm transition-all hover:shadow-md border border-gray-100 dark:border-white/5 w-full">
           <div class="flex justify-between items-start">
@@ -209,8 +213,8 @@
         </div>
       </div>
 
-      <!-- Botones de acción -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 w-full">
+      <!-- Botones de acción (MODIFICADO PARA AGENDA) -->
+      <div class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 w-full">
         <!-- Botón Atender (Grande) -->
         <button id="btnAtender" class="col-span-2 md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3 group transform hover:scale-[1.02]">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -232,7 +236,7 @@
           Nuevo Turno
         </button>
         
-        <button id="btnDevolver" class="bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 group">
+        <button id="btnDevolver" class="hidden bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 group">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -397,7 +401,7 @@
       </div>
 
       <!-- Turnos en Atencion -->
-      <div id="contenedor-atencion" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3 border border-green-500/20">
+      <div id="contenedor-atencion" class="hidden bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3 border border-green-500/20">
         <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -410,7 +414,7 @@
       </div>
 
       <!-- Lista de turnos en espera -->
-      <div id="contenedor-lista-espera" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
+      <div id="contenedor-lista-espera" class="hidden bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -456,17 +460,41 @@
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
+      <!-- AGENDA INTELIGENTE (TIMELINE) -->
+      <div class="bg-white dark:bg-zinc-900 p-0 rounded-2xl shadow-xl mb-6 border border-gray-200 dark:border-zinc-800 overflow-hidden">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z" />
-            </svg>
-            Citas de Hoy
-          </h2>
-          <span id="contador-citas-hoy" class="bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs font-medium px-2.5 py-0.5 rounded-full">0 citas</span>
+          <div class="p-4 flex items-center gap-3">
+             <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-6H3v6a2 2 0 002 2z" />
+                </svg>
+                Agenda de Hoy
+             </h2>
+             <span id="contador-citas-hoy" class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full">0 citas</span>
+          </div>
+          <div class="p-4">
+             <button onclick="abrirModalCitaManual()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Agregar Cita Manual
+             </button>
+          </div>
         </div>
-        <div id="listaCitasHoy" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        
+        <!-- Timeline Container -->
+        <div class="flex h-[960px] overflow-y-auto relative border-t border-gray-200 dark:border-zinc-800 custom-scrollbar">
+            <!-- Sidebar Horas -->
+            <div id="timeline-hours" class="w-20 flex-shrink-0 bg-gray-50 dark:bg-zinc-900/50 border-r border-gray-200 dark:border-zinc-800 text-xs font-bold text-gray-400 text-center pt-2 select-none">
+                <!-- Generado por JS -->
+            </div>
+            <!-- Area de Bloques -->
+            <div id="agenda-slots" class="flex-1 relative timeline-grid bg-white dark:bg-zinc-900">
+                <!-- Bloques generados por JS -->
+                <!-- Línea de tiempo actual -->
+                <div id="current-time-line" class="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none hidden" style="top: 0;">
+                    <div class="absolute -left-2 -top-1.5 w-3 h-3 bg-red-500 rounded-full"></div>
+                </div>
+            </div>
+        </div>
       </div>
 
       <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
@@ -482,7 +510,7 @@
         <div id="listaCitasFuturas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
+      <div class="hidden bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -502,6 +530,44 @@
         <p class="text-xs">Hecho por <strong class="text-white">LUIS ALFREDO CABRERA REYES</strong></p>
       </div>
     </footer>
+    </div>
+  </div>
+
+  <!-- Modal Nueva Cita Manual -->
+  <div id="modalNuevaCita" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-[60] transition-opacity duration-300">
+    <div class="bg-white dark:bg-zinc-900 p-8 rounded-2xl w-full max-w-md shadow-2xl transform transition-all border border-gray-200 dark:border-zinc-800">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold dark:text-white">Nueva Cita</h2>
+        <button onclick="cerrarModalCitaManual()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <form id="formCitaManual" class="space-y-5">
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cliente</label>
+            <input type="text" id="cita-nombre" required class="w-full p-3 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nombre del cliente">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono</label>
+            <input type="tel" id="cita-telefono" required class="w-full p-3 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Teléfono">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Servicio</label>
+            <select id="cita-servicio" required class="w-full p-3 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">Seleccionar...</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Hora de Inicio</label>
+            <select id="cita-hora" required class="w-full p-3 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">Cargando horarios...</option>
+            </select>
+        </div>
+        <div class="pt-4 flex gap-3">
+            <button type="button" onclick="cerrarModalCitaManual()" class="flex-1 py-3 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors">Cancelar</button>
+            <button type="submit" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all">Guardar Cita</button>
+        </div>
+      </form>
     </div>
   </div>
 

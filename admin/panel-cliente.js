@@ -3,26 +3,44 @@ import { ensureSupabase } from '../database.js';
 const negocioId = 'barberia005';
 const supabase = await ensureSupabase();
 
-// FIX: Handle Invalid Refresh Token error on startup
-const { error: authError } = await supabase.auth.getSession();
-if (authError && (authError.message.includes('Refresh Token') || authError.message.includes('Invalid'))) {
-    console.error('Session error:', authError);
+// Estado centralizado para la aplicación, eliminando variables globales.
+const appState = {
+  user: null,
+  profile: null,
+  barbers: [],
+  hasActiveTurn: false,
+  hasActiveAppointment: false,
+  selectedTimeSlot: null,
+  suggestedTime: null,
+  serviceDuration: 30,
+};
+
+// Obtener usuario desde la sesión como fuente de verdad, no desde localStorage.
+const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+
+if (sessionError || !user) {
+    console.error('Authentication error or no user session:', sessionError?.message);
+    // Limpiar datos locales potencialmente corruptos.
     localStorage.removeItem(`cliente_id_${negocioId}`);
     localStorage.removeItem(`cliente_telefono_${negocioId}`);
     window.location.href = 'login_cliente.html';
+    throw new Error("No user session found."); // Detener ejecución del script.
 }
 
-const clienteId = localStorage.getItem(`cliente_id_${negocioId}`);
+appState.user = user;
+const clienteId = appState.user.id; // Usar ID de usuario desde la sesión segura.
+
 let serviciosCache = {};
+let preciosCache = {};
 let configCache = null;
 let diasOperacionNum = [];
 
 // --- SISTEMA DE CACHÉ ROBUSTO ---
 const CACHE_TTL = {
-  PROFILE: 60,   // 1 hora
+  PROFILE: 60,    // 1 hora
   SERVICES: 1440, // 24 horas
-  CONFIG: 60,    // 1 hora
-  BARBERS: 60    // 1 hora
+  CONFIG: 60,     // 1 hora
+  BARBERS: 60     // 1 hora
 };
 
 function getCache(key) {
@@ -57,16 +75,6 @@ function animateNumber(el, to, duration = 500) {
   requestAnimationFrame(step);
 }
 
-const bannerContentDefault = [
-  { title: '✂️ Consejo del día', text: 'No te laves el cabello justo después del corte. Espera al menos 24 horas para que el estilo se asiente.', badge: 'Tip Pro' },
-  { title: '🤯 ¿Sabías que...?', text: 'El cabello crece en promedio 1.25 cm al mes. ¡Mantén tu corte fresco cada 3 semanas!', badge: 'Curiosidad' },
-  { title: '💈 Servicio Premium', text: 'Prueba nuestro tratamiento de toalla caliente. Relajación total para tu piel.', badge: 'Recomendado' },
-  { title: '🌙 Dato Curioso', text: 'La barba crece más rápido de noche debido a la relajación del cuerpo.', badge: 'Sabías que' },
-  { title: '🔥 Promoción', text: 'Trae a un amigo y obtén un 10% de descuento en tu próximo corte.', badge: 'Oferta' },
-  { title: '🧔 Cuidado de Barba', text: 'Usa aceite para barba diariamente para evitar la picazón y mantenerla suave.', badge: 'Tip Barba' },
-  { title: '🚿 Agua Fría', text: 'Enjuagar tu cabello con agua fría al final del baño ayuda a cerrar las cutículas y dar brillo.', badge: 'Tip Salud' }
-];
-
 function getSaludo() {
   const hora = new Date().getHours();
   if (hora < 12) return 'Buenos días';
@@ -78,46 +86,75 @@ function updateBanner(mode = 'default') {
   const bannerInicio = document.getElementById('banner-inicio');
   if (!bannerInicio) return;
 
-  let content;
-  const bgDiv = bannerInicio.querySelector('.banner-bg');
-
-  const nombreUsuario = document.getElementById('profile-name')?.textContent || 'Cliente';
-  const primerNombre = nombreUsuario.split(' ')[0];
-  const saludo = getSaludo();
+  const contentWrapper = bannerInicio.querySelector('.banner-content-wrapper');
+  let htmlContent = '';
+  const day = new Date().getDay(); // 0 = Domingo, 1 = Lunes...
 
   if (mode === 'active_turn') {
-    content = {
-      title: '✂️ Tu barbero está trabajando',
-      text: 'Estamos avanzando con los turnos. Mantente atento a tu posición.',
-      badge: 'En Curso 🔥'
-    };
+    htmlContent = `
+        <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent z-0"></div>
+        <div class="relative z-10">
+            <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full px-3 py-1 text-[10px] font-bold mb-4 shadow-lg uppercase tracking-widest"><span class="banner-badge">En Curso 🔥</span></div>
+            <h2 class="banner-title text-3xl md:text-5xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-xl leading-none">Tu barbero está <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">trabajando</span></h2>
+            <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm mb-2">Estamos avanzando con los turnos. Mantente atento.</p>
+        </div>
+    `;
   } else if (mode === 'available') {
-    content = {
-      title: '✅ Barbero disponible',
-      text: '✂️ Puedes venir ahora mismo. Estamos listos para atenderte sin espera.',
-      badge: 'Sin Espera 🚀'
-    };
+    htmlContent = `
+        <div class="absolute inset-0 bg-gradient-to-r from-green-900/80 via-black/50 to-transparent z-0"></div>
+        <div class="relative z-10">
+            <div class="inline-flex items-center gap-2 bg-green-500/20 backdrop-blur-md text-green-300 border border-green-500/30 rounded-full px-3 py-1 text-[10px] font-bold mb-4 shadow-lg uppercase tracking-widest"><span class="banner-badge">Sin Espera 🚀</span></div>
+            <h2 class="banner-title text-3xl md:text-5xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-xl leading-none">Barbero <br><span class="text-green-400">Disponible</span></h2>
+            <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm">Puedes venir ahora mismo. Estamos listos.</p>
+            <button onclick="switchTab('cita')" class="mt-6 bg-white text-black px-8 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all hover:scale-105 tap-scale flex items-center gap-2">
+                <span>Reservar Ahora</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+            </button>
+        </div>
+    `;
   } else {
-    const idx = Math.floor(Math.random() * bannerContentDefault.length);
-    const defaultContent = bannerContentDefault[idx];
-    content = {
-        ...defaultContent,
-        title: `${saludo}, ${primerNombre}`
-    };
-    if (Math.random() > 0.5) content.title = defaultContent.title;
-  }
+    // Lógica de Marketing Dinámico por Día
+    let title = "Tu estilo empieza aquí.";
+    let text = "Reserva tu cita en segundos y asegura tu espacio con los mejores barberos.";
+    let badge = "Agenda Pro";
 
-  if (bgDiv) {
-    bgDiv.className = 'absolute inset-0 z-0 banner-bg transition-colors duration-500 bg-gradient-to-br from-black via-[#111113] to-[#1a1a1f]';
-    if (mode === 'available') {
-      // bgDiv.classList.add('bg-green-900/20'); // Opcional: tinte verde muy sutil
-    } else {
+    if (day === 1) { // Lunes
+        title = "Empieza la semana con estilo.";
+        text = "Un buen corte define tu semana. Agenda hoy y marca la diferencia.";
+        badge = "Lunes de Estilo";
+    } else if (day === 5) { // Viernes
+        title = "Prepárate para el fin de semana.";
+        text = "Últimos espacios disponibles para lucir impecable este finde.";
+        badge = "Viernes Social";
+        // Contador de escasez simulado para viernes
+        text += " <span class='text-yellow-400 font-bold block mt-1'>⚠️ Quedan pocos espacios hoy.</span>";
+    } else if (day === 0) { // Domingo
+        title = "Domingo de relax y corte.";
+        text = "Prepara tu imagen para la semana que viene.";
     }
+
+    htmlContent = `
+        <div class="absolute inset-0 bg-gradient-to-r from-barberBlack/90 via-barberBlack/60 to-transparent z-0"></div>
+        <div class="relative z-10">
+            <div class="flex flex-col gap-4">
+              <span class="text-xs uppercase tracking-widest text-white/60">
+                ${badge}
+              </span>
+              <h2 class="text-3xl md:text-5xl font-bold banner-title text-white">
+                ${title}
+              </h2>
+              <p class="text-white/70 text-sm max-w-md">
+                ${text}
+              </p>
+              <button onclick="switchTab('cita')" class="mt-2 px-6 py-3 rounded-xl font-bold btn-primary shadow-lg w-fit">
+                Reservar Ahora
+              </button>
+            </div>
+        </div>
+    `;
   }
 
-  bannerInicio.querySelector('.banner-title').textContent = content.title;
-  bannerInicio.querySelector('.banner-text').textContent = content.text;
-  bannerInicio.querySelector('.banner-badge').textContent = content.badge;
+  if (contentWrapper) contentWrapper.innerHTML = htmlContent;
 }
 
 const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
@@ -144,10 +181,6 @@ if (!clienteId) {
   window.location.href = 'login_cliente.html';
 }
 
-window.toggleProfileMenu = () => {
-  document.getElementById('profile-menu').classList.toggle('hidden');
-};
-
 window.toggleFab = () => {
   const menu = document.getElementById('fab-menu');
   const btn = document.getElementById('fab-main');
@@ -156,8 +189,8 @@ window.toggleFab = () => {
 };
 
 window.logout = async () => {
-  localStorage.removeItem(`cliente_id_${negocioId}`);
-  localStorage.removeItem(`cliente_telefono_${negocioId}`);
+  // Limpiar caché de la aplicación al cerrar sesión
+  Object.keys(localStorage).filter(k => k.startsWith(`cache_${negocioId}`)).forEach(k => localStorage.removeItem(k));
   await supabase.auth.signOut();
   try {
     if ('serviceWorker' in navigator) {
@@ -178,9 +211,12 @@ window.logout = async () => {
 };
 
 window.addEventListener('click', function (e) {
-  const profileMenuContainer = document.querySelector('.relative');
   const profileMenu = document.getElementById('profile-menu');
-  if (profileMenu && !profileMenu.classList.contains('hidden') && profileMenuContainer && !profileMenuContainer.contains(e.target)) {
+  const profileToggle = document.getElementById('nav-profile-toggle');
+  if (!profileMenu || profileMenu.classList.contains('hidden')) return;
+  const clickDentroMenu = profileMenu.contains(e.target);
+  const clickEnToggle = profileToggle && profileToggle.contains(e.target);
+  if (!clickDentroMenu && !clickEnToggle) {
     profileMenu.classList.add('hidden');
   }
 });
@@ -201,7 +237,10 @@ function setupThemeToggle() {
       if (textSpanMenu) textSpanMenu.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
       
       // Actualizar botón flotante
-      if (btnFloating) btnFloating.innerHTML = isDark ? sunIcon : moonIcon;
+      if (btnFloating) {
+          btnFloating.innerHTML = isDark ? sunIcon : moonIcon;
+          btnFloating.classList.remove('hidden'); // Asegurar visibilidad
+      }
   };
 
   const saved = localStorage.getItem('theme');
@@ -228,16 +267,6 @@ function setupStaticEventHandlers() {
     profileToggle.addEventListener('click', () => {
       const menu = document.getElementById('profile-menu');
       if (menu) menu.classList.toggle('hidden');
-    });
-  }
-
-  const menuTurno = document.getElementById('menu-go-turno');
-  if (menuTurno) {
-    menuTurno.addEventListener('click', (e) => {
-      e.preventDefault();
-      switchTab('turno');
-      const menu = document.getElementById('profile-menu');
-      if (menu) menu.classList.add('hidden');
     });
   }
 
@@ -274,82 +303,67 @@ function setupStaticEventHandlers() {
     });
   }
 
-  document.querySelectorAll('.nav-item').forEach((el) => {
-    el.addEventListener('click', () => {
-      const tab = el.dataset.tab;
-      if (tab) switchTab(tab);
-    });
-  });
+  // Reemplazo con delegación de eventos para navegación robusta
+  document.addEventListener('click', (e) => {
+    const navItem = e.target.closest('[data-tab]');
+    if (!navItem) return;
 
-  document.querySelectorAll('.nav-link').forEach((el) => {
-    el.addEventListener('click', () => {
-      const tab = el.dataset.tab;
-      if (tab) switchTab(tab);
-    });
+    const tab = navItem.dataset.tab;
+    if (tab) {
+      e.preventDefault();
+      switchTab(tab);
+    }
   });
 }
 
-const turnoBtn = document.getElementById('tab-turno-btn');
-const citaBtn = document.getElementById('tab-cita-btn');
-const perfilBtn = document.getElementById('tab-perfil-btn');
-const activeClasses = 'border-black dark:border-white text-black dark:text-white font-bold';
-const inactiveClasses = 'border-transparent text-black/50 hover:text-black hover:border-black/10 dark:text-white/50 dark:hover:text-white dark:hover:border-white/10';
-
 const slotsCache = {};
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos de vida para el caché
 let lastSlotsParams = '';
 
-const switchTab = (tab) => {
-  const panels = ['inicio', 'turno', 'cita', 'perfil'];
+window.switchTab = (tab) => {
+  const panels = ['inicio', 'cita', 'perfil'];
+
   panels.forEach(p => {
     const el = document.getElementById(`tab-${p}-panel`);
-    if (el) {
-      el.classList.toggle('hidden', p !== tab);
-    }
-  });
+    if (!el) return;
 
-  // Mobile Bottom Nav
-  document.querySelectorAll('.nav-item').forEach(el => {
-    const isSelected = el.dataset.tab === tab;
-    el.classList.toggle('text-black', isSelected);
-    el.classList.toggle('dark:text-white', isSelected);
-    el.classList.toggle('scale-110', isSelected);
-    el.classList.toggle('text-black/40', !isSelected);
-    el.classList.toggle('dark:text-white/40', !isSelected);
-    if (isSelected) {
-      // Removed specific colors for monochrome look
+    if (p === tab) {
+      el.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        el.classList.add('active');
+      });
     } else {
-      // Clean up
+      el.classList.remove('active');
+      el.classList.add('hidden');
     }
   });
 
-  // Desktop Top Nav
-  document.querySelectorAll('.nav-link').forEach(el => {
-    const isSelected = el.dataset.tab === tab;
-    el.classList.toggle('bg-black', isSelected);
-    el.classList.toggle('dark:bg-white', isSelected);
-    el.classList.toggle('text-white', isSelected);
-    el.classList.toggle('dark:text-black', isSelected);
-    el.classList.toggle('text-black/60', !isSelected);
-    el.classList.toggle('dark:text-white/60', !isSelected);
+  // actualizar estilos nav móvil
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    el.classList.remove('active', 'text-white', 'scale-110');
+    if (el.dataset.tab === tab) {
+      el.classList.add('active', 'text-white');
+    }
   });
-
-  // Controlar visibilidad del botón flotante de tema (Solo en Inicio)
-  const themeBtn = document.getElementById('floating-theme-toggle');
-  if (themeBtn) {
-      if (tab === 'inicio') themeBtn.classList.remove('hidden');
-      else themeBtn.classList.add('hidden');
-  }
-
-  if (turnoBtn && citaBtn && perfilBtn) {
-    turnoBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'turno' ? activeClasses : inactiveClasses}`;
-    citaBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'cita' ? activeClasses : inactiveClasses}`;
-    perfilBtn.className = `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all ${tab === 'perfil' ? activeClasses : inactiveClasses}`;
-  }
 };
 
-turnoBtn?.addEventListener('click', () => switchTab('turno'));
-citaBtn?.addEventListener('click', () => switchTab('cita'));
-perfilBtn?.addEventListener('click', () => switchTab('perfil'));
+function setupPosterTilt() {
+  const poster = document.querySelector('.barber-poster-3d');
+  if (!poster) return;
+  poster.addEventListener('mousemove', (e) => {
+    const rect = poster.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = (y - centerY) / 20;
+    const rotateY = (centerX - x) / 20;
+    poster.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-10px)`;
+  });
+  poster.addEventListener('mouseleave', () => {
+    poster.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
+  });
+}
 
 window.mostrarSeccion = (seccion) => {
   switchTab(seccion);
@@ -363,22 +377,34 @@ async function init() {
     return;
   }
   renderStructure();
+  setupStaticEventHandlers();
+  setupThemeToggle();
   updateBanner();
   await cargarPerfil();
-  await cargarServicios();
-  await actualizarEstadoFila();
-  await verificarTurnoActivo();
+  await cargarServicios(); 
+  await cargarBarberos(); // Cargar barberos para el select
+
+  // Configurar fecha por defecto a HOY
+  const dp = document.getElementById('date-picker');
+  if (dp) {
+      const today = new Date();
+      const d = today.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+      dp.value = d;
+      dp.min = d;
+  }
+
   await verificarCitaActiva();
 
   if (localStorage.getItem('cita_reservada') === 'true') {
     localStorage.removeItem('cita_reservada');
-    switchTab('inicio');
+    switchTab('cita');
     showToast('¡Cita reservada con éxito!', 'success');
+  } else {
+    switchTab('inicio'); // Vista de Inicio por defecto
   }
 
-  document.getElementById('date-picker')?.addEventListener('change', renderSlotsForSelectedDate);
-  document.getElementById('select-servicio-cita')?.addEventListener('change', renderSlotsForSelectedDate);
-  document.getElementById('select-barbero-cita')?.addEventListener('change', renderSlotsForSelectedDate);
+  document.getElementById('select-barbero-cita')?.addEventListener('change', updateBarberInfo);
+  document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
   document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
   const formPerfil = document.getElementById('form-perfil');
@@ -400,8 +426,8 @@ async function init() {
   const safeRefresh = () => {
     clearTimeout(refreshTimeout);
     refreshTimeout = setTimeout(() => {
-      actualizarEstadoFila();
-      verificarTurnoActivo();
+      // actualizarEstadoFila();
+      // verificarTurnoActivo();
       verificarCitaActiva();
       checkPendingRatings();
     }, 500);
@@ -420,27 +446,15 @@ async function init() {
   }
 
   checkPendingRatings();
+  setupPosterTilt();
   
   // Auto-actualizar minutos cada 30 segundos
-  setInterval(() => {
-      actualizarEstadoFila();
-  }, 30000);
+  // setInterval(() => { actualizarEstadoFila(); }, 30000);
 }
 
 function renderStructure() {
   const bannerTemplate = document.getElementById('banner-marketing-template');
   const inicioContainer = document.getElementById('inicio-promo-container');
-  const turnoContainer = document.getElementById('turno-promo-container');
-
-  const createBanner = (title, text, badge) => {
-    const clone = bannerTemplate.cloneNode(true);
-    clone.id = '';
-    clone.classList.remove('hidden');
-    clone.querySelector('.banner-title').textContent = title;
-    clone.querySelector('.banner-text').textContent = text;
-    clone.querySelector('.banner-badge').textContent = badge;
-    return clone;
-  };
 
   if (bannerTemplate && inicioContainer) {
     const banner1 = bannerTemplate.cloneNode(true);
@@ -452,7 +466,8 @@ function renderStructure() {
   const statusContainer = document.getElementById('inicio-status-container');
   if (statusContainer) {
     statusContainer.innerHTML = `
-          <div class="bento-card p-6 relative overflow-hidden group">
+          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
             <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9L15,11L21,5V3M19,5L15,9L17,11L21,7V5M19,7L17,9L19,11L21,9V7M19,9L18,10L19,11L20,10V9M19,11L19,11L19,11L19,11M12,10.5C12,9.67 11.33,9 10.5,9C9.67,9 9,9.67 9,10.5C9,11.33 9.67,12 10.5,12C11.33,12 12,11.33 12,10.5M10.5,7C10.5,7 10.5,7 10.5,7M10.5,14C10.5,14 10.5,14 10.5,14M7.5,10.5C7.5,9.67 6.83,9 6,9C5.17,9 4.5,9.67 4.5,10.5C4.5,11.33 5.17,12 6,12C6.83,12 7.5,11.33 7.5,10.5M6,7C6,7 6,7 6,7M6,14C6,14 6,14 6,14"/></svg>
             </div>
@@ -461,16 +476,17 @@ function renderStructure() {
                     <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
                     </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Tu Estado</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Tu Estado</span>
                 </div>
                 <div id="dash-card-1">
-                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">Sin turno</span>
-                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">No estás en la fila</span>
+                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">Sin turno</span>
+                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">No estás en la fila</span>
                 </div>
             </div>
           </div>
 
-          <div class="bento-card p-6 relative overflow-hidden group">
+          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
             <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/></svg>
             </div>
@@ -479,16 +495,17 @@ function renderStructure() {
                     <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Estimado</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Estimado</span>
                 </div>
                 <div id="dash-card-2">
-                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">-- min</span>
-                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Tiempo de espera</span>
+                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">-- min</span>
+                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Tiempo de espera</span>
                 </div>
             </div>
           </div>
 
-          <div class="bento-card p-6 relative overflow-hidden group">
+          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
             <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M16,11.78L20.24,4.45L21.97,5.45L19.23,10.22L21.23,13.68L19.5,14.68L17.5,11.22L15.5,14.68L13.77,13.68L15.77,10.22L13.03,5.45L14.76,4.45L19,11.78M12,5V19H10V5H12M16,19H14V11H16V19M8,19H6V11H8V19M4,19H2V11H4V19M16,7H14V5H16V7M8,7H6V5H8V7M4,7H2V5H4V7Z"/></svg>
             </div>
@@ -497,50 +514,13 @@ function renderStructure() {
                     <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                     </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40">Demanda</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Demanda</span>
                 </div>
                 <div id="dash-card-3">
-                   <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 text-black/80 dark:text-white/80 text-lg font-bold animate-pulse">Calculando...</span>
+                   <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 subtitle-text text-lg font-bold animate-pulse text-gray-900 dark:text-white">Calculando...</span>
                 </div>
             </div>
           </div>
-        `;
-  }
-
-  const turnoPanel = document.getElementById('tab-turno-panel');
-  if (turnoPanel) {
-    turnoPanel.innerHTML = `
-            <div id="card-turno-activo" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #000; background: linear-gradient(90deg, rgba(0,0,0,0.03), transparent 40%);">
-                <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                </div>
-                <h3 class="text-sm font-bold text-black/50 dark:text-white/50 uppercase tracking-wider mb-2">Tu Turno en Curso</h3>
-                <div class="flex items-baseline gap-3">
-                  <span id="mi-numero-turno" class="text-7xl font-display font-bold text-[#111111] dark:text-white tracking-wide">--</span>
-                  <span id="mi-estado-turno" class="px-4 py-1.5 rounded-full bg-yellow-500/10 text-yellow-400 text-xs font-bold border border-yellow-500/20">En Espera</span>
-                </div>
-                <p id="mi-servicio-turno" class="text-black/80 dark:text-white/80 mt-3 font-medium text-lg">Servicio...</p>
-                <div class="mt-6 pt-6 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
-                  <div id="mi-info-extra" class="text-sm text-black/60 dark:text-white/60 w-full">Calculando...</div>
-                  <button onclick="cancelarTurno()" class="bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-black/10 dark:border-white/10">Cancelar</button>
-                </div>
-            </div>
-
-            <div id="seccion-tomar-turno" class="bento-card p-8">
-                <h3 class="text-3xl font-display font-bold mb-8 flex items-center gap-3 text-[#111111] dark:text-white tracking-wide">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-black dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  Reservar Nuevo Turno
-                </h3>
-                <div id="bloqueado-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30 flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  <span id="bloqueado-texto">Ya tienes un turno activo.</span>
-                </div>
-                <div class="grid grid-cols-1 gap-6">
-                  <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Servicio</label><select id="select-servicio" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
-                  <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Barbero</label><select id="select-barbero-turno" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
-                </div>
-                <button onclick="tomarTurno()" id="btn-tomar-turno" class="mt-8 w-full bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-3 text-lg transition-all">Confirmar Turno</button>
-            </div>
         `;
   }
 
@@ -549,52 +529,101 @@ function renderStructure() {
     citaPanel.innerHTML = `
             <div id="cita-promo-container" class="mb-6"></div>
             
-            <div id="card-cita-activa" class="hidden bento-card p-8 relative overflow-hidden mb-8 group" style="border-left: 4px solid #000; background: linear-gradient(90deg, rgba(0,0,0,0.03), transparent 40%);">
+            <div id="card-cita-activa" class="hidden bento-card p-8 relative overflow-hidden mb-8 group bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-lg rounded-2xl" style="border-left: 4px solid #000;">
                 <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
-                <h3 class="text-sm font-bold text-black dark:text-white uppercase tracking-wider mb-2">📅 Tu Cita Programada</h3>
+                <h3 class="text-sm font-bold title-text uppercase tracking-wider mb-2 text-gray-900 dark:text-white">📅 Tu Cita Programada</h3>
                 <div class="flex flex-col gap-1">
-                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide text-[#111111] dark:text-white">--</span>
-                  <span id="cita-barbero" class="text-lg font-medium text-black/80 dark:text-white/80">--</span>
+                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide title-text text-gray-900 dark:text-white">--</span>
+                  <span id="cita-barbero" class="text-lg font-medium subtitle-text text-gray-600 dark:text-gray-300">--</span>
                 </div>
-                <p id="cita-servicio" class="text-black/60 dark:text-white/60 mt-3 font-medium">Cita Reservada</p>
+                <p id="cita-servicio" class="subtitle-text mt-3 font-medium text-gray-600 dark:text-gray-400">Cita Reservada</p>
                 <div class="mt-6 pt-6 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
-                  <div class="text-sm text-black/60 dark:text-white/60">Llega 5 min antes</div>
+                  <div class="text-sm subtitle-text text-gray-500 dark:text-gray-400">Llega 5 min antes</div>
                   <button onclick="cancelarCita()" class="bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-black/10 dark:border-white/10">Cancelar Cita</button>
                 </div>
             </div>
             
-            <div id="seccion-cita-inteligente" class="bento-card p-8">
-                <h3 class="text-3xl font-display font-bold mb-2 flex items-center gap-2 text-[#111111] dark:text-white tracking-wide">Agendar cita</h3>
-                <p class="text-sm text-black/60 dark:text-white/60 mb-6" id="texto-sugerencia">Consulta disponibilidad y reserva.</p>
-                <div id="bloqueado-cita-msg" class="hidden mb-6 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm font-medium border border-yellow-100 dark:border-yellow-800/30">
-                    No puedes agendar cita si tienes un turno activo.
-                </div>
-                <div id="form-cita-container">
-                    <div class="flex flex-col sm:flex-row gap-3">
-                      <button id="btn-ver-horarios" onclick="verHorariosLibres()" class="flex-1 px-6 py-4 bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold rounded-xl shadow-lg focus:outline-none transition-all">Ver horarios libres</button>
+            <div id="seccion-cita-inteligente" class="bento-card p-0 overflow-hidden bg-white dark:bg-[#111113] shadow-xl border border-gray-100 dark:border-white/5">
+                <!-- Header Azul Oscuro -->
+                <div class="bg-gradient-to-r from-barberBlack to-[#1e293b] p-6 md:p-8 text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
-                    <div id="horarios-libres" class="mt-6 hidden">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Fecha</label><input id="date-picker" type="date" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
-                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Barbero</label><select id="select-barbero-cita" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Cargando...</option></select></div>
-                            <div><label class="block text-sm font-semibold mb-2 text-black/60 dark:text-white/60">Servicio</label><select id="select-servicio-cita" class="w-full p-3 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"><option value="">Selecciona...</option></select></div>
+                    <h3 class="text-2xl md:text-3xl font-display font-bold mb-2 relative z-10">Agenda Inteligente</h3>
+                    <p class="text-blue-200 text-sm relative z-10">Reserva tu espacio en segundos.</p>
+                </div>
+
+                <div id="form-cita-container" class="p-6 md:p-8 space-y-6">
+                    <!-- Step 1: Service -->
+                    <div>
+                        <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">1. Selecciona tu Servicio</label>
+                        <select id="select-servicio-cita" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all appearance-none">
+                            <option value="">Elegir servicio...</option>
+                        </select>
+                    </div>
+
+                    <!-- Step 2 & 3 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div>
+                            <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">2. Elige Profesional</label>
+                            <div class="relative">
+                                <select id="select-barbero-cita" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all appearance-none">
+                                    <option value="">Cargando...</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            </div>
                         </div>
-                        
+                        <div>
+                            <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">3. Selecciona Fecha</label>
+                            <input id="date-picker" type="date" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all">
+                        </div>
+                    </div>
+
+                <button id="btn-ver-horarios" class="w-full py-4 bg-barberBlack dark:bg-white text-white dark:text-black font-bold rounded-xl shadow-lg hover:scale-[1.01] transition-transform flex justify-center items-center gap-2 tap-scale">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Ver Horarios Libres
+                    </button>
+
+                    <div id="horarios-libres" class="mt-2 hidden">
                         <div id="barber-info-card" class="hidden mt-4 flex items-center gap-4 p-4 bg-[#F8F8F9] dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm transition-all animate-fade-in">
                             <img id="barber-avatar-display" src="" class="w-12 h-12 rounded-full object-cover border-2 border-barberRed shadow-sm">
                             <div>
-                                <p id="barber-name-display" class="font-bold text-[#111111] dark:text-white text-lg leading-tight"></p>
-                                <p class="text-xs text-black/60 dark:text-white/60 font-medium uppercase tracking-wider">Barbero seleccionado</p>
+                                <p id="barber-name-display" class="font-bold title-text text-lg leading-tight text-gray-900 dark:text-white"></p>
+                                <p class="text-xs subtitle-text font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Barbero seleccionado</p>
                             </div>
                         </div>
 
-                        <div id="rango-horario-display"></div>
-                        <div class="mt-6 bg-[#F8F8F9] dark:bg-black/30 p-6 rounded-2xl border border-black/5 dark:border-white/5">
-                            <div id="slots-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
-                            <div id="action-container" class="mt-6 hidden flex justify-center animate-fade-in">
-                                <button id="btn-confirmar-reserva" class="bg-black dark:bg-white text-white dark:text-black font-bold py-3 px-8 rounded-xl shadow-lg focus:outline-none hover:bg-black/80 dark:hover:bg-white/90 transition-colors">Confirmar Reserva</button>
+                        <div id="slots-section" class="pt-4 border-t border-gray-100 dark:border-white/5">
+                            <div class="flex items-center justify-between mb-4">
+                                <label class="block text-xs font-bold subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Horarios Disponibles</label>
+                                <span id="rango-horario-display" class="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full"></span>
+                            </div>
+                            
+                            <div id="slots-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3"></div>
+
+                            <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-600 rounded-r-xl flex gap-3 items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <p class="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                                    <strong>Política de puntualidad:</strong> Llega 10 minutos antes. Retrasos de 10 min cancelan la cita automáticamente.
+                                </p>
+                            </div>
+
+                            <div id="action-container" class="hidden pt-4 animate-fade-in mt-4">
+                                 <div class="bg-gray-50 dark:bg-white/5 p-5 rounded-xl mb-4 border border-gray-100 dark:border-white/5">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-xs subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Servicio</span>
+                                        <span id="summary-service" class="text-sm font-bold text-gray-900 dark:text-white text-right">--</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-white/10 mt-2">
+                                        <span class="text-xs subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Total</span>
+                                        <span id="summary-price" class="text-lg font-black text-blue-600 dark:text-blue-400">RD$ 0.00</span>
+                                    </div>
+                                 </div>
+                                <button id="btn-confirmar-reserva" class="w-full py-4 btn-primary font-bold rounded-xl shadow-xl transition-all transform hover:scale-[1.01] flex justify-center items-center gap-2 tap-scale">Confirmar Cita</button>
                             </div>
                         </div>
                     </div>
@@ -608,7 +637,7 @@ function renderStructure() {
     perfilPanel.innerHTML = `
           <div id="perfil-promo-container" class="mb-6"></div>
 
-          <div class="bento-card p-8 max-w-2xl mx-auto">
+          <div class="bento-card p-8 max-w-2xl mx-auto bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-lg rounded-2xl">
             <div class="flex flex-col sm:flex-row items-center gap-6">
               <div class="relative flex-shrink-0">
                 <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U" class="w-32 h-32 rounded-full border-4 bg-white dark:bg-[#111113] border-black/5 dark:border-[#111113] shadow-2xl object-cover ring-2 ring-black/10 dark:ring-white/10">
@@ -618,31 +647,22 @@ function renderStructure() {
                 <input type="file" id="avatar-upload" class="hidden" accept="image/*" onchange="subirAvatar(this)">
               </div>
               <div class="text-center sm:text-left">
-                <h3 id="profile-name" class="text-4xl font-display font-bold text-[#111111] dark:text-white tracking-wide">Cargando...</h3>
-                <p id="profile-phone" class="text-black/60 dark:text-white/60 text-lg mt-1">...</p>
+                <h3 id="profile-name" class="text-4xl font-display font-bold title-text tracking-wide text-gray-900 dark:text-white">Cargando...</h3>
+                <p id="profile-phone" class="subtitle-text text-lg mt-1 text-gray-600 dark:text-gray-400">...</p>
                 <span class="inline-block mt-2 px-4 py-1 rounded-full bg-black/5 dark:bg-white/10 text-black dark:text-white text-xs font-bold border border-black/10 dark:border-white/10">
                   Cliente frecuente ⭐
                 </span>
               </div>
             </div>
-            <form id="form-perfil" class="mt-10 space-y-6">
-              <div><label class="text-sm font-semibold mb-2 block text-black/60 dark:text-white/60">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
-              <div><label class="text-sm font-semibold mb-2 block text-black/60 dark:text-white/60">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+            <form id="form-perfil" class="mt-10 space-y-6 text-gray-900 dark:text-white">
+              <div><label class="text-sm font-semibold mb-2 block subtitle-text text-gray-600 dark:text-gray-400">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+              <div><label class="text-sm font-semibold mb-2 block subtitle-text text-gray-600 dark:text-gray-400">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
               <button type="submit" class="w-full bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-2 mt-4 transition-all">Actualizar Datos</button>
             </form>
           </div>
         `;
   }
 
-  if (bannerTemplate) {
-    const bannerCita = createBanner('Planifica tu Estilo', 'Reserva con anticipación y asegura tu lugar con tu barbero favorito.', 'Agenda Pro');
-    const citaPromo = document.getElementById('cita-promo-container');
-    if (citaPromo) citaPromo.appendChild(bannerCita);
-
-    const bannerPerfil = createBanner('Tu Identidad', 'Mantén tu información actualizada para recibir las mejores ofertas.', 'Mi Cuenta');
-    const perfilPromo = document.getElementById('perfil-promo-container');
-    if (perfilPromo) perfilPromo.appendChild(bannerPerfil);
-  }
 }
 
 function registrarServiceWorker() {
@@ -730,7 +750,7 @@ function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarber
   const barberos = Math.max(1, activeBarbers);
   let tiempoTotalMinutos = 0;
 
-  turnosEnAtencion.forEach(t => {
+  (turnosEnAtencion || []).forEach(t => {
     const duracion = serviciosCache[t.servicio] || 30;
     const inicio = t.started_at ? new Date(t.started_at) : new Date();
     const transcurrido = (Date.now() - inicio.getTime()) / 60000;
@@ -738,7 +758,7 @@ function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarber
     tiempoTotalMinutos += restante;
   });
 
-  turnosEnEspera.forEach(t => {
+  (turnosEnEspera || []).forEach(t => {
     const duracion = serviciosCache[t.servicio] || 30;
     tiempoTotalMinutos += duracion;
   });
@@ -773,7 +793,7 @@ function renderProfile(data) {
 
 async function cargarPerfil() {
   // 1. Renderizar desde caché inmediatamente
-  const cached = getCache('profile');
+  const cached = getCache('PROFILE');
   if (cached) renderProfile(cached);
 
   // 2. Obtener datos frescos
@@ -782,12 +802,16 @@ async function cargarPerfil() {
   if (error) {
     if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) return;
     console.error('Error cargando perfil:', error);
-    if (error.code === 'PGRST116') logout();
+    // CORRECCIÓN: No cerrar sesión si falta el perfil, usar datos locales
+    if (appState.user.user_metadata?.nombre) {
+        renderProfile({ nombre: appState.user.user_metadata.nombre, telefono: appState.user.phone || '', email: appState.user.email });
+    }
     return;
   }
   
   if (data) {
-    setCache('profile', data, CACHE_TTL.PROFILE);
+    setCache('PROFILE', data, 60); // 1 hora de caché
+    appState.profile = data;
     renderProfile(data);
   }
 }
@@ -798,6 +822,7 @@ function renderServices(data) {
     select.innerHTML = '<option value="">Selecciona un servicio...</option>';
     data.forEach(s => {
       serviciosCache[s.nombre] = s.duracion_min;
+      preciosCache[s.nombre] = s.precio;
       const option = document.createElement('option');
       option.value = s.nombre;
       option.textContent = s.nombre;
@@ -817,15 +842,18 @@ function renderServices(data) {
 }
 
 async function cargarServicios() {
-  const cached = getCache('servicios');
+  const cached = getCache('SERVICES');
   if (cached) {
-    cached.forEach(s => serviciosCache[s.nombre] = s.duracion_min);
+    cached.forEach(s => {
+        serviciosCache[s.nombre] = s.duracion_min;
+        preciosCache[s.nombre] = s.precio;
+    });
     renderServices(cached);
   }
 
   const { data } = await supabase.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
   if (data) {
-    setCache('servicios', data, CACHE_TTL.SERVICES);
+    setCache('SERVICES', data, 1440); // 24 horas de caché
     renderServices(data);
   }
 }
@@ -841,10 +869,10 @@ function processConfig(data) {
 }
 
 async function cargarConfigNegocio() {
-  const cached = getCache('config');
+  const cached = getCache('CONFIG');
   if (cached) processConfig(cached);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('configuracion_negocio')
     .select('*')
     .eq('negocio_id', negocioId)
@@ -852,8 +880,13 @@ async function cargarConfigNegocio() {
     .limit(1)
     .maybeSingle();
   
+  if (error) {
+    console.error('Error cargando configuración:', error);
+    return;
+  }
+
   if (data) {
-    setCache('config', data, CACHE_TTL.CONFIG);
+    setCache('CONFIG', data, 60); // 1 hora de caché
     processConfig(data);
   }
 }
@@ -890,7 +923,7 @@ async function actualizarEstadoFila() {
   const pdCita = document.getElementById('personas-delante-cita');
   if (pdCita) animateNumber(pdCita, personasEnCola);
 
-  if (!window.hasActiveTurn && !window.hasActiveAppointment) {
+  if (!appState.hasActiveTurn && !appState.hasActiveAppointment) {
     if (personasEnCola === 0 && enAtencion.length < activeBarbers) {
       updateBanner('available');
     } else {
@@ -934,15 +967,15 @@ async function actualizarEstadoFila() {
   }
 
   const dashCard1 = document.getElementById('dash-card-1');
-  if (dashCard1 && !window.hasActiveTurn && !window.hasActiveAppointment) {
+  if (dashCard1 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
     dashCard1.innerHTML = `
-             <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${personasEnCola}</span>
-             <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Personas en espera</span>
+             <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${personasEnCola}</span>
+             <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Personas en espera</span>
           `;
   }
 
   const dashCard2 = document.getElementById('dash-card-2');
-  if (dashCard2 && !window.hasActiveTurn && !window.hasActiveAppointment) {
+  if (dashCard2 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
     const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     let detalleAtencion = '';
@@ -956,9 +989,9 @@ async function actualizarEstadoFila() {
     }
 
     dashCard2.innerHTML = `
-             <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${tiempoTexto}</span>
+             <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${tiempoTexto}</span>
              <div class="mt-2">
-                <span class="text-sm text-black/60 dark:text-white/60 font-medium block">Atención aprox: ${horaAprox}</span>
+                <span class="text-sm subtitle-text font-medium block text-gray-600 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
                 ${detalleAtencion}
              </div>
           `;
@@ -967,7 +1000,7 @@ async function actualizarEstadoFila() {
   const dashCard3 = document.getElementById('dash-card-3');
   if (dashCard3) {
     dashCard3.innerHTML = `
-             <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl ${badgeClass} bg-opacity-10 border border-black/5 dark:border-white/10 text-lg font-bold">
+             <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl ${badgeClass} bg-opacity-10 border border-black/5 dark:border-white/10 text-lg font-bold subtitle-text text-gray-900 dark:text-white">
                 ${demandaTexto}
              </span>
           `;
@@ -987,7 +1020,7 @@ async function actualizarEstadoFila() {
 
 async function verificarTurnoActivo() {
   const hoy = new Date().toISOString().slice(0, 10);
-  const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
+  const telefono = appState.profile?.telefono || appState.user?.phone;
 
   const { data } = await supabase.from('turnos')
     .select('*')
@@ -997,69 +1030,74 @@ async function verificarTurnoActivo() {
     .eq('telefono', telefono)
     .maybeSingle();
 
-  const card = document.getElementById('card-turno-activo');
+  // Buscar tarjeta en el panel de citas (ahora es el principal)
+  let card = document.getElementById('card-turno-activo');
   const form = document.getElementById('seccion-tomar-turno');
 
+  // Si no existe la tarjeta (porque ocultamos el panel turno), la inyectamos en citas
+  if (!card) {
+      const citaPanel = document.getElementById('tab-cita-panel');
+      if (citaPanel) {
+          const div = document.createElement('div');
+          div.id = 'card-turno-activo';
+          div.className = 'hidden mb-6';
+          citaPanel.prepend(div);
+          card = div;
+      }
+  }
+
   if (data && card) {
-    window.hasActiveTurn = true;
+    appState.hasActiveTurn = true;
     updateBanner('active_turn');
     card.classList.remove('hidden');
     if (form) form.classList.add('hidden');
-    const numeroEl = document.getElementById('mi-numero-turno');
-    if (numeroEl) numeroEl.textContent = data.turno;
-    const servEl = document.getElementById('mi-servicio-turno');
-    if (servEl) servEl.textContent = data.servicio;
+    
     const bloqueadoMsg = document.getElementById('bloqueado-msg');
     if (bloqueadoMsg) bloqueadoMsg.classList.remove('hidden');
-    const bloqueadoTexto = document.getElementById('bloqueado-texto');
-    if (bloqueadoTexto) bloqueadoTexto.textContent = 'Ya tienes un turno activo. Cuando finalice, podrás tomar otro 👌';
-
-    const estadoEl = document.getElementById('mi-estado-turno');
-    const infoExtra = document.getElementById('mi-info-extra');
-
-    const dashCard1 = document.getElementById('dash-card-1');
-    if (dashCard1) {
-      const isEnAtencion = data.estado === 'En atención';
-      dashCard1.innerHTML = `
-        <div class="flex justify-between items-end">
-            <div>
-                <span class="text-7xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">${data.turno}</span>
-                <span class="text-sm text-black/60 dark:text-white/60 font-bold mt-2 block">TU TURNO ACTUAL</span>
-            </div>
-            ${!isEnAtencion ? `
-            <button onclick="cancelarTurno()" class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 text-xs font-bold transition-colors px-4 py-2 rounded-lg border border-red-200 dark:border-red-800/50 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                Cancelar
-            </button>
-            ` : ''}
-        </div>
-            `;
-    }
 
     if (data.estado === 'En atención') {
-      if (estadoEl) {
-        estadoEl.textContent = 'En Atención ⚡';
-        estadoEl.className = 'px-4 py-1.5 rounded-full bg-black/10 dark:bg-white/10 text-black dark:text-white text-xs font-bold border border-black/20 dark:border-white/20 animate-pulse';
-      }
-      const h3 = card.querySelector('h3');
-      if (h3) h3.textContent = '🔥 Te están atendiendo';
-      if (infoExtra) {
-        infoExtra.innerHTML = '<span class="text-lg font-medium text-[#111111] dark:text-white">Relájate y disfruta 😌</span>';
-      }
-      const dashCard2 = document.getElementById('dash-card-2');
-      if (dashCard2) {
-        dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">AHORA</span>
-                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Te están atendiendo</span>
-                `;
-      }
+      // Diseño Premium para "En Atención"
+      card.innerHTML = `
+        <div class="bento-card p-8 relative overflow-hidden group bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-2xl shadow-green-500/30 border-none">
+            <div class="absolute top-0 right-0 p-4 opacity-20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div class="relative z-10 text-center">
+                <div class="inline-block px-4 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-xs font-bold uppercase tracking-widest mb-4 animate-bounce">
+                    🔥 En este momento
+                </div>
+                <h3 class="text-4xl font-display font-bold mb-2">Te están atendiendo</h3>
+                <p class="text-lg text-white/90 font-medium">Relájate y disfruta del servicio.</p>
+                <div class="mt-6 pt-6 border-t border-white/20 flex justify-center gap-4">
+                    <div class="text-center">
+                        <p class="text-xs uppercase tracking-wider opacity-70">Turno</p>
+                        <p class="text-2xl font-bold">${data.turno}</p>
+                    </div>
+                    <div class="w-px bg-white/20"></div>
+                    <div class="text-center">
+                        <p class="text-xs uppercase tracking-wider opacity-70">Servicio</p>
+                        <p class="text-xl font-bold truncate max-w-[150px]">${data.servicio}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+      `;
     } else {
-      if (estadoEl) {
-        estadoEl.textContent = 'En Espera';
-        estadoEl.className = 'px-4 py-1.5 rounded-full bg-yellow-500/10 text-yellow-400 text-xs font-bold border border-yellow-500/20';
-      }
-      const h3 = card.querySelector('h3');
-      if (h3) h3.textContent = '🕒 Tu turno está en cola';
+      // Diseño para "En Espera" (si llegara a mostrarse, aunque el foco es citas)
+      card.innerHTML = `
+        <div class="bento-card p-6 relative overflow-hidden bg-white dark:bg-[#111113] border-l-4 border-yellow-400 shadow-sm rounded-2xl">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-1">En cola de espera</p>
+                    <h3 class="text-3xl font-display font-bold title-text text-gray-900 dark:text-white">Turno ${data.turno}</h3>
+                    <p class="text-sm subtitle-text mt-1 text-gray-600 dark:text-gray-400">${data.servicio}</p>
+                </div>
+                <button onclick="cancelarTurno()" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        </div>
+      `;
 
       const { data: allTurns } = await supabase.from('turnos')
         .select('id, estado, servicio, started_at, created_at')
@@ -1098,9 +1136,9 @@ async function verificarTurnoActivo() {
         }
 
         dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${tiempoEstimado} min</span>
+                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${tiempoEstimado} min</span>
                    <div class="mt-2">
-                      <span class="text-sm text-black/60 dark:text-white/60 font-medium block">Atención aprox: ${horaAprox}</span>
+                      <span class="text-sm subtitle-text font-medium block text-gray-600 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
                       ${detalleAtencion}
                    </div>
                 `;
@@ -1108,25 +1146,7 @@ async function verificarTurnoActivo() {
 
       const porcentaje = Math.max(5, 100 - (personasDelante * 15));
 
-      if (infoExtra) {
-        infoExtra.innerHTML = `
-                <div class="flex flex-col w-full mr-4">
-                    <div class="flex justify-between items-end mb-3">
-                        <span class="font-bold text-lg text-[#111111] dark:text-white">${personasDelante} personas delante</span>
-                        <span class="text-xs font-bold text-black dark:text-white bg-black/10 dark:bg-white/10 px-2 py-1 rounded">${mensajeTiempo}</span>
-                    </div>
-                    <div class="w-full bg-gray-200 dark:bg-black/50 rounded-full h-4 overflow-hidden shadow-inner border border-black/5 dark:border-white/10">
-                        <div class="bg-black dark:bg-white h-full rounded-full transition-all duration-1000 relative progress-striped shadow-lg" style="width: ${porcentaje}%">
-                        </div>
-                    </div>
-                    <p class="text-xs text-black/60 dark:text-white/60 mt-1 text-right">
-                        ${personasDelante === 0 ? '🚀 ¡Es tu turno ahora mismo!' : 'La fila avanza...'}
-                    </p>
-                </div>
-            `;
-      }
-
-      if (personasDelante <= 1 && !window.notificacionCercaEnviada) {
+      if (personasDelante <= 1 && !appState.notificacionCercaEnviada) {
         sendPushNotification('🔔 ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`);
         window.notificacionCercaEnviada = true;
       }
@@ -1137,7 +1157,7 @@ async function verificarTurnoActivo() {
     if (citaForm) citaForm.classList.add('hidden');
     if (citaMsg) citaMsg.classList.remove('hidden');
   } else {
-    window.hasActiveTurn = false;
+    appState.hasActiveTurn = false;
     if (card) card.classList.add('hidden');
     if (form) form.classList.remove('hidden');
     const bloqueadoMsg = document.getElementById('bloqueado-msg');
@@ -1147,8 +1167,8 @@ async function verificarTurnoActivo() {
 }
 
 async function verificarCitaActiva() {
-  const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-  const nombreCliente = localStorage.getItem(`cliente_nombre_${negocioId}`) || 'Cliente';
+  const telefono = appState.profile?.telefono || appState.user?.phone;
+  const nombreCliente = appState.profile?.nombre || appState.user?.user_metadata?.nombre || 'Cliente';
   if (!telefono) return;
 
   const nowISO = new Date().toISOString();
@@ -1169,7 +1189,7 @@ async function verificarCitaActiva() {
   const seccionCita = document.getElementById('seccion-cita-inteligente');
 
   if (cita && cardCita) {
-    window.hasActiveAppointment = true;
+    appState.hasActiveAppointment = true;
     cardCita.classList.remove('hidden');
 
     if (seccionTurno) seccionTurno.classList.add('hidden');
@@ -1201,7 +1221,7 @@ async function verificarCitaActiva() {
     cardCita.dataset.id = cita.id;
 
     const cardHTML = `
-                <div class="bento-card p-6 relative overflow-hidden mb-6 animate-fade-in" style="border-left: 4px solid #000;">
+                <div class="bento-card p-6 relative overflow-hidden mb-6 animate-fade-in bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl" style="border-left: 4px solid #000;">
                     <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 transform rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                     </div>
@@ -1212,21 +1232,21 @@ async function verificarCitaActiva() {
                                 📅 Cita Confirmada
                             </div>
                             <div class="text-right">
-                                <p class="text-xs text-black/60 dark:text-white/60 uppercase tracking-wider font-bold">Barbero</p>
-                                <p class="font-bold text-[#111111] dark:text-white text-lg leading-none">${barberName}</p>
+                                <p class="text-xs subtitle-text uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Barbero</p>
+                                <p class="font-bold title-text text-lg leading-none text-gray-900 dark:text-white">${barberName}</p>
                             </div>
                         </div>
 
                         <div class="mb-6">
-                            <p class="text-5xl font-display font-bold tracking-tight text-[#111111] dark:text-white mb-1">${timeStr}</p>
-                            <p class="text-lg text-black/80 dark:text-white/80 font-medium capitalize">${dateStr}</p>
+                            <p class="text-5xl font-display font-bold tracking-tight title-text mb-1 text-gray-900 dark:text-white">${timeStr}</p>
+                            <p class="text-lg subtitle-text font-medium capitalize text-gray-600 dark:text-gray-400">${dateStr}</p>
                         </div>
 
                         <div class="flex items-center justify-between border-t border-black/5 dark:border-white/10 pt-4">
                             <div>
-                                <p class="text-xs text-black/60 dark:text-white/60 uppercase tracking-wider font-bold">Cliente</p>
-                                <p class="font-bold text-[#111111] dark:text-white">${nombreCliente}</p>
-                                <p class="text-xs text-black/80 dark:text-white/80 mt-0.5">${servicioTexto}</p>
+                                <p class="text-xs subtitle-text uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Cliente</p>
+                                <p class="font-bold title-text text-gray-900 dark:text-white">${nombreCliente}</p>
+                                <p class="text-xs subtitle-text mt-0.5 text-gray-600 dark:text-gray-400">${servicioTexto}</p>
                             </div>
                             <button onclick="cancelarCita(${cita.id})" class="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-black dark:text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors border border-black/10 dark:border-white/10 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1241,39 +1261,34 @@ async function verificarCitaActiva() {
       inicioCitaContainer.innerHTML = cardHTML;
     }
 
-    cardCita.outerHTML = `<div id="card-cita-activa">${cardHTML}</div>`;
+    cardCita.innerHTML = cardHTML;
 
     const dashCard1 = document.getElementById('dash-card-1');
     if (dashCard1) {
       dashCard1.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-black dark:text-white block tracking-wide leading-none">CITA</span>
-                   <span class="text-sm text-black/60 dark:text-white/60 font-bold mt-2 block">PROGRAMADA</span>
+                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">CITA</span>
+                   <span class="text-sm subtitle-text font-bold mt-2 block text-gray-600 dark:text-gray-400">PROGRAMADA</span>
                 `;
     }
     const dashCard2 = document.getElementById('dash-card-2');
     if (dashCard2) {
       dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold text-[#111111] dark:text-white block tracking-wide leading-none">${timeStr}</span>
-                   <span class="text-sm text-black/60 dark:text-white/60 font-medium mt-2 block">Hora de atención</span>
+                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${timeStr}</span>
+                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Hora de atención</span>
                 `;
     }
   } else {
-    window.hasActiveAppointment = false;
+    appState.hasActiveAppointment = false;
     if (inicioCitaContainer) inicioCitaContainer.innerHTML = '';
     const cardCitaEl = document.getElementById('card-cita-activa');
     if (cardCitaEl) cardCitaEl.innerHTML = '';
-    if (!window.hasActiveTurn && seccionTurno) {
-      seccionTurno.classList.remove('hidden');
-      const msg = document.getElementById('bloqueado-msg');
-      if (msg) msg.classList.add('hidden');
-    }
+    
     if (seccionCita) seccionCita.classList.remove('hidden');
   }
 }
 
 async function sendPushNotification(title, body) {
-  const phoneEl = document.getElementById('profile-phone');
-  const telefono = phoneEl ? phoneEl.textContent : null;
+  const telefono = appState.profile?.telefono;
   if (!telefono || telefono === '...') return;
   try {
     const { error } = await supabase.functions.invoke('send-push-notification', {
@@ -1538,10 +1553,9 @@ window.reservarMasTarde = async () => {
 window.verHorariosLibres = () => {
   const cont = document.getElementById('horarios-libres');
   if (cont) cont.classList.remove('hidden');
+  
   const today = new Date();
-  const offset = today.getTimezoneOffset();
-  const localDate = new Date(today.getTime() - (offset * 60 * 1000));
-  const d = localDate.toISOString().slice(0, 10);
+  const d = today.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD local seguro
   const dp = document.getElementById('date-picker');
   if (dp) {
     if (!dp.value) dp.value = d;
@@ -1572,6 +1586,26 @@ function slotDisponible(slotStart, duracion, citas = [], breaks = []) {
   return true;
 }
 
+function updateBarberInfo() {
+  const barberSel = document.getElementById('select-barbero-cita')?.value;  const barbers = appState.barbers || [];
+  const infoCard = document.getElementById('barber-info-card');
+  
+  if (infoCard && barbers.length > 0) {
+    const barber = barbers.find(b => b.id == barberSel);
+    if (barber) {
+      infoCard.classList.remove('hidden');
+      infoCard.classList.add('flex');
+      const nameDisplay = document.getElementById('barber-name-display');
+      if (nameDisplay) nameDisplay.textContent = barber.nombre || barber.usuario || 'Barbero';
+      const avatarDisplay = document.getElementById('barber-avatar-display');
+      if (avatarDisplay) avatarDisplay.src = barber.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario || 'B')}&background=C1121F&color=fff&bold=true`;
+    } else {
+      infoCard.classList.add('hidden');
+      infoCard.classList.remove('flex');
+    }
+  }
+}
+
 async function renderSlotsForSelectedDate() {
   await cargarConfigNegocio();
   const dp = document.getElementById('date-picker');
@@ -1586,35 +1620,25 @@ async function renderSlotsForSelectedDate() {
   const rangoDisplay = document.getElementById('rango-horario-display');
   const actionContainer = document.getElementById('action-container');
 
-  const infoCard = document.getElementById('barber-info-card');
-  if (infoCard && window.barbersData) {
-    const barber = window.barbersData.find(b => b.id == barberSel);
-    if (barber) {
-      infoCard.classList.remove('hidden');
-      infoCard.classList.add('flex');
-      const nameDisplay = document.getElementById('barber-name-display');
-      if (nameDisplay) nameDisplay.textContent = barber.nombre || barber.usuario || 'Barbero';
-      const avatarDisplay = document.getElementById('barber-avatar-display');
-      if (avatarDisplay) avatarDisplay.src = barber.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario || 'B')}&background=C1121F&color=fff&bold=true`;
-    } else {
-      infoCard.classList.add('hidden');
-      infoCard.classList.remove('flex');
-    }
-  }
+  // Asegurar que la info del barbero esté actualizada
+  updateBarberInfo();
 
   if (!negocioId) { console.error('negocioId es undefined'); return; }
-  if (!barberSel) {
-    if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-barberRed font-bold py-4 bg-barberRed/10 rounded-xl border border-barberRed/20">👆 Por favor selecciona un barbero arriba</div>';
-    return;
+  if (!barberSel && barberSelEl?.options.length > 1) { // No mostrar si no hay barberos o no se ha seleccionado
+    showToast('Por favor selecciona un barbero', 'error');
+    if (slotsContainer) slotsContainer.innerHTML = '';
+    return; 
   }
   if (!dateStr) {
+    showToast('Por favor selecciona una fecha', 'error');
     if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">Selecciona una fecha.</div>';
     return;
   }
 
-  const cacheKey = `${dateStr}_${barberSel}`;
+  const dur = serviciosCache[servicioSel] || 30;
+  const cacheKey = `${dateStr}_${barberSel}_${dur}`;
 
-  window.__horaSeleccionada__ = null;
+  appState.selectedTimeSlot = null;
   if (actionContainer) actionContainer.classList.add('hidden');
 
   if (!dateStr || !barberSel || !servicioSel) {
@@ -1623,16 +1647,24 @@ async function renderSlotsForSelectedDate() {
     return;
   }
 
-  if (slotsCache[cacheKey]) {
-    renderSlotsFromData(slotsCache[cacheKey], dateStr, serviciosCache[servicioSel] || 30);
+  // Lógica de limpieza de caché
+  if (Object.keys(slotsCache).length > 50) {
+    slotsCache = {}; // Reiniciar caché si excede el límite
+  }
+
+  // Validación de caché con TTL (Evita datos sucios)
+  if (slotsCache[cacheKey] && (Date.now() - slotsCache[cacheKey].timestamp < CACHE_TTL_MS)) {
+    renderSlotsFromData(slotsCache[cacheKey].data, dateStr, serviciosCache[servicioSel] || 30);
     return;
   }
+
+  // Mostrar contenedor de horarios
+  const horariosLibres = document.getElementById('horarios-libres');
+  if (horariosLibres) horariosLibres.classList.remove('hidden');
 
   if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 animate-pulse">Buscando disponibilidad...</div>';
 
   const promises = [];
-
-  const dur = serviciosCache[servicioSel] || 30;
 
   const apStr = configCache?.hora_apertura || '08:00';
   const ciStr = configCache?.hora_cierre || '21:00';
@@ -1641,10 +1673,14 @@ async function renderSlotsForSelectedDate() {
 
   if (rangoDisplay) {
     rangoDisplay.textContent = `Horario disponible: ${apStr} - ${ciStr}`;
-    rangoDisplay.className = 'mt-4 text-center text-sm font-medium text-black/60 dark:text-white/60 bg-[#F8F8F9] dark:bg-black/30 py-2 rounded-lg border border-black/5 dark:border-white/10';
+    // rangoDisplay.className = 'mt-4 text-center text-sm font-medium text-black/60 dark:text-white/60 bg-[#F8F8F9] dark:bg-black/30 py-2 rounded-lg border border-black/5 dark:border-white/10';
   }
 
-  const startDay = new Date(dateStr + 'T00:00:00');
+  // Corrección Timezone: Construir fecha localmente sin UTC shift
+  const parts = dateStr.split('-');
+  const baseDay = new Date(parts[0], parts[1] - 1, parts[2]); // Fecha base limpia
+  const startDay = new Date(baseDay);
+
   const dayNum = startDay.getDay();
 
   if (diasOperacionNum.length && !diasOperacionNum.includes(dayNum)) {
@@ -1654,12 +1690,14 @@ async function renderSlotsForSelectedDate() {
     return;
   }
 
-  const startDayISO = new Date(dateStr + 'T00:00:00').toISOString();
-  const endDayISO = new Date(dateStr + 'T23:59:59').toISOString();
+  // Rangos para DB (ISO UTC)
+  const startDayDB = new Date(startDay);
+  const endDayDB = new Date(startDay); endDayDB.setHours(23, 59, 59, 999);
+  const startDayISO = startDayDB.toISOString();
+  const endDayISO = endDayDB.toISOString();
 
   startDay.setHours(ap[0], ap[1], 0, 0);
-
-  const endDay = new Date(dateStr + 'T00:00:00');
+  const endDay = new Date(startDay); // Clonar para fin de jornada local
   if (ci[0] === 0 && ci[1] === 0) {
     endDay.setHours(24, 0, 0, 0);
   } else {
@@ -1668,8 +1706,7 @@ async function renderSlotsForSelectedDate() {
 
   if (endDay <= startDay) endDay.setDate(endDay.getDate() + 1);
 
-  const phoneEl = document.getElementById('profile-phone');
-  const telefono = phoneEl ? phoneEl.textContent : '';
+  const telefono = appState.profile?.telefono;
   let misCitas = [];
   if (telefono && telefono !== '...') {
     const pMisCitas = supabase
@@ -1695,6 +1732,7 @@ async function renderSlotsForSelectedDate() {
   promises.push(pCitas.then(r => { citas = r.data || []; }));
 
   let estadoNegocio = null;
+  // Obtener breaks desde estado_negocio para definir horario real del barbero
   const pEstado = supabase.from('estado_negocio').select('weekly_breaks').eq('negocio_id', negocioId).maybeSingle();
   promises.push(pEstado.then(r => { estadoNegocio = r.data; }));
 
@@ -1728,23 +1766,43 @@ async function renderSlotsForSelectedDate() {
   const wb = estadoNegocio?.weekly_breaks || [];
   const brk = wb.find(x => x.day === dayNum);
   const breaks = [];
+  
+  // Construir breaks usando la fecha base local correcta
   if (brk && brk.start && brk.end) {
-    const bs = new Date(dateStr + 'T00:00:00'); const be = new Date(dateStr + 'T00:00:00');
-    const s = brk.start.split(':').map(Number); const e = brk.end.split(':').map(Number);
+    const bs = new Date(baseDay); bs.setHours(0,0,0,0);
+    const be = new Date(baseDay); be.setHours(0,0,0,0);
+    const s = brk.start.split(':').map(Number); 
+    const e = brk.end.split(':').map(Number);
     bs.setHours(s[0], s[1], 0, 0); be.setHours(e[0], e[1], 0, 0);
     breaks.push([bs.getTime(), be.getTime()]);
   }
 
   (turnosActivos || []).forEach(t => {
-    const s = t.started_at ? new Date(t.started_at) : new Date(`${dateStr}T${t.hora}`);
+    // Convertir hora de turno a objeto Date seguro
+    let s;
+    if (t.started_at) {
+      s = new Date(t.started_at);
+    } else {
+      if (t.hora) {
+          const [h, m] = t.hora.split(':');
+          s = new Date(startDay);
+          s.setHours(h, m, 0, 0);
+      } else {
+          return; // Saltar si no hay hora
+      }
+    }
     const d = serviciosCache[t.servicio] || 30;
     const e = new Date(s);
     e.setMinutes(e.getMinutes() + d);
     breaks.push([s.getTime(), e.getTime()]);
   });
 
-  const dataToCache = { startDay, endDay, citas, breaks, isToday: (dateStr === new Date().toISOString().slice(0, 10)) };
-  slotsCache[cacheKey] = dataToCache;
+  // Comparación segura de "Hoy" usando localDateString
+  const isToday = dateStr === new Date().toLocaleDateString('en-CA');
+  const dataToCache = { startDay, endDay, citas, breaks, isToday };
+  
+  // Guardar en caché con timestamp
+  slotsCache[cacheKey] = { data: dataToCache, timestamp: Date.now() };
 
   renderSlotsFromData(dataToCache, dateStr, dur);
 }
@@ -1756,38 +1814,48 @@ function renderSlotsFromData(data, dateStr, dur) {
 
   slotsContainer.innerHTML = '';
 
-  const step = 30;
+  const step = 15; // Intervalo de 15 minutos para agenda inteligente
   const tmp = new Date(startDay);
   const now = new Date();
+  
+  // Buffer de seguridad configurable
+  const bufferMinutes = configCache?.reserva_buffer_min || 10;
+  const bufferTime = new Date(now.getTime() + bufferMinutes * 60000);
 
   while (tmp < endDay) {
     const currentSlot = new Date(tmp);
 
-    let isPast = false;
-    if (isToday && currentSlot.getTime() < now.getTime()) isPast = true;
+    // Filtro estricto de horas pasadas
+    if (isToday && currentSlot < bufferTime) {
+        tmp.setMinutes(tmp.getMinutes() + step);
+        continue;
+    }
 
     const slotEnd = new Date(currentSlot);
     slotEnd.setMinutes(slotEnd.getMinutes() + dur);
     if (slotEnd > endDay) break;
 
-    const disponible = !isPast && slotDisponible(currentSlot, dur, citas || [], breaks);
+    const disponible = slotDisponible(currentSlot, dur, citas || [], breaks);
 
     const btn = document.createElement('button');
-    const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm';
+    const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm outline-none focus:ring-2 focus:ring-blue-500 active:scale-95';
 
     if (disponible) {
-      btn.className = `${baseClass} bg-[#F8F8F9] dark:bg-transparent border-black/5 dark:border-white/10 hover:border-black/20 dark:hover:bg-white/10 cursor-pointer group`;
+      btn.className = `${baseClass} bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group`;
       btn.onclick = () => seleccionarHora(currentSlot, btn);
+      // Highlight first available
+      if (slotsContainer.children.length === 0) {
+          // Optional: Add "Next" badge logic here if needed
+      }
     } else {
-      btn.className = `${baseClass} bg-gray-100 dark:bg-[#1E1E22] border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50`;
+      btn.className = `${baseClass} bg-gray-50 dark:bg-white/5 border-transparent text-gray-300 dark:text-gray-700 cursor-not-allowed`;
       btn.disabled = true;
     }
 
     const timeStr = currentSlot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
     btn.innerHTML = `
-            <span class="${disponible ? 'text-[#111111] dark:text-gray-200 group-hover:text-black dark:group-hover:text-white' : ''}">${timeStr}</span>
-            ${disponible ? `<span class="text-[10px] text-green-600 dark:text-green-400 font-medium mt-1">Libre</span>` : '<span class="text-[10px] mt-1">Ocupado</span>'}
+            <span class="${disponible ? 'text-gray-900 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''}">${timeStr}</span>
         `;
 
     slotsContainer.appendChild(btn);
@@ -1800,20 +1868,30 @@ function renderSlotsFromData(data, dateStr, dur) {
 }
 
 function seleccionarHora(date, btnElement) {
-  window.__horaSeleccionada__ = date;
+  appState.selectedTimeSlot = date;
 
   const container = document.getElementById('slots-container');
   if (container) {
     Array.from(container.children).forEach(c => {
       if (!c.disabled) {
         c.classList.remove('slot-selected');
-        c.classList.remove('bg-black', 'dark:bg-white', 'text-white', 'dark:text-black', 'border-black', 'dark:border-white');
+        c.classList.remove('bg-blue-600', 'text-white', 'border-blue-600', 'shadow-lg', 'shadow-blue-600/30');
+        c.classList.add('bg-white', 'dark:bg-white/5', 'text-gray-900', 'dark:text-gray-200');
       }
     });
   }
 
-  btnElement.classList.remove('dark:bg-transparent');
-  btnElement.classList.add('slot-selected');
+  btnElement.classList.remove('bg-white', 'dark:bg-white/5', 'text-gray-900', 'dark:text-gray-200');
+  btnElement.classList.add('bg-blue-600', 'text-white', 'border-blue-600', 'shadow-lg', 'shadow-blue-600/30', 'slot-selected');
+
+  // Update Summary
+  const servicioSel = document.getElementById('select-servicio-cita').value;
+  const precio = preciosCache[servicioSel] || 0;
+  const duracion = serviciosCache[servicioSel] || 30;
+  
+  document.getElementById('summary-service').textContent = servicioSel;
+  document.getElementById('summary-price').textContent = `RD$ ${Number(precio).toFixed(2)}`;
+  // document.getElementById('summary-duration').textContent = `${duracion} min`;
 
   const actionContainer = document.getElementById('action-container');
   if (actionContainer) {
@@ -1827,10 +1905,10 @@ async function confirmarReservaManual() {
     await solicitarPermisoNotificacion();
   }
 
-  if (!window.__horaSeleccionada__) return;
-
-  const date = window.__horaSeleccionada__;
+  const date = appState.selectedTimeSlot;
   const barberSel = document.getElementById('select-barbero-cita').value;
+
+  if (!date) return;
 
   if (!date) {
     showToast('Error: Debes seleccionar una hora.', 'error');
@@ -1843,14 +1921,19 @@ async function confirmarReservaManual() {
   }
 
   const servicioSel = document.getElementById('select-servicio-cita').value || document.getElementById('select-servicio').value;
-  const phoneEl = document.getElementById('profile-phone');
+  const telefono = appState.profile?.telefono;
 
   if (!servicioSel) {
     showToast('Error: Debes seleccionar un servicio.', 'error');
     return;
   }
-  const telefono = phoneEl ? phoneEl.textContent : '';
   const dur = serviciosCache[servicioSel] || 30;
+
+  // Validación de doble reserva en el frontend
+  if (appState.hasActiveAppointment || appState.hasActiveTurn) {
+    showToast('Ya tienes una reserva activa para hoy.', 'error');
+    return;
+  }
 
   const slotEnd = new Date(date);
   slotEnd.setMinutes(slotEnd.getMinutes() + dur);
@@ -1879,7 +1962,8 @@ async function confirmarReservaManual() {
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#111113', '#ffffff'] });
         }
 
-        Object.keys(slotsCache).forEach(k => delete slotsCache[k]);
+        // Limpiar caché para forzar recarga de datos frescos
+        Object.keys(slotsCache).forEach(k => delete slotsCache[k]); 
 
         sendPushNotification('¡Cita Confirmada!', `Tu cita para las ${timeStr} ha sido agendada.`);
 
@@ -1895,8 +1979,7 @@ async function confirmarReservaManual() {
 }
 
 window.cancelarTurno = async () => {
-  confirmarAccion('Cancelar Turno', '¿Estás seguro de que deseas cancelar tu turno actual?', async () => {
-    const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
+  confirmarAccion('Cancelar Turno', '¿Estás seguro de que deseas cancelar tu turno actual?', async () => {    const telefono = appState.profile?.telefono;
     const hoy = new Date().toISOString().slice(0, 10);
 
     if (!telefono) {
@@ -1920,7 +2003,7 @@ window.cancelarTurno = async () => {
 };
 
 window.cancelarCita = async (idCita = null) => {
-  const card = document.getElementById('card-cita-activa');
+  const card = document.querySelector('#card-cita-activa .bento-card'); // Selector más específico
   const id = idCita || (card ? card.dataset.id : null);
   if (!id) return;
 
@@ -1932,6 +2015,7 @@ window.cancelarCita = async (idCita = null) => {
       if (error) {
         showToast('Error al cancelar cita', 'error');
       } else {
+        slotsCache = {}; // Limpiar caché de slots
         showToast('Tu cita ha sido cancelada.', 'success');
         verificarCitaActiva();
       }
@@ -2007,7 +2091,7 @@ window.subirAvatar = async (input) => {
 };
 
 async function checkPendingRatings() {
-  const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
+  const telefono = appState.profile?.telefono;
   if (!telefono) return;
 
   const { data: turnos } = await supabase
@@ -2078,9 +2162,8 @@ function cerrarModalCalificacion() {
 }
 
 async function enviarCalificacion(turnoId, rating, comment) {
-  const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-  const nameEl = document.getElementById('profile-name');
-  const nombre = nameEl ? nameEl.textContent : '';
+  const telefono = appState.profile?.telefono;
+  const nombre = appState.profile?.nombre;
 
   const { error } = await supabase.from('comentarios').insert([{
     negocio_id: negocioId,
@@ -2116,9 +2199,12 @@ if (formCal) {
   });
 }
 
-init();
-cargarBarberos();
-cargarConfigNegocio();
-document.querySelectorAll('a[href^="https://wa.me/"]').forEach(a => a.addEventListener('click', () => { if (navigator.vibrate) navigator.vibrate(20); }));
-setupThemeToggle();
-setupStaticEventHandlers();
+if (typeof init === 'function') init();
+if (typeof cargarBarberos === 'function') cargarBarberos();
+if (typeof cargarConfigNegocio === 'function') cargarConfigNegocio();
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('a[href^="https://wa.me/"]').forEach(a => a.addEventListener('click', () => { if (navigator.vibrate) navigator.vibrate(20); }));
+    setupThemeToggle();
+    setupStaticEventHandlers();
+});

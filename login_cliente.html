@@ -338,6 +338,11 @@
         } else {
             // Fallback: Si no hay perfil en tabla clientes, guardamos al menos el ID de auth
             localStorage.setItem(`cliente_id_${negocioId}`, signInData.user.id);
+            // CORRECCIÓN: Guardar metadata para evitar pantalla blanca en panel
+            if (signInData.user.user_metadata) {
+                 if (signInData.user.user_metadata.nombre) localStorage.setItem(`cliente_nombre_${negocioId}`, signInData.user.user_metadata.nombre);
+                 if (signInData.user.user_metadata.telefono) localStorage.setItem(`cliente_telefono_${negocioId}`, signInData.user.user_metadata.telefono);
+            }
         }
   
         window.location.href = 'panel_cliente.html';

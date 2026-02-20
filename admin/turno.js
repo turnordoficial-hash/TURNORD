@@ -18,6 +18,7 @@ let clientesMap = {};
 let barberosActivosList = []; // Cache para lógica de disponibilidad
 let __pushSubsCount = 0;
 let isSubmittingTurn = false; // Flag para evitar doble submit
+let agendaInterval = null; // Intervalo para actualizar línea de tiempo y estados
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -46,7 +47,9 @@ const ESTADOS = {
     DEVUELTO: 'Devuelto',
     CITA_PROGRAMADA: 'Programada',
     CITA_CANCELADA: 'Cancelada',
-    CITA_ATENDIDA: 'Atendida'
+    CITA_ATENDIDA: 'Atendida',
+    CITA_EN_CURSO: 'En curso',
+    CITA_NO_PRESENTADO: 'No presentado'
 };
 
 // --- MÁQUINA DE ESTADOS CENTRALIZADA ---
@@ -191,6 +194,12 @@ async function cargarServicios() {
             sel.innerHTML = '<option value="">Seleccione un servicio</option>' +
                 data.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
         }
+        // Llenar select del modal de cita manual
+        const selCita = document.getElementById('cita-servicio');
+        if (selCita && data && data.length) {
+            selCita.innerHTML = '<option value="">Seleccione un servicio</option>' +
+                data.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
+        }
     } catch (e) {
         console.error('Error crítico al cargar servicios:', e);
     }
@@ -314,6 +323,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnAtender')?.addEventListener('click', atenderAhora);
     document.getElementById('btnTomarTurnoManual')?.addEventListener('click', abrirModal);
     document.getElementById('formTurno')?.addEventListener('submit', tomarTurno);
+    
+    // Agenda Inteligente
+    document.getElementById('formCitaManual')?.addEventListener('submit', guardarCitaManual);
+    renderTimelineHours();
 
     // 5. Limpieza de canales al salir (Evitar fugas de memoria)
     window.addEventListener('beforeunload', () => {
@@ -889,6 +902,10 @@ async function cargarTurnos() {
     citasHoy = citasDia;
     citasFuturas = citasRes;
 
+    // Renderizar Agenda Inteligente
+    renderAgendaTimeline();
+    checkAgendaStates(); // Verificar estados (No show, etc)
+
     // Limpiar intervalos SOLO cuando tenemos los datos nuevos listos para evitar parpadeos vacíos
     Object.values(activeTurnIntervals).forEach(clearInterval);
     activeTurnIntervals = {};
@@ -1048,7 +1065,7 @@ async function cargarTurnos() {
             tiempoPromedio.textContent = `${Math.round(promedio)} min`;
         }
     }
-    renderCitas();
+    // renderCitas(); // Reemplazado por renderAgendaTimeline
     renderPorBarbero(enAtencion || [], dataRender || [], citasHoy || []);
     
     // --- ALERTA VISUAL DE PRÓXIMA CITA ---
