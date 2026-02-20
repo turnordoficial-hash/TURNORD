@@ -447,6 +447,49 @@ function renderStructure() {
               </div>
           </div>
       </div>
+      
+      <!-- SECCION TOMAR TURNO (Restaurada para uso de datos inmediatos) -->
+      <div id="seccion-tomar-turno" class="mt-6 bg-white dark:bg-[#111] p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-32 h-32 bg-gray-100 dark:bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+          <h3 class="text-2xl font-black text-gray-900 dark:text-white mb-4 relative z-10">Tomar Turno Ahora</h3>
+          <div class="space-y-4 relative z-10">
+              <div>
+                  <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Servicio</label>
+                  <div class="relative">
+                    <select id="select-servicio" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#C1121F] appearance-none cursor-pointer">
+                        <option value="">Cargando servicios...</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
+              </div>
+              <div>
+                  <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Barbero (Opcional)</label>
+                  <div class="relative">
+                    <select id="select-barbero-turno" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#C1121F] appearance-none cursor-pointer">
+                        <option value="">Cualquiera</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
+              </div>
+              <button id="btn-tomar-turno" onclick="tomarTurno()" class="w-full py-4 bg-black dark:bg-white text-white dark:text-black font-black rounded-2xl shadow-lg hover:scale-[1.02] transition-transform flex justify-center items-center gap-2">
+                  CONFIRMAR TURNO
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </button>
+          </div>
+          
+          <!-- Mensaje de bloqueo si hay turno activo -->
+          <div id="bloqueado-msg" class="hidden absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-3xl">
+              <div class="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              </div>
+              <h4 class="text-xl font-bold text-gray-900 dark:text-white">Turno en curso</h4>
+              <p id="bloqueado-texto" class="text-sm text-gray-500 dark:text-gray-400 mt-2">Ya tienes un turno activo. Espera a ser atendido.</p>
+          </div>
+      </div>
         `;
   }
 
@@ -789,25 +832,31 @@ async function cargarPerfil() {
 }
 
 function renderServices(data) {
+  // 1. Llenar caché incondicionalmente para cálculos
+  data.forEach(s => {
+      serviciosCache[s.nombre] = s.duracion_min;
+      preciosCache[s.nombre] = s.precio;
+  });
+
   const select = document.getElementById('select-servicio');
   if (select) {
     select.innerHTML = '<option value="">Selecciona un servicio...</option>';
     data.forEach(s => {
-      serviciosCache[s.nombre] = s.duracion_min;
-      preciosCache[s.nombre] = s.precio;
       const option = document.createElement('option');
       option.value = s.nombre;
-      option.textContent = s.nombre;
+      // MOSTRAR DATOS: Nombre + Duración + Precio
+      option.textContent = `${s.nombre} (${s.duracion_min} min) - RD$ ${s.precio}`;
       select.appendChild(option);
     });
   }
   const svcCita = document.getElementById('select-servicio-cita');
   if (svcCita) {
-    svcCita.innerHTML = '<option value="">Selecciona un servicio...</option>';
+    svcCita.innerHTML = '<option value="">Elegir servicio...</option>';
     (data || []).forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.nombre;
-      opt.textContent = s.nombre;
+      // MOSTRAR DATOS: Nombre + Duración + Precio
+      opt.textContent = `${s.nombre} (${s.duracion_min} min) - RD$ ${s.precio}`;
       svcCita.appendChild(opt);
     });
   }
@@ -816,10 +865,6 @@ function renderServices(data) {
 async function cargarServicios() {
   const cached = getCache('SERVICES');
   if (cached) {
-    cached.forEach(s => {
-        serviciosCache[s.nombre] = s.duracion_min;
-        preciosCache[s.nombre] = s.precio;
-    });
     renderServices(cached);
   }
 
@@ -1109,8 +1154,8 @@ async function verificarTurnoActivo() {
 
       const porcentaje = Math.max(5, 100 - (personasDelante * 15));
 
-      if (personasDelante <= 1 && !appState.notificacionCercaEnviada) {
-        sendPushNotification('🔔 ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`);
+    if (personasDelante <= 1 && !appState.notificacionCercaEnviada) {
+        sendPushNotification('💈 JBarber - ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`, '/panel_cliente.html#turno');
         window.notificacionCercaEnviada = true;
       }
     }
@@ -1250,12 +1295,12 @@ async function verificarCitaActiva() {
   }
 }
 
-async function sendPushNotification(title, body) {
+async function sendPushNotification(title, body, url) {
   const telefono = appState.profile?.telefono;
   if (!telefono || telefono === '...') return;
   try {
     const { error } = await supabase.functions.invoke('send-push-notification', {
-      body: { telefono, negocio_id: negocioId, title, body }
+      body: { telefono, negocio_id: negocioId, title, body, url }
     });
     if (error) throw error;
   } catch (e) {
@@ -1379,7 +1424,7 @@ window.tomarTurno = async () => {
 
     const nuevoTurno = data.turno;
     showToast(`¡Turno ${nuevoTurno} reservado!`);
-    sendPushNotification('🎉 ¡Estás en la lista!', `Tu turno ${nuevoTurno} está confirmado. Relájate, nosotros te avisamos.`);
+    sendPushNotification('💈 JBarber - Turno confirmado', `Tu turno ${nuevoTurno} está confirmado. Te avisaremos cuando se acerque tu momento.`, '/panel_cliente.html#turno');
 
     if (navigator.vibrate) navigator.vibrate(200);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1488,7 +1533,11 @@ window.reservarCitaInteligente = async () => {
     if (error) throw error;
 
     showToast('¡Cita inteligente reservada!');
-    await sendPushNotification('¡Cita Reservada!', `Tu cita inteligente para hoy a las ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ha sido confirmada.`);
+    await sendPushNotification(
+      '💈 JBarber - Cita reservada',
+      `Tu cita inteligente para hoy a las ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ha sido confirmada.`,
+      '/panel_cliente.html#cita'
+    );
 
     setTimeout(() => window.location.reload(), 2000);
   } catch (e) {
@@ -1925,10 +1974,13 @@ async function confirmarReservaManual() {
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#111113', '#ffffff'] });
         }
 
-        // Limpiar caché para forzar recarga de datos frescos
         Object.keys(slotsCache).forEach(k => delete slotsCache[k]); 
 
-        sendPushNotification('¡Cita Confirmada!', `Tu cita para las ${timeStr} ha sido agendada.`);
+        sendPushNotification(
+          '💈 JBarber - Cita confirmada',
+          `Tu cita para las ${timeStr} ha sido agendada.`,
+          '/panel_cliente.html#cita'
+        );
 
         window.location.reload();
       } catch (e) {

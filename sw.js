@@ -5,10 +5,10 @@
 self.addEventListener("push", (event) => {
 
   let payload = {
-    title: "TurnoRD",
-    body: "Hay una nueva notificación para ti.",
+    title: "💈 JBarber",
+    body: "Tienes una actualización en tu turno o cita.",
     icon: "jbarber/jjj.png",
-    url: "panel_cliente.html"
+    url: "/panel_cliente.html"
   };
 
   if (event.data) {
@@ -25,7 +25,7 @@ self.addEventListener("push", (event) => {
     badge: "imegenlogin/favicon-32x32.png",
     vibrate: [100, 50, 100],
     data: {
-      url: payload.url || "panel_cliente.html"
+      url: payload.url || "/panel_cliente.html"
     },
     actions: [
       {

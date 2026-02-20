@@ -83,8 +83,8 @@ serve(async (req) => {
     }
 
     const payload = JSON.stringify({
-      title: title || "¡Es tu turno!",
-      body: body || "Un barbero te está esperando",
+      title: title || "💈 JBarber",
+      body: body || "Tienes una actualización en tu turno o cita.",
       icon: "jbarber/jjj.png",
       badge: "imegenlogin/favicon-32x32.png",
       vibrate: [200, 100, 200],
