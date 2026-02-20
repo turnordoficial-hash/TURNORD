@@ -323,10 +323,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnAtender')?.addEventListener('click', atenderAhora);
     document.getElementById('btnTomarTurnoManual')?.addEventListener('click', abrirModal);
     document.getElementById('formTurno')?.addEventListener('submit', tomarTurno);
-    
-    // Agenda Inteligente
-    document.getElementById('formCitaManual')?.addEventListener('submit', guardarCitaManual);
-    renderTimelineHours();
 
     // 5. Limpieza de canales al salir (Evitar fugas de memoria)
     window.addEventListener('beforeunload', () => {
@@ -902,9 +898,7 @@ async function cargarTurnos() {
     citasHoy = citasDia;
     citasFuturas = citasRes;
 
-    // Renderizar Agenda Inteligente
-    renderAgendaTimeline();
-    checkAgendaStates(); // Verificar estados (No show, etc)
+    renderCitas();
 
     // Limpiar intervalos SOLO cuando tenemos los datos nuevos listos para evitar parpadeos vacíos
     Object.values(activeTurnIntervals).forEach(clearInterval);

@@ -83,78 +83,8 @@ function getSaludo() {
 }
 
 function updateBanner(mode = 'default') {
-  const bannerInicio = document.getElementById('banner-inicio');
-  if (!bannerInicio) return;
-
-  const contentWrapper = bannerInicio.querySelector('.banner-content-wrapper');
-  let htmlContent = '';
-  const day = new Date().getDay(); // 0 = Domingo, 1 = Lunes...
-
-  if (mode === 'active_turn') {
-    htmlContent = `
-        <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent z-0"></div>
-        <div class="relative z-10">
-            <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full px-3 py-1 text-[10px] font-bold mb-4 shadow-lg uppercase tracking-widest"><span class="banner-badge">En Curso 🔥</span></div>
-            <h2 class="banner-title text-3xl md:text-5xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-xl leading-none">Tu barbero está <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">trabajando</span></h2>
-            <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm mb-2">Estamos avanzando con los turnos. Mantente atento.</p>
-        </div>
-    `;
-  } else if (mode === 'available') {
-    htmlContent = `
-        <div class="absolute inset-0 bg-gradient-to-r from-green-900/80 via-black/50 to-transparent z-0"></div>
-        <div class="relative z-10">
-            <div class="inline-flex items-center gap-2 bg-green-500/20 backdrop-blur-md text-green-300 border border-green-500/30 rounded-full px-3 py-1 text-[10px] font-bold mb-4 shadow-lg uppercase tracking-widest"><span class="banner-badge">Sin Espera 🚀</span></div>
-            <h2 class="banner-title text-3xl md:text-5xl font-display font-bold text-white mb-3 tracking-wide drop-shadow-xl leading-none">Barbero <br><span class="text-green-400">Disponible</span></h2>
-            <p class="banner-text text-white/80 text-sm md:text-base max-w-lg leading-relaxed font-medium drop-shadow-sm">Puedes venir ahora mismo. Estamos listos.</p>
-            <button onclick="switchTab('cita')" class="mt-6 bg-white text-black px-8 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all hover:scale-105 tap-scale flex items-center gap-2">
-                <span>Reservar Ahora</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-            </button>
-        </div>
-    `;
-  } else {
-    // Lógica de Marketing Dinámico por Día
-    let title = "Tu estilo empieza aquí.";
-    let text = "Reserva tu cita en segundos y asegura tu espacio con los mejores barberos.";
-    let badge = "Agenda Pro";
-
-    if (day === 1) { // Lunes
-        title = "Empieza la semana con estilo.";
-        text = "Un buen corte define tu semana. Agenda hoy y marca la diferencia.";
-        badge = "Lunes de Estilo";
-    } else if (day === 5) { // Viernes
-        title = "Prepárate para el fin de semana.";
-        text = "Últimos espacios disponibles para lucir impecable este finde.";
-        badge = "Viernes Social";
-        // Contador de escasez simulado para viernes
-        text += " <span class='text-yellow-400 font-bold block mt-1'>⚠️ Quedan pocos espacios hoy.</span>";
-    } else if (day === 0) { // Domingo
-        title = "Domingo de relax y corte.";
-        text = "Prepara tu imagen para la semana que viene.";
-    }
-
-    htmlContent = `
-        <div class="absolute inset-0 bg-gradient-to-r from-barberBlack/90 via-barberBlack/60 to-transparent z-0"></div>
-        <div class="relative z-10">
-            <div class="flex flex-col gap-4">
-              <span class="text-xs uppercase tracking-widest text-white/60">
-                ${badge}
-              </span>
-              <h2 class="text-3xl md:text-5xl font-bold banner-title text-white">
-                ${title}
-              </h2>
-              <p class="text-white/70 text-sm max-w-md">
-                ${text}
-              </p>
-              <button onclick="switchTab('cita')" class="mt-2 px-6 py-3 rounded-xl font-bold btn-primary shadow-lg w-fit">
-                Reservar Ahora
-              </button>
-            </div>
-        </div>
-    `;
-  }
-
-  if (contentWrapper) contentWrapper.innerHTML = htmlContent;
+  // Función eliminada por solicitud
+  return;
 }
 
 const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
@@ -453,74 +383,54 @@ async function init() {
 }
 
 function renderStructure() {
-  const bannerTemplate = document.getElementById('banner-marketing-template');
-  const inicioContainer = document.getElementById('inicio-promo-container');
-
-  if (bannerTemplate && inicioContainer) {
-    const banner1 = bannerTemplate.cloneNode(true);
-    banner1.id = 'banner-inicio';
-    banner1.classList.remove('hidden');
-    inicioContainer.appendChild(banner1);
-  }
-
   const statusContainer = document.getElementById('inicio-status-container');
   if (statusContainer) {
     statusContainer.innerHTML = `
-          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
-            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3L13,9L15,11L21,5V3M19,5L15,9L17,11L21,7V5M19,7L17,9L19,11L21,9V7M19,9L18,10L19,11L20,10V9M19,11L19,11L19,11L19,11M12,10.5C12,9.67 11.33,9 10.5,9C9.67,9 9,9.67 9,10.5C9,11.33 9.67,12 10.5,12C11.33,12 12,11.33 12,10.5M10.5,7C10.5,7 10.5,7 10.5,7M10.5,14C10.5,14 10.5,14 10.5,14M7.5,10.5C7.5,9.67 6.83,9 6,9C5.17,9 4.5,9.67 4.5,10.5C4.5,11.33 5.17,12 6,12C6.83,12 7.5,11.33 7.5,10.5M6,7C6,7 6,7 6,7M6,14C6,14 6,14 6,14"/></svg>
-            </div>
-            <div class="relative z-10">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
-                    </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Tu Estado</span>
-                </div>
-                <div id="dash-card-1">
-                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">Sin turno</span>
-                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">No estás en la fila</span>
-                </div>
-            </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Card Estado (Ultra Design) -->
+          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#111] to-black border border-white/10 shadow-2xl group">
+              <div class="absolute top-0 right-0 w-32 h-32 bg-[#C1121F]/20 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-[#C1121F]/30"></div>
+              <div class="absolute bottom-0 left-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
+              
+              <div class="relative z-10 p-6">
+                  <div class="flex justify-between items-start mb-4">
+                      <div class="p-3 rounded-2xl bg-white/5 border border-white/10 text-white shadow-inner">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      </div>
+                      <span class="px-3 py-1 rounded-full bg-[#C1121F]/20 border border-[#C1121F]/30 text-[#C1121F] text-[10px] font-bold uppercase tracking-widest">
+                          Tu Estado
+                      </span>
+                  </div>
+                  
+                  <div id="dash-card-1">
+                      <span class="text-4xl md:text-5xl font-black text-white tracking-tight">Sin turno</span>
+                      <p class="text-gray-400 text-sm mt-1 font-medium">Únete a la fila ahora</p>
+                  </div>
+              </div>
           </div>
 
-          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
-            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z"/></svg>
-            </div>
-            <div class="relative z-10">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Estimado</span>
-                </div>
-                <div id="dash-card-2">
-                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">-- min</span>
-                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Tiempo de espera</span>
-                </div>
-            </div>
+          <!-- Card Estimado (Ultra Design) -->
+          <div class="relative overflow-hidden rounded-3xl bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 shadow-xl group">
+              <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+              <div class="absolute top-0 right-0 w-20 h-20 bg-yellow-500/20 rounded-full blur-2xl transition-all group-hover:scale-150"></div>
+              
+              <div class="relative z-10 p-6">
+                  <div class="flex justify-between items-start mb-4">
+                      <div class="p-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-black dark:text-white">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                      <span class="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-[10px] font-bold uppercase tracking-widest">
+                          Tiempo
+                      </span>
+                  </div>
+                  
+                  <div id="dash-card-2">
+                       <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight">-- min</span>
+                       <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">Tiempo estimado</p>
+                  </div>
+              </div>
           </div>
-
-          <div class="bento-card p-6 relative overflow-hidden group tap-scale bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-barberRed to-barberGold"></div>
-            <div class="absolute -right-6 -top-6 text-black/5 dark:text-white/5 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32" viewBox="0 0 24 24" fill="currentColor"><path d="M16,11.78L20.24,4.45L21.97,5.45L19.23,10.22L21.23,13.68L19.5,14.68L17.5,11.22L15.5,14.68L13.77,13.68L15.77,10.22L13.03,5.45L14.76,4.45L19,11.78M12,5V19H10V5H12M16,19H14V11H16V19M8,19H6V11H8V19M4,19H2V11H4V19M16,7H14V5H16V7M8,7H6V5H8V7M4,7H2V5H4V7Z"/></svg>
-            </div>
-            <div class="relative z-10">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="p-3 bg-black/5 dark:bg-white/10 rounded-2xl text-black dark:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                    </div>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Demanda</span>
-                </div>
-                <div id="dash-card-3">
-                   <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black/5 dark:bg-white/10 subtitle-text text-lg font-bold animate-pulse text-gray-900 dark:text-white">Calculando...</span>
-                </div>
-            </div>
-          </div>
+      </div>
         `;
   }
 
@@ -529,101 +439,140 @@ function renderStructure() {
     citaPanel.innerHTML = `
             <div id="cita-promo-container" class="mb-6"></div>
             
-            <div id="card-cita-activa" class="hidden bento-card p-8 relative overflow-hidden mb-8 group bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-lg rounded-2xl" style="border-left: 4px solid #000;">
-                <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                </div>
-                <h3 class="text-sm font-bold title-text uppercase tracking-wider mb-2 text-gray-900 dark:text-white">📅 Tu Cita Programada</h3>
-                <div class="flex flex-col gap-1">
-                  <span id="cita-fecha-hora" class="text-4xl font-display font-bold tracking-wide title-text text-gray-900 dark:text-white">--</span>
-                  <span id="cita-barbero" class="text-lg font-medium subtitle-text text-gray-600 dark:text-gray-300">--</span>
-                </div>
-                <p id="cita-servicio" class="subtitle-text mt-3 font-medium text-gray-600 dark:text-gray-400">Cita Reservada</p>
-                <div class="mt-6 pt-6 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
-                  <div class="text-sm subtitle-text text-gray-500 dark:text-gray-400">Llega 5 min antes</div>
-                  <button onclick="cancelarCita()" class="bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/20 text-sm font-semibold transition-colors px-4 py-2 rounded-lg border border-black/10 dark:border-white/10">Cancelar Cita</button>
+            <!-- Card Cita Activa (Hidden by default) -->
+            <div id="card-cita-activa" class="hidden relative overflow-hidden rounded-3xl bg-black border border-white/10 shadow-2xl mb-8 group">
+                <div class="absolute inset-0 bg-gradient-to-r from-[#C1121F]/20 to-transparent opacity-50"></div>
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"></div>
+                
+                <div class="relative z-10 p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md">
+                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-white">Confirmada</span>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Barbero</p>
+                            <p id="cita-barbero" class="text-lg font-bold text-white">--</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 id="cita-fecha-hora" class="text-4xl md:text-5xl font-black text-white tracking-tight leading-none mb-1">--</h3>
+                        <p id="cita-servicio" class="text-lg text-gray-300 font-medium">--</p>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-6 border-t border-white/10">
+                        <p class="text-xs text-gray-500 font-medium">Llega 5 min antes</p>
+                        <button onclick="cancelarCita()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            Cancelar
+                        </button>
+                    </div>
                 </div>
             </div>
             
-            <div id="seccion-cita-inteligente" class="bento-card p-0 overflow-hidden bg-white dark:bg-[#111113] shadow-xl border border-gray-100 dark:border-white/5">
-                <!-- Header Azul Oscuro -->
-                <div class="bg-gradient-to-r from-barberBlack to-[#1e293b] p-6 md:p-8 text-white relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-4 opacity-10">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <!-- Sección Agenda Inteligente -->
+            <div id="seccion-cita-inteligente" class="relative overflow-hidden rounded-3xl bg-white dark:bg-[#111] shadow-xl border border-gray-100 dark:border-white/5">
+                <!-- Header Premium -->
+                <div class="relative bg-[#0B0B0B] p-8 overflow-hidden">
+                    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30"></div>
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-[#C1121F]/20 rounded-full blur-[60px] transform translate-x-1/2 -translate-y-1/2"></div>
+                    
+                    <div class="relative z-10">
+                        <h3 class="text-3xl font-black text-white mb-2 tracking-tight">AGENDA <span class="text-[#C1121F]">PRO</span></h3>
+                        <p class="text-gray-400 text-sm font-medium">Reserva tu espacio con estilo y precisión.</p>
                     </div>
-                    <h3 class="text-2xl md:text-3xl font-display font-bold mb-2 relative z-10">Agenda Inteligente</h3>
-                    <p class="text-blue-200 text-sm relative z-10">Reserva tu espacio en segundos.</p>
                 </div>
 
-                <div id="form-cita-container" class="p-6 md:p-8 space-y-6">
-                    <!-- Step 1: Service -->
-                    <div>
-                        <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">1. Selecciona tu Servicio</label>
-                        <select id="select-servicio-cita" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all appearance-none">
-                            <option value="">Elegir servicio...</option>
-                        </select>
+                <div id="form-cita-container" class="p-6 md:p-8 space-y-8">
+                    <!-- Step 1 -->
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400">
+                            <span class="w-5 h-5 rounded-full bg-[#C1121F] text-white flex items-center justify-center text-[10px]">1</span>
+                            Selecciona Servicio
+                        </label>
+                        <div class="relative group">
+                            <select id="select-servicio-cita" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-[#C1121F] outline-none transition-all appearance-none cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10">
+                                <option value="">Elegir servicio...</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Step 2 & 3 -->
+                    <!-- Step 2 & 3 Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div>
-                            <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">2. Elige Profesional</label>
-                            <div class="relative">
-                                <select id="select-barbero-cita" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all appearance-none">
+                         <div class="space-y-3">
+                            <label class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400">
+                                <span class="w-5 h-5 rounded-full bg-[#C1121F] text-white flex items-center justify-center text-[10px]">2</span>
+                                Profesional
+                            </label>
+                            <div class="relative group">
+                                <select id="select-barbero-cita" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-[#C1121F] outline-none transition-all appearance-none cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10">
                                     <option value="">Cargando...</option>
                                 </select>
                                 <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                 </div>
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold subtitle-text mb-2 uppercase tracking-wider">3. Selecciona Fecha</label>
-                            <input id="date-picker" type="date" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-900 outline-none transition-all">
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400">
+                                <span class="w-5 h-5 rounded-full bg-[#C1121F] text-white flex items-center justify-center text-[10px]">3</span>
+                                Fecha
+                            </label>
+                            <input id="date-picker" type="date" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-[#C1121F] outline-none transition-all cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10">
                         </div>
                     </div>
 
-                <button id="btn-ver-horarios" class="w-full py-4 bg-barberBlack dark:bg-white text-white dark:text-black font-bold rounded-xl shadow-lg hover:scale-[1.01] transition-transform flex justify-center items-center gap-2 tap-scale">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Ver Horarios Libres
+                    <button id="btn-ver-horarios" class="w-full py-5 bg-[#C1121F] hover:bg-red-700 text-white font-black tracking-wide rounded-2xl shadow-lg shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.02] transition-all flex justify-center items-center gap-3 group">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        BUSCAR HORARIOS
                     </button>
 
-                    <div id="horarios-libres" class="mt-2 hidden">
-                        <div id="barber-info-card" class="hidden mt-4 flex items-center gap-4 p-4 bg-[#F8F8F9] dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm transition-all animate-fade-in">
-                            <img id="barber-avatar-display" src="" class="w-12 h-12 rounded-full object-cover border-2 border-barberRed shadow-sm">
+                    <div id="horarios-libres" class="mt-4 hidden animate-fade-in">
+                        <!-- Barber Info -->
+                        <div id="barber-info-card" class="hidden mb-6 flex items-center gap-4 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                            <img id="barber-avatar-display" src="" class="w-14 h-14 rounded-full object-cover border-2 border-[#C1121F] shadow-md">
                             <div>
-                                <p id="barber-name-display" class="font-bold title-text text-lg leading-tight text-gray-900 dark:text-white"></p>
-                                <p class="text-xs subtitle-text font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Barbero seleccionado</p>
+                                <p id="barber-name-display" class="font-black text-lg leading-tight text-gray-900 dark:text-white"></p>
+                                <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Seleccionado</p>
                             </div>
                         </div>
 
-                        <div id="slots-section" class="pt-4 border-t border-gray-100 dark:border-white/5">
-                            <div class="flex items-center justify-between mb-4">
-                                <label class="block text-xs font-bold subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Horarios Disponibles</label>
-                                <span id="rango-horario-display" class="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full"></span>
+                        <div id="slots-section" class="pt-6 border-t border-gray-100 dark:border-white/10">
+                            <div class="flex items-center justify-between mb-5">
+                                <label class="text-xs font-black uppercase tracking-widest text-gray-400">Disponibilidad</label>
+                                <span id="rango-horario-display" class="text-[10px] font-bold text-white bg-black px-3 py-1 rounded-full"></span>
                             </div>
                             
                             <div id="slots-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3"></div>
 
-                            <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-600 rounded-r-xl flex gap-3 items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <p class="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-                                    <strong>Política de puntualidad:</strong> Llega 10 minutos antes. Retrasos de 10 min cancelan la cita automáticamente.
+                            <div class="mt-8 p-5 bg-yellow-50 dark:bg-yellow-900/10 border-l-4 border-yellow-500 rounded-r-xl flex gap-4 items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                <p class="text-xs text-yellow-800 dark:text-yellow-200 font-medium leading-relaxed">
+                                    <strong>Nota:</strong> Llega 10 minutos antes. Retrasos cancelan la cita automáticamente.
                                 </p>
                             </div>
 
-                            <div id="action-container" class="hidden pt-4 animate-fade-in mt-4">
-                                 <div class="bg-gray-50 dark:bg-white/5 p-5 rounded-xl mb-4 border border-gray-100 dark:border-white/5">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="text-xs subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Servicio</span>
-                                        <span id="summary-service" class="text-sm font-bold text-gray-900 dark:text-white text-right">--</span>
-                                    </div>
-                                    <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-white/10 mt-2">
-                                        <span class="text-xs subtitle-text uppercase tracking-wider text-gray-500 dark:text-gray-400">Total</span>
-                                        <span id="summary-price" class="text-lg font-black text-blue-600 dark:text-blue-400">RD$ 0.00</span>
+                            <div id="action-container" class="hidden pt-6 animate-fade-in">
+                                 <div class="bg-black text-white p-6 rounded-2xl mb-4 shadow-xl relative overflow-hidden">
+                                    <div class="absolute top-0 right-0 w-32 h-32 bg-[#C1121F]/30 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Servicio</span>
+                                            <span id="summary-service" class="text-sm font-bold text-right">--</span>
+                                        </div>
+                                        <div class="flex justify-between items-center pt-4 border-t border-white/10 mt-2">
+                                            <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Total</span>
+                                            <span id="summary-price" class="text-2xl font-black text-[#C1121F]">RD$ 0.00</span>
+                                        </div>
                                     </div>
                                  </div>
-                                <button id="btn-confirmar-reserva" class="w-full py-4 btn-primary font-bold rounded-xl shadow-xl transition-all transform hover:scale-[1.01] flex justify-center items-center gap-2 tap-scale">Confirmar Cita</button>
+                                <button id="btn-confirmar-reserva" class="w-full py-5 bg-black dark:bg-white text-white dark:text-black font-black tracking-wide rounded-2xl shadow-xl hover:scale-[1.02] transition-all flex justify-center items-center gap-2">
+                                    CONFIRMAR RESERVA
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -969,8 +918,8 @@ async function actualizarEstadoFila() {
   const dashCard1 = document.getElementById('dash-card-1');
   if (dashCard1 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
     dashCard1.innerHTML = `
-             <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${personasEnCola}</span>
-             <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Personas en espera</span>
+             <span class="text-4xl md:text-5xl font-black text-white tracking-tight block">${personasEnCola}</span>
+             <p class="text-gray-400 text-sm mt-1 font-medium">Personas en espera</p>
           `;
   }
 
@@ -985,24 +934,15 @@ async function actualizarEstadoFila() {
         let partes = [];
         if (citasCount > 0) partes.push(`${citasCount} Cita${citasCount > 1 ? 's' : ''}`);
         if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
-        detalleAtencion = `<span class="text-xs text-blue-600 dark:text-blue-400 font-bold block mt-1 animate-pulse">En curso: ${partes.join(' y ')}</span>`;
+        detalleAtencion = `<div class="mt-3 inline-block px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold animate-pulse">En curso: ${partes.join(' y ')}</div>`;
     }
 
     dashCard2.innerHTML = `
-             <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${tiempoTexto}</span>
+             <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoTexto}</span>
              <div class="mt-2">
-                <span class="text-sm subtitle-text font-medium block text-gray-600 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
+                <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Atención aprox: <span class="text-gray-900 dark:text-white font-bold">${horaAprox}</span></p>
                 ${detalleAtencion}
              </div>
-          `;
-  }
-
-  const dashCard3 = document.getElementById('dash-card-3');
-  if (dashCard3) {
-    dashCard3.innerHTML = `
-             <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl ${badgeClass} bg-opacity-10 border border-black/5 dark:border-white/10 text-lg font-bold subtitle-text text-gray-900 dark:text-white">
-                ${demandaTexto}
-             </span>
           `;
   }
 
@@ -1136,9 +1076,9 @@ async function verificarTurnoActivo() {
         }
 
         dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${tiempoEstimado} min</span>
+                   <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoEstimado} min</span>
                    <div class="mt-2">
-                      <span class="text-sm subtitle-text font-medium block text-gray-600 dark:text-gray-400">Atención aprox: ${horaAprox}</span>
+                      <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Atención aprox: <span class="text-gray-900 dark:text-white font-bold">${horaAprox}</span></p>
                       ${detalleAtencion}
                    </div>
                 `;
@@ -1228,7 +1168,7 @@ async function verificarCitaActiva() {
                     
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
-                            <div class="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-black dark:text-white">
+                            <div class="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
                                 📅 Cita Confirmada
                             </div>
                             <div class="text-right">
@@ -1266,15 +1206,15 @@ async function verificarCitaActiva() {
     const dashCard1 = document.getElementById('dash-card-1');
     if (dashCard1) {
       dashCard1.innerHTML = `
-                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">CITA</span>
-                   <span class="text-sm subtitle-text font-bold mt-2 block text-gray-600 dark:text-gray-400">PROGRAMADA</span>
+                   <span class="text-4xl md:text-5xl font-black text-white tracking-tight block">CITA</span>
+                   <p class="text-gray-400 text-sm mt-1 font-bold uppercase tracking-wide">PROGRAMADA</p>
                 `;
     }
     const dashCard2 = document.getElementById('dash-card-2');
     if (dashCard2) {
       dashCard2.innerHTML = `
-                   <span class="text-5xl font-display font-bold title-text block tracking-wide leading-none text-gray-900 dark:text-white">${timeStr}</span>
-                   <span class="text-sm subtitle-text font-medium mt-2 block text-gray-600 dark:text-gray-400">Hora de atención</span>
+                   <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${timeStr}</span>
+                   <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-bold uppercase tracking-wide">Hora de atención</p>
                 `;
     }
   } else {
@@ -1838,10 +1778,10 @@ function renderSlotsFromData(data, dateStr, dur) {
     const disponible = slotDisponible(currentSlot, dur, citas || [], breaks);
 
     const btn = document.createElement('button');
-    const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm outline-none focus:ring-2 focus:ring-blue-500 active:scale-95';
+    const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm outline-none focus:ring-2 focus:ring-[#C1121F] active:scale-95';
 
     if (disponible) {
-      btn.className = `${baseClass} bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group`;
+      btn.className = `${baseClass} bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-[#C1121F] dark:hover:border-[#C1121F] hover:text-[#C1121F] dark:hover:text-[#C1121F] cursor-pointer group`;
       btn.onclick = () => seleccionarHora(currentSlot, btn);
       // Highlight first available
       if (slotsContainer.children.length === 0) {
@@ -1855,7 +1795,7 @@ function renderSlotsFromData(data, dateStr, dur) {
     const timeStr = currentSlot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
     btn.innerHTML = `
-            <span class="${disponible ? 'text-gray-900 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''}">${timeStr}</span>
+            <span class="${disponible ? 'text-gray-900 dark:text-gray-200 group-hover:text-[#C1121F] dark:group-hover:text-[#C1121F]' : ''}">${timeStr}</span>
         `;
 
     slotsContainer.appendChild(btn);
@@ -1875,14 +1815,14 @@ function seleccionarHora(date, btnElement) {
     Array.from(container.children).forEach(c => {
       if (!c.disabled) {
         c.classList.remove('slot-selected');
-        c.classList.remove('bg-blue-600', 'text-white', 'border-blue-600', 'shadow-lg', 'shadow-blue-600/30');
+        c.classList.remove('bg-[#C1121F]', 'text-white', 'border-[#C1121F]', 'shadow-lg', 'shadow-red-600/30');
         c.classList.add('bg-white', 'dark:bg-white/5', 'text-gray-900', 'dark:text-gray-200');
       }
     });
   }
 
   btnElement.classList.remove('bg-white', 'dark:bg-white/5', 'text-gray-900', 'dark:text-gray-200');
-  btnElement.classList.add('bg-blue-600', 'text-white', 'border-blue-600', 'shadow-lg', 'shadow-blue-600/30', 'slot-selected');
+  btnElement.classList.add('bg-[#C1121F]', 'text-white', 'border-[#C1121F]', 'shadow-lg', 'shadow-red-600/30', 'slot-selected');
 
   // Update Summary
   const servicioSel = document.getElementById('select-servicio-cita').value;

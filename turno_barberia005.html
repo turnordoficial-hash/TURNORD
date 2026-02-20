@@ -171,7 +171,7 @@
         </div>
 
         <!-- Tarjetas de información (OCULTAS POR REQUERIMIENTO NO COLA) -->
-        <div class="hidden grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 w-full">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 w-full">
         <!-- Turno actual -->
         <div class="bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm transition-all hover:shadow-md border border-gray-100 dark:border-white/5 w-full">
           <div class="flex justify-between items-start">
@@ -214,7 +214,7 @@
       </div>
 
       <!-- Botones de acción (MODIFICADO PARA AGENDA) -->
-      <div class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 w-full">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 w-full">
         <!-- Botón Atender (Grande) -->
         <button id="btnAtender" class="col-span-2 md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-2xl font-black text-xl shadow-xl transition-all flex items-center justify-center gap-3 group transform hover:scale-[1.02]">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -401,7 +401,7 @@
       </div>
 
       <!-- Turnos en Atencion -->
-      <div id="contenedor-atencion" class="hidden bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3 border border-green-500/20">
+      <div id="contenedor-atencion" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3 border border-green-500/20">
         <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -414,7 +414,7 @@
       </div>
 
       <!-- Lista de turnos en espera -->
-      <div id="contenedor-lista-espera" class="hidden bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
+      <div id="contenedor-lista-espera" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -461,7 +461,7 @@
       </div>
 
       <!-- AGENDA INTELIGENTE (TIMELINE) -->
-      <div class="bg-white dark:bg-zinc-900 p-0 rounded-2xl shadow-xl mb-6 border border-gray-200 dark:border-zinc-800 overflow-hidden">
+      <div class="hidden bg-white dark:bg-zinc-900 p-0 rounded-2xl shadow-xl mb-6 border border-gray-200 dark:border-zinc-800 overflow-hidden">
         <div class="flex justify-between items-center mb-4">
           <div class="p-4 flex items-center gap-3">
              <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center">
@@ -470,7 +470,7 @@
                 </svg>
                 Agenda de Hoy
              </h2>
-             <span id="contador-citas-hoy" class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full">0 citas</span>
+             <span id="contador-citas-hoy-timeline" class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-bold px-3 py-1 rounded-full">0 citas</span>
           </div>
           <div class="p-4">
              <button onclick="abrirModalCitaManual()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 text-sm">
@@ -495,6 +495,19 @@
                 </div>
             </div>
         </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Citas de Hoy
+          </h2>
+          <span id="contador-citas-hoy" class="bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs font-medium px-2.5 py-0.5 rounded-full">0 citas</span>
+        </div>
+        <div id="listaCitasHoy" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
       </div>
 
       <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-3">
