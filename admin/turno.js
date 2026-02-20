@@ -1072,6 +1072,15 @@ async function cargarTurnos() {
     });
 
     if (proximaCitaInminente) {
+        try {
+            const key = `cita_recordatorio_${negocioId}_${proximaCitaInminente.id}`;
+            if (typeof localStorage !== 'undefined' && !localStorage.getItem(key)) {
+                localStorage.setItem(key, '1');
+                notificarRecordatorioCita(proximaCitaInminente);
+            }
+        } catch (e) {
+            console.error('Error gestionando recordatorio de cita:', e);
+        }
         const alertaDiv = document.getElementById('alerta-cita-proxima') || document.createElement('div');
         alertaDiv.id = 'alerta-cita-proxima';
         alertaDiv.className = 'fixed bottom-4 right-4 bg-yellow-500 text-white px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce cursor-pointer';
@@ -1440,6 +1449,116 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
 
     } catch (invokeError) {
         console.error('Error al invocar notificación de turno tomado:', invokeError);
+    }
+}
+
+async function notificarRecordatorioCita(cita) {
+    if (__pushSubsCount === 0) return;
+    if (!cita || !cita.cliente_telefono) return;
+
+    const telefono = cita.cliente_telefono;
+    const nombre = clientesMap[telefono] || 'Cliente';
+    const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || supabase.supabaseKey;
+
+        let data, error;
+        try {
+            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                body: {
+                    telefono,
+                    negocio_id: negocioId,
+                    title: `⏰ Recordatorio de cita`,
+                    body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
+                }
+            }));
+        } catch (eInvoke) {
+            try {
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        telefono,
+                        negocio_id: negocioId,
+                        title: `⏰ Recordatorio de cita`,
+                        body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = await res.json().catch(() => ({ success: true }));
+                error = null;
+            } catch (eFetch) {
+                error = eFetch;
+            }
+        }
+
+        if (error) {
+            console.error('Error al enviar recordatorio de cita:', error.message);
+        } else if (data && data.success) {
+            console.log(`Recordatorio de cita enviado a ${nombre} (${telefono})`);
+        }
+    } catch (invokeError) {
+        console.error('Error al invocar recordatorio de cita:', invokeError);
+    }
+}
+
+async function notificarCitaAceptada(telefono, nombre, startAt) {
+    if (__pushSubsCount === 0) return;
+    if (!telefono) return;
+
+    const hora = startAt ? new Date(startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || supabase.supabaseKey;
+
+        let data, error;
+        try {
+            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                body: {
+                    telefono,
+                    negocio_id: negocioId,
+                    title: `✅ Cita aceptada`,
+                    body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
+                }
+            }));
+        } catch (eInvoke) {
+            try {
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        telefono,
+                        negocio_id: negocioId,
+                        title: `✅ Cita aceptada`,
+                        body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = await res.json().catch(() => ({ success: true }));
+                error = null;
+            } catch (eFetch) {
+                error = eFetch;
+            }
+        }
+
+        if (error) {
+            console.error('Error al enviar notificación de cita aceptada:', error.message);
+        } else if (data && data.success) {
+            console.log(`Notificación de cita aceptada enviada a ${nombre || 'cliente'} (${telefono})`);
+        }
+    } catch (invokeError) {
+        console.error('Error al invocar notificación de cita aceptada:', invokeError);
     }
 }
 
@@ -1855,11 +1974,12 @@ async function procesarAtencionCita(citaId, negocioId) {
         turnoId = resTurno.id;
     }
 
-    // 4. Actualizar estados
     const { error: errUpdTurno } = await supabase.from('turnos').update({ estado: 'En atención', started_at: new Date().toISOString(), barber_id: cita.barber_id }).eq('id', turnoId);
     if (errUpdTurno) throw errUpdTurno;
     const { error: errUpdCita } = await supabase.from('citas').update({ estado: 'Atendida' }).eq('id', citaId);
     if (errUpdCita) throw errUpdCita;
+
+    await notificarCitaAceptada(cita.cliente_telefono || '', nombreCliente, cita.start_at);
 }
 
 async function confirmarCancelarCita() {

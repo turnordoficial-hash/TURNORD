@@ -58,7 +58,23 @@ function getCache(key) {
 
 function setCache(key, data, ttlMinutes) {
   const expiry = Date.now() + (ttlMinutes * 60 * 1000);
-  localStorage.setItem(`cache_${negocioId}_${key}`, JSON.stringify({ data, expiry }));
+  const cacheKey = `cache_${negocioId}_${key}`;
+  const payload = JSON.stringify({ data, expiry });
+
+  try {
+    localStorage.setItem(cacheKey, payload);
+  } catch (e) {
+    // Manejo de error si el LocalStorage está lleno (QuotaExceededError)
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      console.warn('LocalStorage lleno. Limpiando caché antiguo de la aplicación...');
+      // Limpiar solo las claves de esta app para hacer espacio
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith(`cache_${negocioId}`)) localStorage.removeItem(k);
+      });
+      // Intentar guardar de nuevo
+      try { localStorage.setItem(cacheKey, payload); } catch (e2) { console.error('Fallo crítico de caché', e2); }
+    }
+  }
 }
 // --------------------------------
 
@@ -616,15 +632,22 @@ function renderStructure() {
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
+  
+  // Ruta absoluta para evitar problemas con subdirectorios
+  const swPath = '/sw.js'; 
+
   navigator.serviceWorker.register(swPath)
-    .then(async () => {
+    .then(async (registration) => {
+      console.log('Service Worker registrado con éxito:', registration.scope);
+      
+      // Intentar sincronizar push si ya tenemos permiso
       try {
         if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
           await crearOSincronizarSuscripcionPush();
         }
       } catch (err) {
-        console.error('SW error al sincronizar suscripción push:', err);
+        // Error silencioso, no es crítico para el funcionamiento offline
+        console.log('Sincronización push pendiente de permisos.');
       }
     })
     .catch(err => console.error('SW error:', err));
