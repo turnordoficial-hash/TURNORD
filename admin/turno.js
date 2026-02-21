@@ -282,6 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mostrarNotificacion('Turnos actualizados', 'success');
     });
     setupSidebar();
+    injectSidebarExtras(); // Inyectar botón de canje y link a promociones
 
     const listaEspera = document.getElementById('listaEspera');
     if (listaEspera) {
@@ -358,6 +359,80 @@ function setupSidebar() {
     if (overlay) overlay.addEventListener('click', toggleMobile);
     if (closeSidebar) closeSidebar.addEventListener('click', toggleMobile);
     if (toggleBtn) toggleBtn.addEventListener('click', toggleDesktop);
+}
+
+function injectSidebarExtras() {
+    const nav = document.querySelector('#sidebar nav');
+    if (!nav) return;
+
+    // Link a Promociones
+    const promoLink = document.createElement('a');
+    promoLink.href = 'promociones.html';
+    promoLink.className = 'flex items-center px-6 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors sidebar-text';
+    promoLink.innerHTML = `<span class="mr-3 text-xl">🎁</span> <span class="sidebar-text">Promociones</span>`;
+    nav.appendChild(promoLink);
+
+    // Botón Canjear Puntos
+    const btnCanje = document.createElement('button');
+    btnCanje.className = 'w-full mt-4 flex items-center px-6 py-3 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors font-bold';
+    btnCanje.innerHTML = `<span class="mr-3 text-xl">💎</span> <span class="sidebar-text">Canjear Puntos</span>`;
+    btnCanje.onclick = abrirModalCanjePuntos;
+    nav.appendChild(btnCanje);
+}
+
+async function abrirModalCanjePuntos() {
+    const { value: telefono } = await Swal.fire({
+        title: 'Canjear Puntos',
+        input: 'tel',
+        inputLabel: 'Ingrese teléfono del cliente',
+        inputPlaceholder: 'Ej: 8295550000',
+        showCancelButton: true
+    });
+
+    if (telefono) {
+        const { data: cliente } = await supabase.from('clientes').select('nombre, puntos').eq('negocio_id', negocioId).eq('telefono', telefono).maybeSingle();
+        
+        if (!cliente) {
+            mostrarNotificacion('Cliente no encontrado', 'error');
+            return;
+        }
+
+        const { value: formValues } = await Swal.fire({
+            title: `Cliente: ${cliente.nombre}`,
+            html: `
+                <div class="text-center mb-4">
+                    <p class="text-sm text-gray-500">Puntos Disponibles</p>
+                    <p class="text-4xl font-black text-emerald-600">${cliente.puntos || 0}</p>
+                </div>
+                <input id="swal-puntos" type="number" class="swal2-input" placeholder="Puntos a canjear">
+                <input id="swal-concepto" class="swal2-input" placeholder="Concepto (ej. Corte Gratis)">
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Canjear',
+            preConfirm: () => {
+                return {
+                    puntos: document.getElementById('swal-puntos').value,
+                    concepto: document.getElementById('swal-concepto').value
+                }
+            }
+        });
+
+        if (formValues) {
+            const { data: res, error } = await supabase.rpc('canjear_puntos', {
+                p_negocio_id: negocioId,
+                p_cliente_telefono: telefono,
+                p_puntos: parseInt(formValues.puntos),
+                p_concepto: formValues.concepto
+            });
+
+            if (error || !res.success) {
+                mostrarNotificacion(res?.message || 'Error al canjear', 'error');
+            } else {
+                Swal.fire('Canje Exitoso', `Nuevo saldo: ${res.nuevo_saldo} pts`, 'success');
+            }
+        }
+    }
 }
 
 let draggedItem = null;

@@ -408,19 +408,22 @@ DECLARE
   conflicto_turno INTEGER;
   nueva public.citas;
 BEGIN
+  -- 1. BLOQUEO FUERTE: Bloquear el registro del barbero para serializar transacciones
+  -- Esto obliga a que las reservas para este barbero se procesen una por una.
+  PERFORM 1 FROM public.barberos WHERE id = p_barber_id FOR UPDATE;
+
+  -- 2. Validar conflicto con turnos en atención (Bloqueo dinámico)
   SELECT COUNT(*) INTO conflicto_turno
   FROM public.turnos t
   WHERE t.negocio_id = p_negocio_id
     AND t.barber_id = p_barber_id
     AND t.estado = 'En atención'
     AND t.started_at IS NOT NULL
-    AND t.started_at < p_end
-    AND COALESCE(t.ended_at, t.started_at + INTERVAL '3 hours') > p_start;
-
+    
   IF conflicto_turno > 0 THEN
-    RAISE EXCEPTION 'Conflicto con turno en atención para el barbero en el intervalo seleccionado';
+    RAISE EXCEPTION 'El barbero está atendiendo un turno en este momento y no puede recibir citas.';
   END IF;
-
+  -- 3. Insertar cita (La restricción EXCLUDE en la tabla citas manejará solapamientos de citas)
   INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
   VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
   RETURNING * INTO nueva;
@@ -444,6 +447,8 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   email TEXT NOT NULL,
   documento_identidad TEXT, -- Cédula o Código (Opcional)
   avatar_url TEXT,
+  puntos INTEGER DEFAULT 0,
+  ultima_visita TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad),
@@ -464,6 +469,42 @@ DROP TRIGGER IF EXISTS trg_set_timestamp_updated_at_clientes ON public.clientes;
 CREATE TRIGGER trg_set_timestamp_updated_at_clientes
 BEFORE UPDATE ON public.clientes
 FOR EACH ROW EXECUTE FUNCTION public.set_timestamp_updated_at();
+
+-- Tabla: Historial de Puntos
+CREATE TABLE IF NOT EXISTS public.historial_puntos (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  cliente_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL, -- 'GANADO', 'GASTADO'
+  monto INTEGER NOT NULL,
+  descripcion TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Trigger para sumar puntos automáticamente al finalizar un turno
+CREATE OR REPLACE FUNCTION public.sumar_puntos_turno() RETURNS TRIGGER AS $$
+BEGIN
+  -- Si el turno pasa a 'Atendido', sumar 10 puntos y actualizar última visita
+  IF NEW.estado = 'Atendido' AND OLD.estado <> 'Atendido' THEN
+    UPDATE public.clientes
+    SET puntos = COALESCE(puntos, 0) + 10,
+        ultima_visita = NOW()
+    WHERE telefono = NEW.telefono AND negocio_id = NEW.negocio_id;
+
+    -- Registrar en historial
+    INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
+    SELECT NEW.negocio_id, c.id, 'GANADO', 10, 'Servicio completado: ' || COALESCE(NEW.servicio, 'General')
+    FROM public.clientes c
+    WHERE c.telefono = NEW.telefono AND c.negocio_id = NEW.negocio_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sumar_puntos ON public.turnos;
+CREATE TRIGGER trg_sumar_puntos
+AFTER UPDATE ON public.turnos
+FOR EACH ROW EXECUTE FUNCTION public.sumar_puntos_turno();
 
 COMMIT;
 

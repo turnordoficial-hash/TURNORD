@@ -138,6 +138,10 @@
     .barber-hero-light {
       background: radial-gradient(circle at top left, rgba(193,18,31,0.12) 0, transparent 55%), radial-gradient(circle at bottom right, rgba(0,48,73,0.16) 0, transparent 55%), linear-gradient(145deg, #FFFFFF, #F8F9FA);
     }
+    .hero-title {
+      letter-spacing: -0.5px;
+      font-weight: 800;
+    }
     .barber-chip {
       background: rgba(11,11,11,0.9);
       color: #F8F9FA;
@@ -435,7 +439,7 @@
     
     <div id="tab-inicio-panel" class="animate-fade-in space-y-6">
         <!-- Nueva Tarjeta Principal Premium -->
-        <section class="relative overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10 group">
+        <section id="hero-marketing-card" class="relative overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10 group transition-all duration-500">
             <!-- Efectos de Fondo -->
             <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
             <div class="absolute -top-24 -right-24 w-64 h-64 bg-[#C1121F]/40 blur-[80px] rounded-full animate-pulse"></div>
@@ -444,18 +448,23 @@
             <div class="relative z-10 p-6 md:p-10 flex flex-col md:flex-row items-center gap-8">
                 <!-- Contenido de Texto -->
                 <div class="flex-1 text-center md:text-left space-y-5">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-lg">
-                        <span class="w-2 h-2 rounded-full bg-[#C1121F] animate-ping"></span>
-                        <span class="text-[10px] font-bold uppercase tracking-widest text-white">Flow Dominicano</span>
+                    <div id="hero-badge-container" class="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-yellow-300 text-black text-[11px] font-bold px-4 py-1 rounded-full transition-all duration-500">
+                        <span id="hero-badge-text">💎 Cliente VIP</span>
+                    </div>
+                    <div id="hero-status-pill" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md shadow-lg transition-all duration-500">
+                        <span class="w-2 h-2 rounded-full bg-[#C1121F] animate-pulse"></span>
+                        <span id="hero-status-text" class="text-[10px] font-bold uppercase tracking-widest text-white">JBarber Club</span>
                     </div>
                     
-                    <h1 class="text-4xl md:text-5xl font-display font-black text-white leading-none tracking-tight drop-shadow-lg">
-                        CITA LISTA <br>
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#C1121F] via-red-500 to-white">PA' LA CALLE</span>
+                    <h1 id="hero-title" class="hero-title text-4xl md:text-5xl font-display font-black text-white leading-none tracking-tight drop-shadow-lg transition-all duration-500">
+                        Tu estilo, tu regla.<br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#C1121F] via-red-500 to-yellow-300 animate-gradient-x">
+                            Sube de nivel hoy.
+                        </span>
                     </h1>
                     
-                    <p class="text-gray-300 text-sm font-medium max-w-md mx-auto md:mx-0 leading-relaxed">
-                        Sin buidero ni fila. Elige tu hora, tu barbero y llega <span class="text-yellow-400 font-bold">fresh</span>. Tu turno se respeta.
+                    <p id="hero-subtitle" class="text-gray-300 text-sm font-medium max-w-md mx-auto md:mx-0 leading-relaxed transition-all duration-500">
+                        Acumula puntos con cada corte y desbloquea recompensas exclusivas.
                     </p>
 
                     <div class="flex flex-col sm:flex-row gap-3 pt-2 justify-center md:justify-start">
@@ -470,6 +479,10 @@
                             Ver mi estado
                         </button>
                     </div>
+                    <p class="text-xs text-gray-300 flex items-center gap-1 pt-1 justify-center md:justify-start">
+                        <span class="text-[#C1121F]">⚡</span>
+                        Últimos espacios disponibles hoy
+                    </p>
                 </div>
 
                 <!-- Elemento Visual (Tarjeta Flotante) -->

@@ -78,6 +78,134 @@ function setCache(key, data, ttlMinutes) {
 }
 // --------------------------------
 
+function getSaludo() {
+  const hora = new Date().getHours();
+  if (hora < 12) return 'Buenos días';
+  if (hora < 18) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
+function calcularNivelInfo(puntos) {
+  // Asumimos 10 puntos por servicio
+  const servicios = Math.floor((puntos || 0) / 10);
+  
+  const niveles = [
+    { min: 0, max: 4, nombre: "Nuevo Cliente", icon: "💈", mensaje: "Bienvenido a la familia", color: "text-gray-500", bg: "bg-gray-500" },
+    { min: 5, max: 9, nombre: "Cliente Activo", icon: "⭐", mensaje: "Gracias por confiar", color: "text-blue-500", bg: "bg-blue-500" },
+    { min: 10, max: 19, nombre: "Cliente Frecuente", icon: "⭐⭐", mensaje: "Eres parte de la casa", color: "text-yellow-500", bg: "bg-yellow-500" },
+    { min: 20, max: 39, nombre: "Cliente VIP", icon: "👑", mensaje: "Nivel preferencial", color: "text-purple-500", bg: "bg-purple-500" },
+    { min: 40, max: 9999, nombre: "Leyenda", icon: "💎", mensaje: "Cliente histórico", color: "text-emerald-500", bg: "bg-emerald-500" }
+  ];
+
+  const nivelActual = niveles.find(n => servicios >= n.min && servicios <= n.max) || niveles[niveles.length - 1];
+  const nextLevel = niveles[niveles.indexOf(nivelActual) + 1];
+  
+  const totalRange = nextLevel ? nextLevel.min - nivelActual.min : 1;
+  const currentInLevel = servicios - nivelActual.min;
+  const progress = nextLevel ? Math.min(100, (currentInLevel / totalRange) * 100) : 100;
+
+  return { ...nivelActual, progress, servicios, nextLevel };
+}
+
+// --- MOTOR DE MARKETING INTELIGENTE ---
+class SmartMarketingEngine {
+  constructor(profile) {
+    this.profile = profile;
+    this.segment = this.calculateSegment();
+    this.messageIndex = 0;
+    this.rotationInterval = null;
+  }
+
+  calculateSegment() {
+    if (!this.profile) return 'Nuevo';
+    const visitas = this.profile.puntos ? Math.floor(this.profile.puntos / 10) : 0; // Estimado
+    const lastVisit = this.profile.ultima_visita ? new Date(this.profile.ultima_visita) : null;
+    const daysSince = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24)) : 999;
+
+    if (visitas <= 1) return 'Nuevo';
+    if (daysSince > 45) return 'Inactivo';
+    if (daysSince > 21) return 'Regular';
+    if (visitas > 20) return 'VIP';
+    return 'Frecuente';
+  }
+
+  getMessages() {
+    const points = this.profile?.puntos || 0;
+    const nextReward = points < 100 ? 100 : (points < 150 ? 150 : 200);
+    const pointsNeeded = nextReward - points;
+
+    const commonMessages = [
+      { title: "Tu estilo, tu regla.", subtitle: "Acumula puntos con cada corte y desbloquea recompensas.", badge: "💎 JBarber Club" },
+      { title: "¿Sabías qué?", subtitle: "Cortar tu cabello cada 3 semanas mantiene tu estilo impecable.", badge: "💡 Tip Pro" }
+    ];
+
+    const segments = {
+      'Nuevo': [
+        { title: "¡Bienvenido al Club!", subtitle: "Tu primer corte acumula puntos dobles hoy.", badge: "🎉 Estreno" },
+        { title: "Invita y Gana", subtitle: "Trae a un amigo y ambos reciben descuento.", badge: "👥 Referidos" }
+      ],
+      'Frecuente': [
+        { title: "Mantén el Flow", subtitle: "Ya casi es hora de tu retoque habitual.", badge: "✂️ Estilo Fresh" },
+        { title: `Estás cerca: ${points} pts`, subtitle: `Solo te faltan ${pointsNeeded} puntos para tu recompensa.`, badge: "🎯 Meta Cerca" }
+      ],
+      'Inactivo': [
+        { title: "¡Te extrañamos!", subtitle: "Vuelve esta semana y recibe un trato especial.", badge: "🔥 Reactivación" },
+        { title: "Tu silla te espera", subtitle: "No dejes que tu estilo se pierda. Reserva ahora.", badge: "💈 JBarber" }
+      ],
+      'VIP': [
+        { title: "Nivel Leyenda", subtitle: "Gracias por ser parte de la élite de JBarber.", badge: "👑 VIP Member" },
+        { title: "Prioridad Total", subtitle: "Agenda tu cita preferencial cuando quieras.", badge: "💎 Exclusivo" }
+      ]
+    };
+
+    // Mezclar mensajes del segmento con comunes
+    return [...(segments[this.segment] || segments['Nuevo']), ...commonMessages];
+  }
+
+  startRotation() {
+    const messages = this.getMessages();
+    if (messages.length === 0) return;
+
+    const updateUI = () => {
+      const msg = messages[this.messageIndex];
+      const titleEl = document.getElementById('hero-title');
+      const subEl = document.getElementById('hero-subtitle');
+      const badgeEl = document.getElementById('hero-badge-text');
+      
+      if (titleEl && subEl && badgeEl) {
+        // Fade out
+        titleEl.style.opacity = '0';
+        subEl.style.opacity = '0';
+        
+        setTimeout(() => {
+          // Update content
+          titleEl.innerHTML = msg.title.replace(/\n/g, '<br>');
+          subEl.textContent = msg.subtitle;
+          badgeEl.textContent = msg.badge;
+          
+          // Fade in
+          titleEl.style.opacity = '1';
+          subEl.style.opacity = '1';
+        }, 300);
+      }
+      
+      this.messageIndex = (this.messageIndex + 1) % messages.length;
+    };
+
+    updateUI(); // Initial run
+    if (this.rotationInterval) clearInterval(this.rotationInterval);
+    this.rotationInterval = setInterval(updateUI, 8000); // Rotar cada 8 segundos
+  }
+}
+
+let marketingEngine = null;
+
+async function iniciarMotorMarketing() {
+  if (!appState.profile) return;
+  marketingEngine = new SmartMarketingEngine(appState.profile);
+  marketingEngine.startRotation();
+}
+
 function animateNumber(el, to, duration = 500) {
   if (!el) return;
   const from = parseInt(el.textContent || '0', 10) || 0;
@@ -89,13 +217,6 @@ function animateNumber(el, to, duration = 500) {
     if (p < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
-}
-
-function getSaludo() {
-  const hora = new Date().getHours();
-  if (hora < 12) return 'Buenos días';
-  if (hora < 18) return 'Buenas tardes';
-  return 'Buenas noches';
 }
 
 function updateBanner(mode = 'default') {
@@ -174,12 +295,12 @@ function setupThemeToggle() {
   const textSpanMenu = document.getElementById('theme-text');
   const root = document.documentElement;
   
-  const moonIcon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
-  const sunIcon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>';
+  const moonIcon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>';
+  const sunIcon = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>';
 
   const updateUI = (isDark) => {
       // Actualizar botón del menú
-      if (iconContainerMenu) iconContainerMenu.innerHTML = isDark ? sunIcon : moonIcon;
+      if (iconContainerMenu) iconContainerMenu.innerHTML = isDark ? moonIcon : sunIcon;
       if (textSpanMenu) textSpanMenu.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
       
       // Actualizar botón flotante
@@ -326,6 +447,11 @@ async function init() {
   setupStaticEventHandlers();
   setupThemeToggle();
   updateBanner();
+  
+  // 🔥 CRÍTICO: Cargar configuración antes que nada para tener diasOperacionNum
+  await cargarConfigNegocio();
+  // await cargarServicios(); // Ya se llama abajo, redundante
+
   await cargarPerfil();
   await cargarServicios(); 
   await cargarBarberos(); // Cargar barberos para el select
@@ -340,6 +466,7 @@ async function init() {
   }
 
   await verificarCitaActiva();
+  iniciarMotorMarketing(); // Iniciar motor de marketing
 
   if (localStorage.getItem('cita_reservada') === 'true') {
     localStorage.removeItem('cita_reservada');
@@ -359,7 +486,8 @@ async function init() {
       e.preventDefault();
       const nombre = document.getElementById('edit-nombre').value;
       const email = document.getElementById('edit-email').value;
-      const { error } = await supabase.from('clientes').update({ nombre, email }).eq('id', clienteId);
+      const telefono = document.getElementById('edit-telefono').value;
+      const { error } = await supabase.from('clientes').update({ nombre, email, telefono }).eq('id', clienteId);
       if (error) showToast('Error al actualizar el perfil', 'error');
       else {
         showToast('Perfil actualizado con éxito', 'success');
@@ -443,51 +571,14 @@ function renderStructure() {
                   <div id="dash-card-2">
                        <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight">-- min</span>
                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">Tiempo estimado</p>
+                       <div class="mt-3">
+                          <div class="w-full h-2.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
+                             <div id="turno-progress" class="h-full bg-[#C1121F] rounded-full" style="width:40%;"></div>
+                          </div>
+                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Progreso de tu turno</p>
+                       </div>
                   </div>
               </div>
-          </div>
-      </div>
-      
-      <!-- SECCION TOMAR TURNO (Restaurada para uso de datos inmediatos) -->
-      <div id="seccion-tomar-turno" class="mt-6 bg-white dark:bg-[#111] p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 relative overflow-hidden">
-          <div class="absolute top-0 right-0 w-32 h-32 bg-gray-100 dark:bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
-          <h3 class="text-2xl font-black text-gray-900 dark:text-white mb-4 relative z-10">Tomar Turno Ahora</h3>
-          <div class="space-y-4 relative z-10">
-              <div>
-                  <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Servicio</label>
-                  <div class="relative">
-                    <select id="select-servicio" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#C1121F] appearance-none cursor-pointer">
-                        <option value="">Cargando servicios...</option>
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-              </div>
-              <div>
-                  <label class="block text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Barbero (Opcional)</label>
-                  <div class="relative">
-                    <select id="select-barbero-turno" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#C1121F] appearance-none cursor-pointer">
-                        <option value="">Cualquiera</option>
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                  </div>
-              </div>
-              <button id="btn-tomar-turno" onclick="tomarTurno()" class="w-full py-4 bg-black dark:bg-white text-white dark:text-black font-black rounded-2xl shadow-lg hover:scale-[1.02] transition-transform flex justify-center items-center gap-2">
-                  CONFIRMAR TURNO
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-              </button>
-          </div>
-          
-          <!-- Mensaje de bloqueo si hay turno activo -->
-          <div id="bloqueado-msg" class="hidden absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-3xl">
-              <div class="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              </div>
-              <h4 class="text-xl font-bold text-gray-900 dark:text-white">Turno en curso</h4>
-              <p id="bloqueado-texto" class="text-sm text-gray-500 dark:text-gray-400 mt-2">Ya tienes un turno activo. Espera a ser atendido.</p>
           </div>
       </div>
         `;
@@ -642,6 +733,16 @@ function renderStructure() {
 
   const perfilPanel = document.getElementById('tab-perfil-panel');
   if (perfilPanel) {
+    const puntos = appState.profile?.puntos || 0;    
+    const nivelInfo = calcularNivelInfo(puntos);
+    
+    // Recompensas estáticas (Configurable)
+    const recompensas = [
+        { pts: 100, label: "50% Descuento", icon: "✂️" },
+        { pts: 150, label: "Lavado Gratis", icon: "🧴" },
+        { pts: 200, label: "Corte Gratis", icon: "🎁" }
+    ];
+
     perfilPanel.innerHTML = `
           <div id="perfil-promo-container" class="mb-6"></div>
 
@@ -657,13 +758,74 @@ function renderStructure() {
               <div class="text-center sm:text-left">
                 <h3 id="profile-name" class="text-4xl font-display font-bold title-text tracking-wide text-gray-900 dark:text-white">Cargando...</h3>
                 <p id="profile-phone" class="subtitle-text text-lg mt-1 text-gray-600 dark:text-gray-400">...</p>
-                <span class="inline-block mt-2 px-4 py-1 rounded-full bg-black/5 dark:bg-white/10 text-black dark:text-white text-xs font-bold border border-black/10 dark:border-white/10">
-                  Cliente frecuente ⭐
-                </span>
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 ${nivelInfo.color} text-xs font-bold border border-black/10 dark:border-white/10">
+                      ${nivelInfo.icon} ${nivelInfo.nombre}
+                    </span>
+                    <span class="text-xs text-gray-400 font-medium">"${nivelInfo.mensaje}"</span>
+                </div>
               </div>
             </div>
+
+            <!-- Sección de Nivel y Progreso -->
+            <div class="mt-8 p-6 bg-white dark:bg-[#141416] rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-${nivelInfo.bg.split('-')[1]}-500/10 to-transparent rounded-full blur-2xl -mr-10 -mt-10"></div>
+                
+                <div class="flex justify-between items-end mb-2">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Progreso de Nivel</p>
+                        <p class="text-2xl font-black text-gray-900 dark:text-white mt-1">
+                            ${nivelInfo.servicios} <span class="text-sm font-medium text-gray-500">servicios</span>
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-bold text-gray-400">Siguiente Nivel</p>
+                        <p class="text-sm font-bold ${nivelInfo.color}">${nivelInfo.nextLevel ? nivelInfo.nextLevel.nombre : 'Máximo'}</p>
+                    </div>
+                </div>
+                
+                <div class="w-full h-4 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden mb-2">
+                    <div class="h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative" style="width: ${nivelInfo.progress}%">
+                        <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                </div>
+                <p class="text-xs text-center text-gray-500 dark:text-gray-400 font-medium">
+                    ${nivelInfo.nextLevel ? `Te faltan ${nivelInfo.nextLevel.min - nivelInfo.servicios} servicios para subir de nivel` : '¡Has alcanzado la cima!'}
+                </p>
+            </div>
+
+            <!-- Recompensas -->
+            <div class="mt-6">
+                <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#C1121F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
+                    Premios Disponibles
+                </h4>
+                <div class="grid grid-cols-3 gap-3">
+                    ${recompensas.map(r => {
+                        const unlocked = puntos >= r.pts;
+                        return `
+                        <div class="flex flex-col items-center justify-center p-3 rounded-2xl border ${unlocked ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-lg shadow-red-900/20' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-400 grayscale'} transition-all">
+                            <span class="text-2xl mb-1">${r.icon}</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider mb-1">${r.pts} pts</span>
+                            <span class="text-xs font-bold text-center leading-tight">${r.label}</span>
+                            ${unlocked ? '<div class="mt-1 text-[10px] bg-white/20 px-2 py-0.5 rounded-full">Desbloqueado</div>' : ''}
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <!-- Historial de Puntos -->
+            <div class="mt-8">
+                <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-4">Historial de Puntos</h4>
+                <div id="historial-puntos-list" class="space-y-3">
+                    <div class="text-center py-4"><svg class="animate-spin h-5 w-5 mx-auto text-gray-400" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
+                </div>
+            </div>
+
             <form id="form-perfil" class="mt-10 space-y-6 text-gray-900 dark:text-white">
               <div><label class="text-sm font-semibold mb-2 block subtitle-text text-gray-600 dark:text-gray-400">Nombre Completo</label><input type="text" id="edit-nombre" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
+              <div><label class="text-sm font-semibold mb-2 block subtitle-text text-gray-600 dark:text-gray-400">Teléfono</label><input type="tel" id="edit-telefono" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
               <div><label class="text-sm font-semibold mb-2 block subtitle-text text-gray-600 dark:text-gray-400">Correo Electrónico</label><input type="email" id="edit-email" class="w-full p-4 rounded-xl border bg-[#F8F8F9] dark:bg-[#111113] border-black/5 dark:border-white/10 text-[#111111] dark:text-white focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white transition outline-none"></div>
               <button type="submit" class="w-full bg-black dark:bg-white hover:bg-black/80 dark:hover:bg-white/90 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-2 mt-4 transition-all">Actualizar Datos</button>
             </form>
@@ -794,10 +956,23 @@ function renderProfile(data) {
     if (profileName) profileName.textContent = data.nombre;
     const profilePhone = document.getElementById('profile-phone');
     if (profilePhone) profilePhone.textContent = data.telefono;
+    const editTelefono = document.getElementById('edit-telefono');
+    if (editTelefono) editTelefono.value = data.telefono || '';
     const editNombre = document.getElementById('edit-nombre');
     if (editNombre) editNombre.value = data.nombre;
     const editEmail = document.getElementById('edit-email');
     if (editEmail) editEmail.value = data.email || '';
+
+    // 🔥 Saludo Dinámico
+    const saludoEl = document.getElementById('saludo-usuario');
+    if (saludoEl) {
+       saludoEl.textContent = `${getSaludo()}, ${data.nombre.split(' ')[0]}`;
+    }
+
+    // 🔥 Nivel de Cliente
+    const nivel = calcularNivel(data.puntos || 0);
+    const badge = document.getElementById('profile-level-badge');
+    if (badge) badge.textContent = `${nivel}`;
 
     const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
     const navAvatar = document.getElementById('nav-avatar');
@@ -806,13 +981,42 @@ function renderProfile(data) {
     if (profileAvatar) profileAvatar.src = avatarUrl;
 }
 
+async function cargarHistorialPuntos() {
+    const container = document.getElementById('historial-puntos-list');
+    if (!container) return;
+
+    const { data, error } = await supabase
+        .from('historial_puntos')
+        .select('*')
+        .eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+    if (error || !data || data.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-500 text-center italic">No hay movimientos recientes.</p>';
+        return;
+    }
+
+    container.innerHTML = data.map(item => `
+        <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
+            <div>
+                <p class="text-xs font-bold text-gray-900 dark:text-white">${item.descripcion || 'Movimiento de puntos'}</p>
+                <p class="text-[10px] text-gray-500">${new Date(item.created_at).toLocaleDateString()}</p>
+            </div>
+            <span class="text-sm font-bold ${item.tipo === 'GANADO' ? 'text-green-500' : 'text-red-500'}">
+                ${item.tipo === 'GANADO' ? '+' : '-'}${item.monto}
+            </span>
+        </div>
+    `).join('');
+}
+
 async function cargarPerfil() {
   // 1. Renderizar desde caché inmediatamente
   const cached = getCache('PROFILE');
   if (cached) renderProfile(cached);
 
   // 2. Obtener datos frescos
-  const { data, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
+  const { data, error } = await supabase.from('clientes').select('*, puntos, ultima_visita').eq('id', clienteId).single();
   
   if (error) {
     if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) return;
@@ -828,6 +1032,8 @@ async function cargarPerfil() {
     setCache('PROFILE', data, 60); // 1 hora de caché
     appState.profile = data;
     renderProfile(data);
+    iniciarMotorMarketing(); // Reiniciar motor con datos frescos
+    cargarHistorialPuntos(); // Cargar historial
   }
 }
 
@@ -844,8 +1050,7 @@ function renderServices(data) {
     data.forEach(s => {
       const option = document.createElement('option');
       option.value = s.nombre;
-      // MOSTRAR DATOS: Nombre + Duración + Precio
-      option.textContent = `${s.nombre} (${s.duracion_min} min) - RD$ ${s.precio}`;
+      option.textContent = `${s.nombre} - RD$ ${s.precio}`;
       select.appendChild(option);
     });
   }
@@ -855,8 +1060,7 @@ function renderServices(data) {
     (data || []).forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.nombre;
-      // MOSTRAR DATOS: Nombre + Duración + Precio
-      opt.textContent = `${s.nombre} (${s.duracion_min} min) - RD$ ${s.precio}`;
+      opt.textContent = `${s.nombre} - RD$ ${s.precio}`;
       svcCita.appendChild(opt);
     });
   }
@@ -1004,6 +1208,11 @@ async function actualizarEstadoFila() {
         if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
         detalleAtencion = `<div class="mt-3 inline-block px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold animate-pulse">En curso: ${partes.join(' y ')}</div>`;
     }
+
+    // 🔥 Progreso Dinámico
+    const porcentaje = Math.max(5, 100 - (personasEnCola * 15));
+    const progress = document.getElementById('turno-progress');
+    if (progress) progress.style.width = `${porcentaje}%`;
 
     dashCard2.innerHTML = `
              <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoTexto}</span>
@@ -1185,18 +1394,19 @@ async function verificarCitaActiva() {
     .select('*, barberos(nombre)')
     .eq('negocio_id', negocioId)
     .eq('cliente_telefono', telefono)
-    .neq('estado', 'Cancelada')
     .gt('end_at', nowISO)
     .order('start_at', { ascending: true })
     .limit(1)
     .maybeSingle();
+
+  const estadosNoActivos = ['Cancelada', 'Atendida', 'Cita Atendida', 'Completada', 'Finalizada'];
 
   const cardCita = document.getElementById('card-cita-activa');
   const seccionTurno = document.getElementById('seccion-tomar-turno');
   const inicioCitaContainer = document.getElementById('inicio-cita-card-container');
   const seccionCita = document.getElementById('seccion-cita-inteligente');
 
-  if (cita && cardCita) {
+  if (cita && !estadosNoActivos.includes(cita.estado) && cardCita) {
     appState.hasActiveAppointment = true;
     cardCita.classList.remove('hidden');
 
@@ -1636,7 +1846,9 @@ async function renderSlotsForSelectedDate() {
   updateBarberInfo();
 
   if (!negocioId) { console.error('negocioId es undefined'); return; }
-  if (!barberSel && barberSelEl?.options.length > 1) { // No mostrar si no hay barberos o no se ha seleccionado
+  
+  // 🔥 FIX: Validación correcta de barbero seleccionado
+  if (!barberSel) {
     showToast('Por favor selecciona un barbero', 'error');
     if (slotsContainer) slotsContainer.innerHTML = '';
     return; 
@@ -1826,7 +2038,10 @@ function renderSlotsFromData(data, dateStr, dur) {
 
   slotsContainer.innerHTML = '';
 
-  const step = 15; // Intervalo de 15 minutos para agenda inteligente
+  const bufferSlotMinutes = 5;
+  // 🔥 FIX: Grid fijo de 15 minutos para evitar huecos invisibles
+  const step = 15; 
+  
   const tmp = new Date(startDay);
   const now = new Date();
   
@@ -2194,6 +2409,11 @@ async function enviarCalificacion(turnoId, rating, comment) {
   } else {
     showToast('¡Gracias por tu opinión!');
     cerrarModalCalificacion();
+    try {
+      await verificarCitaActiva();
+    } catch (e) {
+      console.error('Error actualizando estado de cita después de calificación:', e);
+    }
   }
 }
 
