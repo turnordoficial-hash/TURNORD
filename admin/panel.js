@@ -50,19 +50,36 @@ function actualizarContadores(turnosHoy) {
 }
 
 // Dibuja la tabla del historial de turnos del día.
-function actualizarTabla(turnosHoy) {
+function actualizarTabla(items) {
   const tabla = document.getElementById('tablaHistorial');
   if (!tabla) return;
 
-  tabla.innerHTML = turnosHoy.length === 0
-      ? `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay turnos registrados hoy.</td></tr>`
-      : turnosHoy.map(turno => `
-          <tr>
-            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.turno}</td>
-            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.nombre || 'N/A'}</td>
-            <td class="py-2 px-4 border-b dark:border-gray-700">${turno.hora || 'N/A'}</td>
-            <td class="py-2 px-4 border-b dark:border-gray-700">
-              <span class="${turno.estado === 'En espera' ? 'text-yellow-500' : turno.estado === 'Atendido' ? 'text-green-500' : 'text-gray-500'} font-bold">${turno.estado}</span>
+  tabla.innerHTML = items.length === 0
+      ? `<tr><td colspan="4" class="py-4 text-center text-gray-500">No hay registros hoy.</td></tr>`
+      : items.map(item => {
+          let estadoClass = 'text-gray-500';
+          let estadoTexto = item.estado;
+
+          if (item.estado === 'En espera') {
+              estadoClass = 'text-yellow-500';
+          } else if (item.estado === 'Atendido') {
+              estadoClass = 'text-green-500';
+          } else if (item.estado === 'En atención') {
+              estadoClass = 'text-blue-600 animate-pulse';
+          } else if (item.estado === 'Cita Programada') {
+              estadoClass = 'text-purple-500';
+              estadoTexto = '📅 Programada';
+          } else if (item.estado === 'Cancelado') {
+              estadoClass = 'text-red-500';
+          }
+
+          return `
+          <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-medium text-gray-900 dark:text-white">${item.turno}</td>
+            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">${item.nombre || 'N/A'}</td>
+            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-mono text-xs">${item.hora || 'N/A'}</td>
+            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">
+              <span class="${estadoClass} font-bold text-xs uppercase tracking-wider">${estadoTexto}</span>
             </td>
           </tr>
         `).join('');
@@ -74,18 +91,72 @@ async function cargarDatos() {
 
   try {
     const hoyLocal = ymdLocal(new Date());
-    const { data, error } = await supabase
+    
+    // 1. Cargar Turnos
+    const { data: turnosData, error: turnosError } = await supabase
       .from('turnos')
       .select('id, turno, nombre, estado, hora, servicio, started_at, created_at') // 2. Optimización de consulta
       .eq('negocio_id', negocioId)
       .eq('fecha', hoyLocal)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (turnosError) throw turnosError;
 
-    const turnosHoy = data || [];
+    // 2. Cargar Citas Programadas para hoy
+    const startOfDay = new Date(hoyLocal + 'T00:00:00');
+    const endOfDay = new Date(hoyLocal + 'T23:59:59');
+
+    const { data: citasData, error: citasError } = await supabase
+      .from('citas')
+      .select('id, cliente_telefono, start_at, estado')
+      .eq('negocio_id', negocioId)
+      .gte('start_at', startOfDay.toISOString())
+      .lte('start_at', endOfDay.toISOString())
+      .eq('estado', 'Programada');
+
+    if (citasError) throw citasError;
+
+    // 3. Obtener nombres de clientes para las citas
+    let citasConNombre = [];
+    if (citasData && citasData.length > 0) {
+        const telefonos = [...new Set(citasData.map(c => c.cliente_telefono).filter(Boolean))];
+        let clientesMap = {};
+        
+        if (telefonos.length > 0) {
+            const { data: clientes } = await supabase
+                .from('clientes')
+                .select('telefono, nombre')
+                .eq('negocio_id', negocioId)
+                .in('telefono', telefonos);
+            
+            (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
+        }
+
+        citasConNombre = citasData.map(c => {
+            const fecha = new Date(c.start_at);
+            const hora = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            return {
+                id: `cita-${c.id}`,
+                turno: '📅',
+                nombre: clientesMap[c.cliente_telefono] || 'Cliente Cita',
+                estado: 'Cita Programada',
+                hora: hora,
+                servicio: 'Cita',
+                created_at: c.start_at,
+                isCita: true
+            };
+        });
+    }
+
+    const turnosHoy = turnosData || [];
+    
+    // Combinar y ordenar por fecha de creación/inicio
+    const historialCombinado = [...turnosHoy, ...citasConNombre].sort((a, b) => {
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+
     actualizarContadores(turnosHoy);
-    actualizarTabla(turnosHoy);
+    actualizarTabla(historialCombinado);
     actualizarTurnoEnAtencion(turnosHoy);
 
   } catch (err) {
@@ -205,6 +276,7 @@ function suscribirseCitas() {
             const hora = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             mostrarNotificacion(`Nueva cita agendada: ${hora}`, 'success');
         }
+        solicitarActualizacion(); // Refrescar tabla
       }
     )
     .subscribe();

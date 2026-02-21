@@ -1792,16 +1792,26 @@ function slotDisponible(slotStart, duracion, citas = [], breaks = []) {
   const startMs = slotStart.getTime();
   const endMs = slotEnd.getTime();
 
+  // Buffer de seguridad (Limpieza/Preparación)
+  const bufferMinutes = configCache?.reserva_buffer_min || 5;
+  const bufferMs = bufferMinutes * 60 * 1000;
+
   const conflictCita = citas.some(c => {
     const cStart = new Date(c.start_at).getTime();
     const cEnd = new Date(c.end_at).getTime();
-    return startMs < cEnd && endMs > cStart;
+    
+    // Lógica de Buffer Estricta:
+    // 1. El nuevo turno no puede empezar antes de que termine la cita anterior + buffer
+    // 2. El nuevo turno + buffer no puede terminar después de que empiece la siguiente cita
+    return startMs < (cEnd + bufferMs) && (endMs + bufferMs) > cStart;
   });
   if (conflictCita) return false;
 
   const conflictBreak = breaks.some(b => {
     const [bStart, bEnd] = b;
-    return startMs < bEnd && endMs > bStart;
+    // Para breaks/turnos activos, aseguramos que nuestro servicio + buffer no choque con el inicio del break
+    // y que no empecemos antes de que termine el break.
+    return startMs < bEnd && (endMs + bufferMs) > bStart;
   });
   if (conflictBreak) return false;
 
@@ -2017,7 +2027,7 @@ async function renderSlotsForSelectedDate() {
     }
     const d = serviciosCache[t.servicio] || 30;
     const e = new Date(s);
-    e.setMinutes(e.getMinutes() + d);
+    e.setMinutes(e.getMinutes() + d + (configCache?.reserva_buffer_min || 5)); // Agregar buffer al turno activo
     breaks.push([s.getTime(), e.getTime()]);
   });
 
