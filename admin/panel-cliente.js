@@ -2039,8 +2039,8 @@ function renderSlotsFromData(data, dateStr, dur) {
   slotsContainer.innerHTML = '';
 
   const bufferSlotMinutes = 5;
-  // 🔥 FIX: Grid fijo de 15 minutos para evitar huecos invisibles
-  const step = 15; 
+  // Grid dinámico: Duración + Buffer (Agenda Inteligente)
+  const step = dur + bufferSlotMinutes; 
   
   const tmp = new Date(startDay);
   const now = new Date();
