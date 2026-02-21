@@ -435,6 +435,29 @@ async function abrirModalCanjePuntos() {
     }
 }
 
+async function enviarCorreoMarketingCliente(clienteId, flow) {
+    try {
+        const { data, error } = await supabase.functions.invoke('send-marketing-email', {
+            body: {
+                negocio_id: negocioId,
+                cliente_id: clienteId,
+                flow
+            }
+        });
+        if (error) {
+            console.error('Error enviando correo de marketing:', error.message || error);
+            mostrarNotificacion('No se pudo enviar el correo de marketing', 'error');
+            return;
+        }
+        if (data && data.success) {
+            mostrarNotificacion('Correo de marketing enviado', 'success');
+        }
+    } catch (e) {
+        console.error('Error inesperado al enviar correo de marketing:', e);
+        mostrarNotificacion('Error al enviar correo de marketing', 'error');
+    }
+}
+
 let draggedItem = null;
 
 function handleDragStart(event) {
@@ -1283,6 +1306,31 @@ function abrirModalPago(turnId) {
         const turno = enAtencionCache.find(t => t.id == turnId) || dataRender.find(t => t.id == turnId);
         const inputMonto = document.getElementById('montoCobrado');
         
+        // --- CONTROL DINÁMICO DE CLIENTE (NUEVO) ---
+        const infoClienteDiv = document.getElementById('info-cliente-pago') || document.createElement('div');
+        infoClienteDiv.id = 'info-cliente-pago';
+        infoClienteDiv.className = 'mb-4 p-3 rounded-lg hidden'; // Oculto por defecto
+        // Insertar antes del input de monto si no existe
+        if (!document.getElementById('info-cliente-pago')) {
+             const form = document.getElementById('formPago');
+             form.insertBefore(infoClienteDiv, form.firstChild);
+        }
+
+        if (turno && turno.telefono) {
+            // Verificar estado del cliente en segundo plano
+            supabase.from('clientes').select('puntos, nombre').eq('negocio_id', negocioId).eq('telefono', turno.telefono).maybeSingle()
+            .then(({ data: cliente }) => {
+                if (cliente && cliente.puntos >= 100) { // Ejemplo: Meta a los 100 puntos
+                    infoClienteDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800 flex items-center gap-2 animate-pulse';
+                    infoClienteDiv.innerHTML = `<span>🏆</span> <div><strong>¡Atención!</strong> ${cliente.nombre} tiene <strong>${cliente.puntos} puntos</strong>.<br><span class="text-xs">Puede canjear una recompensa hoy.</span></div>`;
+                    infoClienteDiv.classList.remove('hidden');
+                } else {
+                    infoClienteDiv.classList.add('hidden');
+                }
+            });
+        }
+        // -------------------------------------------
+
         if (inputMonto) {
             if (turno && turno.servicio && preciosCache[turno.servicio] !== undefined) {
                 inputMonto.value = preciosCache[turno.servicio];

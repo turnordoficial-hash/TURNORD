@@ -16,8 +16,10 @@
 
   <!-- Inicializar Dark Mode antes de render -->
   <script>
-    if (localStorage.getItem('modoOscuro') === 'true') {
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   </script>
   <!-- Verificación de Sesión -->
@@ -647,17 +649,5 @@
   </div>
 
   <script type="module" src="admin/panel-cliente.js"></script>
-  <script>
-    const themeToggle = document.getElementById('theme-toggle-menu');
-    const floatingToggle = document.getElementById('floating-theme-toggle');
-
-    function toggleTheme() {
-      const isDark = document.documentElement.classList.toggle('dark');
-      localStorage.setItem('modoOscuro', isDark);
-    }
-
-    themeToggle?.addEventListener('click', toggleTheme);
-    floatingToggle?.addEventListener('click', toggleTheme);
-  </script>
 </body>
 </html>

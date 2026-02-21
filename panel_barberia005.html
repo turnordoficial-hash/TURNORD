@@ -39,13 +39,11 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
     // Inicializar modo oscuro
-    function inicializarModoOscuro() {
-      const modoOscuro = localStorage.getItem('modoOscuro') === 'true';
-      document.documentElement.classList.toggle('dark', modoOscuro);
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-
-    // Ejecutar al cargar
-    inicializarModoOscuro();
   </script>
   <script>
     tailwind.config = {
@@ -306,9 +304,10 @@
 </script>
 
 <script>
-  // Función para alternar modo oscuro con theme.js
+  // Función para alternar modo oscuro (Estandarizada)
   document.getElementById('toggleDarkMode').addEventListener('click', function() {
-    if (window.theme && window.theme.toggleMode) window.theme.toggleMode();
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 </script>
 

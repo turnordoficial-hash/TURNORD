@@ -418,7 +418,7 @@ BEGIN
   WHERE t.negocio_id = p_negocio_id
     AND t.barber_id = p_barber_id
     AND t.estado = 'En atención'
-    AND t.started_at IS NOT NULL
+    AND t.started_at IS NOT NULL;
     
   IF conflicto_turno > 0 THEN
     RAISE EXCEPTION 'El barbero está atendiendo un turno en este momento y no puede recibir citas.';
@@ -676,3 +676,79 @@ BEGIN
   RETURN nueva;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==============================================================================
+-- 11) Sistema de Promociones y Puntos (Admin)
+-- ==============================================================================
+
+-- RPC para canjear puntos manualmente desde el panel de administración
+CREATE OR REPLACE FUNCTION public.canjear_puntos(
+  p_negocio_id TEXT,
+  p_cliente_telefono TEXT,
+  p_puntos INT,
+  p_concepto TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_cliente_id UUID;
+  v_saldo_actual INT;
+BEGIN
+  -- Obtener cliente
+  SELECT id, puntos INTO v_cliente_id, v_saldo_actual
+  FROM public.clientes
+  WHERE negocio_id = p_negocio_id AND telefono = p_cliente_telefono;
+
+  IF v_cliente_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Cliente no encontrado');
+  END IF;
+
+  IF v_saldo_actual < p_puntos THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Saldo insuficiente');
+  END IF;
+
+  -- Descontar puntos
+  UPDATE public.clientes
+  SET puntos = puntos - p_puntos
+  WHERE id = v_cliente_id;
+
+  -- Registrar historial
+  INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
+  VALUES (p_negocio_id, v_cliente_id, 'GASTADO', p_puntos, p_concepto);
+
+  RETURN jsonb_build_object('success', true, 'nuevo_saldo', v_saldo_actual - p_puntos);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Tabla de Promociones
+CREATE TABLE IF NOT EXISTS public.promociones (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  tipo TEXT NOT NULL, -- 'AUTOMATICA', 'CAMPAÑA', 'NIVEL', 'REFERIDO'
+  subtipo TEXT, -- 'CUMPLEAÑOS', 'INACTIVO', 'TEMPORADA', etc.
+  descripcion TEXT,
+  configuracion JSONB DEFAULT '{}'::jsonb, -- { descuento: 10, tipo_descuento: '%', dias_inactivo: 30, etc }
+  activo BOOLEAN DEFAULT FALSE,
+  fecha_inicio TIMESTAMPTZ,
+  fecha_fin TIMESTAMPTZ,
+  impacto_clientes INTEGER DEFAULT 0,
+  impacto_ingresos NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.promociones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin manage promociones" ON public.promociones FOR ALL USING (true) WITH CHECK (true);
+
+-- Tabla Historial de Uso de Promociones (para métricas)
+CREATE TABLE IF NOT EXISTS public.historial_uso_promociones (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  promocion_id BIGINT REFERENCES public.promociones(id),
+  cliente_id UUID REFERENCES public.clientes(id),
+  turno_id BIGINT REFERENCES public.turnos(id),
+  monto_ahorrado NUMERIC DEFAULT 0,
+  fecha_uso TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.historial_uso_promociones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin view history" ON public.historial_uso_promociones FOR SELECT USING (true);

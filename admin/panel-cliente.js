@@ -300,7 +300,7 @@ function setupThemeToggle() {
 
   const updateUI = (isDark) => {
       // Actualizar botón del menú
-      if (iconContainerMenu) iconContainerMenu.innerHTML = isDark ? moonIcon : sunIcon;
+      if (iconContainerMenu) iconContainerMenu.innerHTML = isDark ? sunIcon : moonIcon;
       if (textSpanMenu) textSpanMenu.textContent = isDark ? 'Modo Claro' : 'Modo Oscuro';
       
       // Actualizar botón flotante
@@ -970,9 +970,9 @@ function renderProfile(data) {
     }
 
     // 🔥 Nivel de Cliente
-    const nivel = calcularNivel(data.puntos || 0);
+    const nivelInfo = calcularNivelInfo(data.puntos || 0);
     const badge = document.getElementById('profile-level-badge');
-    if (badge) badge.textContent = `${nivel}`;
+    if (badge) badge.textContent = `${nivelInfo.icon} ${nivelInfo.nombre}`;
 
     const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
     const navAvatar = document.getElementById('nav-avatar');
