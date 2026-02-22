@@ -504,6 +504,7 @@ async function init() {
       // verificarTurnoActivo();
       verificarCitaActiva();
       checkPendingRatings();
+      cargarPerfil(); // 🔥 Recargar perfil para actualizar puntos visualmente
     }, 500);
   };
 
@@ -532,23 +533,23 @@ function renderStructure() {
     statusContainer.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Card Estado (Ultra Design) -->
-          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#111] to-black border border-white/10 shadow-2xl group">
-              <div class="absolute top-0 right-0 w-32 h-32 bg-[#C1121F]/20 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-[#C1121F]/30"></div>
+          <div onclick="switchTab('cita')" class="cursor-pointer relative overflow-hidden rounded-3xl bg-white dark:bg-gradient-to-br dark:from-[#111] dark:to-black border border-gray-200 dark:border-white/10 shadow-xl dark:shadow-2xl group hover:scale-[1.02] transition-transform">
+              <div class="absolute top-0 right-0 w-32 h-32 bg-[#C1121F]/10 dark:bg-[#C1121F]/20 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-[#C1121F]/20 dark:group-hover:bg-[#C1121F]/30"></div>
               <div class="absolute bottom-0 left-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
               
               <div class="relative z-10 p-6">
                   <div class="flex justify-between items-start mb-4">
-                      <div class="p-3 rounded-2xl bg-white/5 border border-white/10 text-white shadow-inner">
+                      <div class="p-3 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 text-gray-900 dark:text-white shadow-inner">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                       </div>
-                      <span class="px-3 py-1 rounded-full bg-[#C1121F]/20 border border-[#C1121F]/30 text-[#C1121F] text-[10px] font-bold uppercase tracking-widest">
+                      <span class="px-3 py-1 rounded-full bg-[#C1121F]/10 dark:bg-[#C1121F]/20 border border-[#C1121F]/20 dark:border-[#C1121F]/30 text-[#C1121F] text-[10px] font-bold uppercase tracking-widest">
                           Tu Estado
                       </span>
                   </div>
                   
                   <div id="dash-card-1">
-                      <span class="text-4xl md:text-5xl font-black text-white tracking-tight">Sin turno</span>
-                      <p class="text-gray-400 text-sm mt-1 font-medium">Únete a la fila ahora</p>
+                      <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight">Sin cita</span>
+                      <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">Reserva tu espacio</p>
                   </div>
               </div>
           </div>
@@ -589,31 +590,31 @@ function renderStructure() {
     citaPanel.innerHTML = `
             <div id="cita-promo-container" class="mb-6"></div>
             
-            <!-- Card Cita Activa (Hidden by default) -->
-            <div id="card-cita-activa" class="hidden relative overflow-hidden rounded-3xl bg-black border border-white/10 shadow-2xl mb-8 group">
+            <!-- Card Cita Activa (Hidden by default) - Fixed Dark Mode -->
+            <div id="card-cita-activa" class="hidden relative overflow-hidden rounded-3xl bg-white dark:bg-black border border-gray-200 dark:border-white/10 shadow-xl dark:shadow-2xl mb-8 group">
                 <div class="absolute inset-0 bg-gradient-to-r from-[#C1121F]/20 to-transparent opacity-50"></div>
                 <div class="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl"></div>
                 
                 <div class="relative z-10 p-8">
                     <div class="flex justify-between items-start mb-6">
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 backdrop-blur-md">
                             <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            <span class="text-[10px] font-bold uppercase tracking-widest text-white">Confirmada</span>
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-gray-900 dark:text-white">Confirmada</span>
                         </div>
                         <div class="text-right">
-                            <p class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Barbero</p>
-                            <p id="cita-barbero" class="text-lg font-bold text-white">--</p>
+                            <p class="text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold">Barbero</p>
+                            <p id="cita-barbero" class="text-lg font-bold text-gray-900 dark:text-white">--</p>
                         </div>
                     </div>
 
                     <div class="mb-8">
-                        <h3 id="cita-fecha-hora" class="text-4xl md:text-5xl font-black text-white tracking-tight leading-none mb-1">--</h3>
-                        <p id="cita-servicio" class="text-lg text-gray-300 font-medium">--</p>
+                        <h3 id="cita-fecha-hora" class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight leading-none mb-1">--</h3>
+                        <p id="cita-servicio" class="text-lg text-gray-600 dark:text-gray-300 font-medium">--</p>
                     </div>
 
                     <div class="flex items-center justify-between pt-6 border-t border-white/10">
-                        <p class="text-xs text-gray-500 font-medium">Llega 5 min antes</p>
-                        <button onclick="cancelarCita()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-2">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Llega 5 min antes</p>
+                        <button onclick="cancelarCita()" class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-xs font-bold transition-all flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             Cancelar
                         </button>
@@ -804,7 +805,7 @@ function renderStructure() {
                     ${recompensas.map(r => {
                         const unlocked = puntos >= r.pts;
                         return `
-                        <div class="flex flex-col items-center justify-center p-3 rounded-2xl border ${unlocked ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-lg shadow-red-900/20' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-400 grayscale'} transition-all">
+                        <div class="flex flex-col items-center justify-center p-3 rounded-2xl border ${unlocked ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-lg shadow-red-900/20 animate-pulse' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-400 grayscale'} transition-all">
                             <span class="text-2xl mb-1">${r.icon}</span>
                             <span class="text-[10px] font-bold uppercase tracking-wider mb-1">${r.pts} pts</span>
                             <span class="text-xs font-bold text-center leading-tight">${r.label}</span>
@@ -812,6 +813,28 @@ function renderStructure() {
                         </div>
                         `;
                     }).join('')}
+                </div>
+            </div>
+
+            <!-- Sistema de Referidos -->
+            <div class="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-800 relative overflow-hidden">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl"></div>
+                <h4 class="text-sm font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    Gana 50 Puntos por Amigo
+                </h4>
+                <p class="text-xs text-blue-700 dark:text-blue-300 mb-4 leading-relaxed">
+                    Comparte tu enlace. Cuando tu amigo complete su primer servicio, ambos ganan.
+                </p>
+                <div class="flex gap-2">
+                    <button onclick="copiarLinkReferido()" class="flex-1 bg-white dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        Copiar Link
+                    </button>
+                    <button onclick="compartirReferido()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                        Compartir
+                    </button>
                 </div>
             </div>
 
@@ -837,25 +860,23 @@ function renderStructure() {
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  
-  // Ruta absoluta para evitar problemas con subdirectorios
   const swPath = '/sw.js'; 
-
-  navigator.serviceWorker.register(swPath)
+  fetch(swPath, { method: 'HEAD' })
+    .then(res => {
+      if (!res.ok) throw new Error('Service worker no disponible en este entorno');
+      return navigator.serviceWorker.register(swPath);
+    })
     .then(async (registration) => {
       console.log('Service Worker registrado con éxito:', registration.scope);
-      
-      // Intentar sincronizar push si ya tenemos permiso
       try {
         if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
           await crearOSincronizarSuscripcionPush();
         }
       } catch (err) {
-        // Error silencioso, no es crítico para el funcionamiento offline
         console.log('Sincronización push pendiente de permisos.');
       }
     })
-    .catch(err => console.error('SW error:', err));
+    .catch(err => console.warn('SW no registrado:', err.message || err));
 }
 
 async function crearOSincronizarSuscripcionPush() {
@@ -981,6 +1002,28 @@ function renderProfile(data) {
     if (profileAvatar) profileAvatar.src = avatarUrl;
 }
 
+window.copiarLinkReferido = () => {
+    const link = `${window.location.origin}/login_cliente.html?ref=${clienteId}`;
+    navigator.clipboard.writeText(link).then(() => {
+        showToast('Enlace copiado al portapapeles', 'success');
+    });
+};
+
+window.compartirReferido = async () => {
+    const link = `${window.location.origin}/login_cliente.html?ref=${clienteId}`;
+    const data = {
+        title: 'Te invito a JBarber',
+        text: 'Reserva tu turno sin filas y gana puntos. ¡Usa mi enlace!',
+        url: link
+    };
+
+    if (navigator.share) {
+        try { await navigator.share(data); } catch (err) {}
+    } else {
+        window.copiarLinkReferido();
+    }
+};
+
 async function cargarHistorialPuntos() {
     const container = document.getElementById('historial-puntos-list');
     if (!container) return;
@@ -1013,7 +1056,10 @@ async function cargarHistorialPuntos() {
 async function cargarPerfil() {
   // 1. Renderizar desde caché inmediatamente
   const cached = getCache('PROFILE');
-  if (cached) renderProfile(cached);
+  if (cached) {
+    appState.profile = cached;
+    renderProfile(cached);
+  }
 
   // 2. Obtener datos frescos
   const { data, error } = await supabase.from('clientes').select('*, puntos, ultima_visita').eq('id', clienteId).single();
@@ -1029,6 +1075,17 @@ async function cargarPerfil() {
   }
   
   if (data) {
+    // Detectar si se desbloqueó una recompensa
+    const oldPoints = appState.profile?.puntos || 0;
+    const newPoints = data.puntos || 0;
+    if (newPoints > oldPoints) {
+        const rewards = [100, 150, 200];
+        const unlocked = rewards.some(r => oldPoints < r && newPoints >= r);
+        if (unlocked && typeof confetti === 'function') {
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
+            showToast('¡Felicidades! Has desbloqueado una recompensa 🎉', 'success');
+        }
+    }
     setCache('PROFILE', data, 60); // 1 hora de caché
     appState.profile = data;
     renderProfile(data);
@@ -1190,8 +1247,8 @@ async function actualizarEstadoFila() {
   const dashCard1 = document.getElementById('dash-card-1');
   if (dashCard1 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
     dashCard1.innerHTML = `
-             <span class="text-4xl md:text-5xl font-black text-white tracking-tight block">${personasEnCola}</span>
-             <p class="text-gray-400 text-sm mt-1 font-medium">Personas en espera</p>
+             <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">Sin cita</span>
+             <p class="text-gray-400 text-sm mt-1 font-medium">Reserva tu espacio</p>
           `;
   }
 
@@ -1208,11 +1265,6 @@ async function actualizarEstadoFila() {
         if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
         detalleAtencion = `<div class="mt-3 inline-block px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold animate-pulse">En curso: ${partes.join(' y ')}</div>`;
     }
-
-    // 🔥 Progreso Dinámico
-    const porcentaje = Math.max(5, 100 - (personasEnCola * 15));
-    const progress = document.getElementById('turno-progress');
-    if (progress) progress.style.width = `${porcentaje}%`;
 
     dashCard2.innerHTML = `
              <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoTexto}</span>
@@ -1361,8 +1413,6 @@ async function verificarTurnoActivo() {
                 `;
       }
 
-      const porcentaje = Math.max(5, 100 - (personasDelante * 15));
-
     if (personasDelante <= 1 && !appState.notificacionCercaEnviada) {
         sendPushNotification('💈 JBarber - ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`, '/panel_cliente.html#turno');
         window.notificacionCercaEnviada = true;
@@ -1484,7 +1534,7 @@ async function verificarCitaActiva() {
     const dashCard1 = document.getElementById('dash-card-1');
     if (dashCard1) {
       dashCard1.innerHTML = `
-                   <span class="text-4xl md:text-5xl font-black text-white tracking-tight block">CITA</span>
+                   <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">CITA</span>
                    <p class="text-gray-400 text-sm mt-1 font-bold uppercase tracking-wide">PROGRAMADA</p>
                 `;
     }
@@ -2419,8 +2469,15 @@ async function enviarCalificacion(turnoId, rating, comment) {
   } else {
     showToast('¡Gracias por tu opinión!');
     cerrarModalCalificacion();
+    
+    // 🎉 Animación de Confeti al calificar
+    if (typeof confetti === 'function') {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
+    }
+
     try {
       await verificarCitaActiva();
+      await cargarPerfil(); // Actualizar puntos visualmente
     } catch (e) {
       console.error('Error actualizando estado de cita después de calificación:', e);
     }

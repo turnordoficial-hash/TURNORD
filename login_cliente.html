@@ -214,6 +214,13 @@
     import { ensureSupabase } from './database.js';
     const negocioId = 'barberia005';
 
+    // 1. Capturar código de referido de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+        localStorage.setItem(`referral_code_${negocioId}`, refCode);
+    }
+
     // Lógica PWA para Login
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
@@ -385,6 +392,8 @@
       const btn = document.getElementById('btnRegSubmit');
       const btnText = document.getElementById('btnRegText');
 
+      const referidoPor = localStorage.getItem(`referral_code_${negocioId}`);
+
       btn.disabled = true;
       btnText.textContent = 'Creando cuenta...';
 
@@ -399,7 +408,8 @@
             data: {
               nombre: nombre,
               telefono: telefono,
-              negocio_id: negocioId
+              negocio_id: negocioId,
+              referido_por: referidoPor || null // Enviamos el ID del que refirió
             }
           }
         });

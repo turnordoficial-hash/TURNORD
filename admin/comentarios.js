@@ -11,6 +11,9 @@ function getNegocioId() {
 
 const negocioId = getNegocioId();
 
+let currentPage = 1;
+const itemsPerPage = 5;
+
 function renderComentarios(comentarios) {
     const tablaBody = document.getElementById('tabla-comentarios');
     if (!tablaBody) return;
@@ -37,18 +40,24 @@ function renderComentarios(comentarios) {
     }).join('');
 }
 
-async function cargarComentarios() {
+async function cargarComentarios(page = 1) {
     if (!negocioId) return;
+    currentPage = page;
 
     try {
-        const { data, error } = await supabase
+        const from = (page - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+
+        const { data, count, error } = await supabase
             .from('comentarios')
-            .select('*')
+            .select('*', { count: 'exact' })
             .eq('negocio_id', negocioId)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(from, to);
 
         if (error) throw error;
         renderComentarios(data);
+        renderPaginationControls(count);
     } catch (error) {
         console.error('Error al cargar comentarios:', error);
         const tablaBody = document.getElementById('tabla-comentarios');
@@ -57,6 +66,47 @@ async function cargarComentarios() {
         }
     }
 }
+
+function renderPaginationControls(totalCount) {
+    const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
+    let container = document.getElementById('comentarios-pagination');
+    
+    if (!container) {
+        const table = document.getElementById('tabla-comentarios').closest('table');
+        if (table && table.parentElement) {
+            container = document.createElement('div');
+            container.id = 'comentarios-pagination';
+            container.className = 'flex justify-between items-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-700';
+            table.parentElement.appendChild(container);
+        } else {
+            return;
+        }
+    }
+
+    // Lógica de paginación numérica (1, 2, 3...)
+    let pagesHtml = '';
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if (endPage - startPage + 1 < maxVisible) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        pagesHtml += `<button onclick="window.cambiarPaginaComentarios(${i - currentPage})" class="px-3 py-1.5 text-sm font-medium rounded-lg ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'} transition-colors">${i}</button>`;
+    }
+
+    container.innerHTML = `
+        <   ${pagesHtml}
+            <button onclick="window.cambiarPaginaComentarios(1)" ${currentPage === totalPages ? 'disabled' : ''} class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Siguiente</button>
+        </div>
+    `;
+}
+
+window.cambiarPaginaComentarios = (delta) => {
+    cargarComentarios(currentPage + delta);
+};
 
 function suscribirseAComentarios() {
     if (!negocioId) return;
@@ -71,7 +121,7 @@ function suscribirseAComentarios() {
         },
         (payload) => {
             console.log('Nuevo comentario recibido:', payload.new.id);
-            cargarComentarios();
+            cargarComentarios(1); // Recargar primera página al recibir nuevo comentario
         }
         )
         .subscribe();
@@ -80,11 +130,11 @@ function suscribirseAComentarios() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+    setupSidebar();
     if (!negocioId) return;
     await ensureSupabase();
     await cargarComentarios();
     suscribirseAComentarios();
-    setupSidebar();
 });
 
 function setupSidebar() {
@@ -92,19 +142,20 @@ function setupSidebar() {
     const toggleBtn = document.getElementById('sidebar-toggle-btn');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const closeSidebar = document.getElementById('closeSidebar');
     
     if (!sidebar) return;
 
-    if (btn) btn.addEventListener('click', () => {
+    const toggleMobile = () => {
         sidebar.classList.toggle('-translate-x-full');
         if (overlay) overlay.classList.toggle('opacity-0');
         if (overlay) overlay.classList.toggle('pointer-events-none');
-    });
-    if (overlay) overlay.addEventListener('click', () => {
-        sidebar.classList.toggle('-translate-x-full');
-        overlay.classList.toggle('opacity-0');
-        overlay.classList.toggle('pointer-events-none');
-    });
+    };
+
+    if (btn) btn.addEventListener('click', toggleMobile);
+    if (overlay) overlay.addEventListener('click', toggleMobile);
+    if (closeSidebar) closeSidebar.addEventListener('click', toggleMobile);
+
     if (toggleBtn) toggleBtn.addEventListener('click', () => {
         sidebar.classList.toggle('w-64');
         sidebar.classList.toggle('w-20');

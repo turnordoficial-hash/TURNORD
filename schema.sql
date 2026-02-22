@@ -449,6 +449,8 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   avatar_url TEXT,
   puntos INTEGER DEFAULT 0,
   ultima_visita TIMESTAMPTZ,
+  referido_por UUID REFERENCES public.clientes(id),
+  recompensa_referido_aplicada BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad),
@@ -483,19 +485,39 @@ CREATE TABLE IF NOT EXISTS public.historial_puntos (
 
 -- Trigger para sumar puntos automáticamente al finalizar un turno
 CREATE OR REPLACE FUNCTION public.sumar_puntos_turno() RETURNS TRIGGER AS $$
+DECLARE
+  v_cliente_id UUID;
+  v_referido_por UUID;
+  v_recompensa_aplicada BOOLEAN;
+  v_puntos_referido INT := 50; -- Puntos por defecto para el que refiere
 BEGIN
   -- Si el turno pasa a 'Atendido', sumar 10 puntos y actualizar última visita
   IF NEW.estado = 'Atendido' AND OLD.estado <> 'Atendido' THEN
     UPDATE public.clientes
     SET puntos = COALESCE(puntos, 0) + 10,
         ultima_visita = NOW()
-    WHERE telefono = NEW.telefono AND negocio_id = NEW.negocio_id;
+    WHERE telefono = NEW.telefono AND negocio_id = NEW.negocio_id
+    RETURNING id, referido_por, recompensa_referido_aplicada INTO v_cliente_id, v_referido_por, v_recompensa_aplicada;
 
     -- Registrar en historial
     INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
-    SELECT NEW.negocio_id, c.id, 'GANADO', 10, 'Servicio completado: ' || COALESCE(NEW.servicio, 'General')
-    FROM public.clientes c
-    WHERE c.telefono = NEW.telefono AND c.negocio_id = NEW.negocio_id;
+    VALUES (NEW.negocio_id, v_cliente_id, 'GANADO', 10, 'Servicio completado: ' || COALESCE(NEW.servicio, 'General'));
+
+    -- Lógica de Referidos: Si tiene un "padrino" y aún no se ha pagado la recompensa
+    IF v_referido_por IS NOT NULL AND v_recompensa_aplicada = FALSE THEN
+        -- 1. Pagar al que refirió (Padrino)
+        UPDATE public.clientes
+        SET puntos = COALESCE(puntos, 0) + v_puntos_referido
+        WHERE id = v_referido_por;
+
+        INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
+        VALUES (NEW.negocio_id, v_referido_por, 'GANADO', v_puntos_referido, 'Bono por referido: ' || NEW.nombre);
+
+        -- 2. Marcar como pagado para que no se repita
+        UPDATE public.clientes
+        SET recompensa_referido_aplicada = TRUE
+        WHERE id = v_cliente_id;
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -624,7 +646,8 @@ BEGIN
     NEW.email,
     NEW.raw_user_meta_data->>'nombre',
     NEW.raw_user_meta_data->>'telefono',
-    NEW.raw_user_meta_data->>'negocio_id'
+    NEW.raw_user_meta_data->>'negocio_id',
+    (NEW.raw_user_meta_data->>'referido_por')::uuid
   );
   RETURN NEW;
 END;
@@ -752,3 +775,15 @@ CREATE TABLE IF NOT EXISTS public.historial_uso_promociones (
 
 ALTER TABLE public.historial_uso_promociones ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin view history" ON public.historial_uso_promociones FOR SELECT USING (true);
+
+-- ==============================================================================
+-- 12) Automatización de Correos (Recordatorios y Marketing)
+-- ==============================================================================
+
+ALTER TABLE public.citas
+  ADD COLUMN IF NOT EXISTS reminder_1h_sent BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reminder_30m_sent BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reminder_15m_sent BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.clientes
+  ADD COLUMN IF NOT EXISTS last_marketing_email_sent_at TIMESTAMPTZ;

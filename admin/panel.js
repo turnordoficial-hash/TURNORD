@@ -7,6 +7,9 @@ let currentAtencionId = null; // Para evitar reiniciar timer si es el mismo turn
 let negocioId = null; // Se inicializa de forma segura
 let turnosChannel = null;
 let citasChannel = null;
+let historialGlobal = [];
+let currentPage = 1;
+const itemsPerPage = 10;
 
 function handleAuthError(err) {
   if (err && err.code === 'PGRST303') {
@@ -82,7 +85,8 @@ function actualizarTabla(items) {
               <span class="${estadoClass} font-bold text-xs uppercase tracking-wider">${estadoTexto}</span>
             </td>
           </tr>
-        `).join('');
+        `;
+      }).join('');
 }
 
 // Carga los datos principales de la página (turnos) y actualiza la UI.
@@ -155,8 +159,9 @@ async function cargarDatos() {
         return new Date(b.created_at) - new Date(a.created_at);
     });
 
+    historialGlobal = historialCombinado;
     actualizarContadores(turnosHoy);
-    actualizarTabla(historialCombinado);
+    renderPaginationHistorial();
     actualizarTurnoEnAtencion(turnosHoy);
 
   } catch (err) {
@@ -164,6 +169,31 @@ async function cargarDatos() {
     handleAuthError(err);
     document.getElementById('tablaHistorial').innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos.</td></tr>`;
   }
+}
+
+function renderPaginationHistorial() {
+    const totalPages = Math.ceil(historialGlobal.length / itemsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const itemsToShow = historialGlobal.slice(start, end);
+
+    actualizarTabla(itemsToShow);
+
+    const infoEl = document.getElementById('historialPageInfo');
+    const btnPrev = document.getElementById('btnPrevHistorial');
+    const btnNext = document.getElementById('btnNextHistorial');
+
+    if (infoEl) infoEl.textContent = `Página ${currentPage} de ${totalPages}`;
+    if (btnPrev) btnPrev.disabled = currentPage === 1;
+    if (btnNext) btnNext.disabled = currentPage === totalPages;
+}
+
+function cambiarPaginaHistorial(delta) {
+    currentPage += delta;
+    renderPaginationHistorial();
 }
 
 // Función optimizada para evitar saturación (Debounce)
@@ -331,6 +361,7 @@ function actualizarTurnoEnAtencion(turnosHoy) {
 
 // Inicialización segura de la página.
 async function init() {
+  setupSidebar();
   await ensureSupabase();
   
   // 1. Seguridad: Intentar obtener negocioId desde la sesión (Backend Source of Truth)
@@ -349,8 +380,9 @@ async function init() {
   await cargarDatos();
   suscribirseTurnos();
   suscribirseCitas();
-  setupSidebar();
   window.limpiarHistorialTurnos = limpiarHistorialTurnos;
+  document.getElementById('btnPrevHistorial')?.addEventListener('click', () => cambiarPaginaHistorial(-1));
+  document.getElementById('btnNextHistorial')?.addEventListener('click', () => cambiarPaginaHistorial(1));
 }
 
 window.addEventListener('DOMContentLoaded', init);

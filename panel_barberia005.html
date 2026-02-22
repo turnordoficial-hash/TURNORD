@@ -253,6 +253,14 @@
             <!-- Las filas dinámicas se insertan desde panel.js -->
           </tbody>
         </table>
+        <!-- Controles de Paginación -->
+        <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 dark:border-white/5 px-2">
+          <span class="text-sm text-gray-500 dark:text-gray-400" id="historialPageInfo">Página 1</span>
+          <div class="flex gap-2">
+            <button id="btnPrevHistorial" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Anterior</button>
+            <button id="btnNextHistorial" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Siguiente</button>
+          </div>
+        </div>
       </div>
 
       <!-- Input teléfono -->
