@@ -872,12 +872,8 @@ function renderStructure() {
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  const swPath = '/sw.js';
-  fetch(swPath, { method: 'HEAD' })
-    .then(res => {
-      if (!res.ok) throw new Error('Service worker no disponible en este entorno');
-      return navigator.serviceWorker.register(swPath);
-    })
+  const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
+  navigator.serviceWorker.register(swPath)
     .then(() => {})
     .catch(err => console.warn('SW no registrado:', err.message || err));
 }

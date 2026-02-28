@@ -20,7 +20,10 @@
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({ appId: '85f98db3-968a-4580-bb02-8821411a6bee' });
+      await OneSignal.init({ 
+        appId: '85f98db3-968a-4580-bb02-8821411a6bee',
+        serviceWorkerPath: 'sw.js'
+      });
     });
   </script>
   <link rel="manifest" href="manifest.json">
