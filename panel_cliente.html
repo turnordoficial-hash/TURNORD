@@ -666,10 +666,15 @@
         const tel = profile?.telefono || user.user_metadata?.telefono;
         const name = profile?.nombre || user.user_metadata?.nombre;
         if (tel) {
-            // CORRECCIÓN: Usar login para establecer external_id y coincidir con la Edge Function
-            OneSignal.login(String(tel));
-            // Agregar nombre como tag para que aparezca en el dashboard de OneSignal
-            if (name) OneSignal.User.addTag("nombre", name);
+            // CORRECCIÓN: Asegurar identidad limpia para evitar conflictos 409
+            OneSignalDeferred.push(async function(OneSignal) {
+              const currentExternalId = OneSignal.User.externalId;
+              if (currentExternalId && currentExternalId !== String(tel)) {
+                await OneSignal.logout();
+              }
+              await OneSignal.login(String(tel));
+              if (name) OneSignal.User.addTag("nombre", name);
+            });
         }
       }
     });

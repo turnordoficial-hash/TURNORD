@@ -357,8 +357,12 @@
             
             // OneSignal Login
             if (perfilFinal.telefono) {
-              OneSignalDeferred.push(function(OneSignal) {
-                OneSignal.login(String(perfilFinal.telefono));
+              OneSignalDeferred.push(async function(OneSignal) {
+                const currentExternalId = OneSignal.User.externalId;
+                if (currentExternalId && currentExternalId !== String(perfilFinal.telefono)) {
+                  await OneSignal.logout();
+                }
+                await OneSignal.login(String(perfilFinal.telefono));
                 if (perfilFinal.nombre) OneSignal.User.addTag("nombre", perfilFinal.nombre);
               });
             }
@@ -372,8 +376,12 @@
                  if (mNombre) localStorage.setItem(`cliente_nombre_${negocioId}`, mNombre);
                  if (mTel) {
                    localStorage.setItem(`cliente_telefono_${negocioId}`, mTel);
-                   OneSignalDeferred.push(function(OneSignal) {
-                     OneSignal.login(String(mTel));
+                   OneSignalDeferred.push(async function(OneSignal) {
+                     const currentExternalId = OneSignal.User.externalId;
+                     if (currentExternalId && currentExternalId !== String(mTel)) {
+                       await OneSignal.logout();
+                     }
+                     await OneSignal.login(String(mTel));
                      if (mNombre) OneSignal.User.addTag("nombre", mNombre);
                    });
                  }
