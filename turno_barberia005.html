@@ -50,16 +50,25 @@
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(function(OneSignal) {
+      // Solicitar permiso automáticamente al cargar si no está concedido (v16 SDK)
+      if (!OneSignal.Notifications.permission) {
+        OneSignal.Notifications.requestPermission().catch(function(err) {
+          console.warn('Error al solicitar permiso push:', err);
+        });
+      }
+
       var btn = document.getElementById('enable-push-turno');
       if (!btn) return;
-      OneSignal.Notifications.getPermissionStatus().then(function(status){
-        if (status === 'granted') btn.style.display = 'none';
-      });
+
+      // Actualizar visibilidad inicial
+      if (OneSignal.Notifications.permission) btn.style.display = 'none';
+
       btn.addEventListener('click', function(){
         OneSignal.Notifications.requestPermission().catch(function(){});
       });
-      OneSignal.Notifications.addEventListener('permissionChange', function(e){
-        if (e.permission === 'granted') btn.style.display = 'none';
+
+      OneSignal.Notifications.addEventListener('permissionChange', function(permission){
+        if (permission) btn.style.display = 'none';
       });
     });
   </script>

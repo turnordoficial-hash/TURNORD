@@ -227,6 +227,26 @@ function updateBanner(mode = 'default') {
 // Notificaciones Push con OneSignal
 const ONESIGNAL_APP_ID = '85f98db3-968a-4580-bb02-8821411a6bee';
 
+/**
+ * Solicita permiso para notificaciones push usando OneSignal
+ */
+async function solicitarPermisoNotificacion() {
+  return new Promise((resolve) => {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        if (!OneSignal.Notifications.permission) {
+          await OneSignal.Notifications.requestPermission();
+        }
+        resolve(OneSignal.Notifications.permission);
+      } catch (err) {
+        console.warn('Error al solicitar permiso OneSignal:', err);
+        resolve(false);
+      }
+    });
+  });
+}
+
 function showToast(message, type = 'success') {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -1482,15 +1502,21 @@ async function verificarCitaActiva() {
 }
 
 async function sendPushNotification(title, body, url) {
-  const telefono = appState.profile?.telefono;
-  if (!telefono || telefono === '...') return;
+  const telefono = appState.profile?.telefono || appState.user?.user_metadata?.telefono;
+  if (!telefono || telefono === '...') {
+    console.warn('No se puede enviar push: teléfono no disponible en el perfil');
+    return;
+  }
+  
+  console.log(`Intentando enviar notificación push a ${telefono}...`);
   try {
-    const { error } = await supabase.functions.invoke('send-push-notification', {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
       body: { telefono, negocio_id: negocioId, title, body, url }
     });
     if (error) throw error;
+    console.log('✅ Notificación push enviada con éxito:', data);
   } catch (e) {
-    console.error('Error enviando push:', e);
+    console.error('❌ Error enviando push:', e.message || e);
   }
 }
 

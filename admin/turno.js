@@ -16,7 +16,6 @@ let citasFuturas = [];
 let barberosMap = {};
 let clientesMap = {};
 let barberosActivosList = []; // Cache para lógica de disponibilidad
-let __pushSubsCount = 0;
 let isSubmittingTurn = false; // Flag para evitar doble submit
 let agendaInterval = null; // Intervalo para actualizar línea de tiempo y estados
 let basePricePago = 0;
@@ -254,18 +253,6 @@ async function cargarClientesMap() {
     }
 }
 
-async function cargarPushSubsCount() {
-    try {
-        const { count } = await supabase
-            .from('push_subscriptions')
-            .select('*', { count: 'exact', head: true })
-            .eq('negocio_id', negocioId);
-        __pushSubsCount = count || 0;
-    } catch (e) {
-        __pushSubsCount = 0;
-    }
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
     await ensureSupabase();
     if (!negocioId) return;
@@ -276,7 +263,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await cargarServicios();
     await cargarBarberosMap();
     await cargarClientesMap();
-    await cargarPushSubsCount();
     refrescarUI();
     document.getElementById('refrescar-turnos')?.addEventListener('click', () => {
         refrescarUI();
@@ -302,13 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('formPago')?.addEventListener('submit', guardarPago);
     suscribirseTurnos();
     suscribirseCitas();
-    // Suscripción a cambios de push_subscriptions para mantener el conteo actualizado
-    supabase
-        .channel(`push-subs-${negocioId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'push_subscriptions', filter: `negocio_id=eq.${negocioId}` },
-            async () => { await cargarPushSubsCount(); }
-        )
-        .subscribe();
     iniciarActualizadorMinutos();
     supabase
         .channel('config-turno-admin')
@@ -1397,7 +1376,6 @@ function cerrarModalPago() {
  * Notifica a todos los clientes en espera cuando avanza la fila
  */
 async function notificarAvanceFila() {
-    if (__pushSubsCount === 0) return;
     if (!Array.isArray(dataRender)) return;
     // Optimización: Solo notificar a los primeros 5 de la fila para evitar rate limits y costos
     const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 5);
@@ -1408,7 +1386,7 @@ async function notificarAvanceFila() {
     }
 
     const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || (supabase.supabaseKey || 'ANON_KEY_FALLBACK');
+    const token = session?.access_token || (supabase.supabaseKey || 'ANON_KEY_FALLBACK');
 
     // Notificar a todos los clientes en espera sobre el avance
     const promesas = turnosEnEspera.map(async (turno, i) => {
@@ -1425,6 +1403,7 @@ async function notificarAvanceFila() {
                 mensaje = `La fila avanzó. Quedan ${turnosDelante} personas antes que tú. Estamos más cerca de tu turno.`;
             }
 
+            console.log(`Notificando avance a ${turno.nombre} (${turno.telefono})...`);
             let data, error;
             try {
                 ({ data, error } = await supabase.functions.invoke('send-push-notification', {
@@ -1436,6 +1415,7 @@ async function notificarAvanceFila() {
                     }
                 }));
             } catch (eInvoke) {
+                console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
                 try {
                     const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                     const res = await fetch(url, {
@@ -1460,22 +1440,20 @@ async function notificarAvanceFila() {
             }
 
             if (error) {
-                console.error(`Error notificando a ${turno.nombre}:`, error.message);
+                console.error(`Error notificando a ${turno.nombre}:`, error.message || error);
             } else if (data && data.success) {
-                console.log(`Notificación enviada a ${turno.nombre} (posición ${posicionEnFila})`);
+                console.log(`✅ Notificación enviada a ${turno.nombre} (posición ${posicionEnFila})`);
             }
         } catch (error) {
-            console.error(`Error al notificar a ${turno.nombre}:`, error);
+            console.error(`❌ Error crítico al notificar a ${turno.nombre}:`, error);
         }
     });
 
     await Promise.all(promesas);
-
-    mostrarNotificacion(`Notificaciones de avance enviadas a ${turnosEnEspera.length} clientes.`, 'info');
+    mostrarNotificacion(`Proceso de notificaciones completado.`, 'info');
 }
 
 async function notificarSiguienteEnCola() {
-    if (__pushSubsCount === 0) return;
     if (!Array.isArray(dataRender)) return;
     // dataRender es el array de turnos en espera, ya ordenado.
     // El turno que se acaba de llamar estaba en el índice 0. El siguiente es el del índice 1.
@@ -1503,6 +1481,7 @@ async function notificarSiguienteEnCola() {
                 }
             }));
         } catch (eInvoke) {
+            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
@@ -1527,15 +1506,17 @@ async function notificarSiguienteEnCola() {
         }
 
         if (error) {
-            console.error('Error devuelto por la función de notificación:', error.message);
+            console.error('Error devuelto por la función de notificación:', error.message || error);
             mostrarNotificacion(`No se pudo notificar a ${siguienteTurno.nombre}.`, 'warning');
             return;
         }
 
         if (data && data.success) {
+            console.log(`✅ Notificación push enviada a ${siguienteTurno.nombre}.`);
             mostrarNotificacion(`Notificación push enviada a ${siguienteTurno.nombre}.`, 'info');
         } else {
-             mostrarNotificacion(`Fallo al enviar notificación a ${siguienteTurno.nombre}: ${data.error}`, 'warning');
+             console.error(`Fallo al enviar notificación a ${siguienteTurno.nombre}:`, data?.error || data);
+             mostrarNotificacion(`Fallo al enviar notificación a ${siguienteTurno.nombre}`, 'warning');
         }
 
     } catch (invokeError) {
@@ -1551,7 +1532,6 @@ async function notificarSiguienteEnCola() {
  * @param {string} turno - Número de turno
  */
 async function notificarTurnoTomado(telefono, nombre, turno) {
-    if (__pushSubsCount === 0) return;
     if (!telefono) {
         console.log('No se puede notificar: teléfono no disponible');
         return;
@@ -1574,6 +1554,7 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
                 }
             }));
         } catch (eInvoke) {
+            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
@@ -1598,14 +1579,14 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
         }
 
         if (error) {
-            console.error('Error al notificar turno tomado:', error.message);
+            console.error('Error al notificar turno tomado:', error.message || error);
             return;
         }
 
         if (data && data.success) {
-            console.log(`Notificación de turno tomado enviada a ${nombre}`);
+            console.log(`✅ Notificación de turno tomado enviada a ${nombre}`);
         } else {
-            console.error(`Error al enviar notificación de turno tomado: ${data.error}`);
+            console.error(`Error al enviar notificación de turno tomado:`, data?.error || data);
         }
 
     } catch (invokeError) {
@@ -1614,7 +1595,6 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
 }
 
 async function notificarRecordatorioCita(cita) {
-    if (__pushSubsCount === 0) return;
     if (!cita || !cita.cliente_telefono) return;
 
     const telefono = cita.cliente_telefono;
@@ -1622,6 +1602,7 @@ async function notificarRecordatorioCita(cita) {
     const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     try {
+        console.log(`Enviando recordatorio de cita a ${nombre} (${telefono})...`);
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || supabase.supabaseKey;
 
@@ -1636,6 +1617,7 @@ async function notificarRecordatorioCita(cita) {
                 }
             }));
         } catch (eInvoke) {
+            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
@@ -1660,9 +1642,9 @@ async function notificarRecordatorioCita(cita) {
         }
 
         if (error) {
-            console.error('Error al enviar recordatorio de cita:', error.message);
+            console.error('Error al enviar recordatorio de cita:', error.message || error);
         } else if (data && data.success) {
-            console.log(`Recordatorio de cita enviado a ${nombre} (${telefono})`);
+            console.log(`✅ Recordatorio de cita enviado a ${nombre} (${telefono})`);
         }
     } catch (invokeError) {
         console.error('Error al invocar recordatorio de cita:', invokeError);
@@ -1670,12 +1652,12 @@ async function notificarRecordatorioCita(cita) {
 }
 
 async function notificarCitaAceptada(telefono, nombre, startAt) {
-    if (__pushSubsCount === 0) return;
     if (!telefono) return;
 
     const hora = startAt ? new Date(startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
     try {
+        console.log(`Notificando cita aceptada a ${nombre} (${telefono})...`);
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || supabase.supabaseKey;
 
@@ -1690,6 +1672,7 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
                 }
             }));
         } catch (eInvoke) {
+            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
                 const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
                 const res = await fetch(url, {
@@ -1714,9 +1697,9 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
         }
 
         if (error) {
-            console.error('Error al enviar notificación de cita aceptada:', error.message);
+            console.error('Error al enviar notificación de cita aceptada:', error.message || error);
         } else if (data && data.success) {
-            console.log(`Notificación de cita aceptada enviada a ${nombre || 'cliente'} (${telefono})`);
+            console.log(`✅ Notificación de cita aceptada enviada a ${nombre || 'cliente'} (${telefono})`);
         }
     } catch (invokeError) {
         console.error('Error al invocar notificación de cita aceptada:', invokeError);

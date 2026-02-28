@@ -219,9 +219,9 @@
           overlay.classList.toggle('opacity-0');
           overlay.classList.toggle('pointer-events-none');
         };
-        btn.addEventListener('click', toggle);
-        overlay.addEventListener('click', toggle);
-        if (closeBtn) closeBtn.addEventListener('click', toggle);
+        btn.onclick = toggle;
+        overlay.onclick = toggle;
+        if (closeBtn) closeBtn.onclick = toggle;
       }
     });
   </script>
