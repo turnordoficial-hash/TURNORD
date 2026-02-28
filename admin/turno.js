@@ -1,4 +1,5 @@
 import { supabase, ensureSupabase } from '../database.js';
+import { sumarPuntosCliente, calcularPuntosGanados, RECOMPENSAS } from './promociones.js';
 
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
@@ -1305,7 +1306,7 @@ function abrirModalPago(turnId) {
             // Verificar estado del cliente en segundo plano
             supabase.from('clientes').select('puntos, nombre').eq('negocio_id', negocioId).eq('telefono', turno.telefono).maybeSingle()
             .then(({ data: cliente }) => {
-                if (cliente && cliente.puntos >= 100) { // Ejemplo: Meta a los 100 puntos
+                if (cliente && RECOMPENSAS.length > 0 && cliente.puntos >= RECOMPENSAS[0].pts) { // Ejemplo: Meta al primer nivel de recompensa
                     infoClienteDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800 flex items-center gap-2 animate-pulse';
                     infoClienteDiv.innerHTML = `<span>🏆</span> <div><strong>¡Atención!</strong> ${cliente.nombre} tiene <strong>${cliente.puntos} puntos</strong>.<br><span class="text-xs">Puede canjear una recompensa hoy.</span></div>`;
                     infoClienteDiv.classList.remove('hidden');
@@ -1325,6 +1326,21 @@ function abrirModalPago(turnId) {
                 inputMonto.value = '';
             }
         }
+        
+        // --- CONTROL DINÁMICO DE DESCUENTO (NUEVO) ---
+        // Asumimos que un servicio aplica para descuento si el nombre contiene "Promo" o si lo definimos en una lista.
+        // Para hacerlo profesional, mostramos el descuento solo si el servicio no es el más básico.
+        const discountSection = document.getElementById('seccion-descuento-pago');
+        if (discountSection) {
+            const aplicaDescuento = turno && turno.servicio && (turno.servicio.toLowerCase().includes('promo') || basePricePago > 500);
+            if (aplicaDescuento) {
+                discountSection.classList.remove('hidden');
+            } else {
+                discountSection.classList.add('hidden');
+                if (descEl) descEl.value = ''; // Limpiar si se oculta
+            }
+        }
+
         if (precioPredEl) precioPredEl.textContent = `RD$ ${basePricePago.toFixed(2)}`;
         if (descEl) descEl.value = '';
         if (impEl) impEl.value = '';
@@ -1991,15 +2007,24 @@ async function guardarPago(event) {
        return;
     }
 
-    const exito = await cambiarEstadoTurno(activeTurnIdForPayment, ESTADOS.ATENDIDO, {
-        monto_cobrado: monto,
-        metodo_pago: metodoPago,
-        ended_at: new Date().toISOString()
+    const { data: rpcData, error: rpcError } = await supabase.rpc('finalizar_turno_con_pago', {
+        p_turno_id: activeTurnIdForPayment,
+        p_negocio_id: negocioId,
+        p_monto: monto,
+        p_metodo_pago: metodoPago
     });
 
-    if (!exito) {
+    if (rpcError) {
+        console.error('Error finalizando turno:', rpcError);
+        mostrarNotificacion('Error al finalizar turno: ' + rpcError.message, 'error');
         return;
     }
+
+    const puntosGanados = rpcData?.puntos_ganados || 0;
+    if (puntosGanados > 0) {
+        mostrarNotificacion(`+${puntosGanados} puntos acumulados`, 'success');
+    }
+
     cerrarModalPago();
     mostrarNotificacion(`Turno finalizado con cobro de RD$${monto}`, 'success');
     

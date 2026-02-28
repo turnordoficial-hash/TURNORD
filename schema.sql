@@ -432,6 +432,129 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+CREATE TABLE IF NOT EXISTS public.roles_negocio (
+  negocio_id TEXT NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  rol TEXT NOT NULL CHECK (rol IN ('admin','staff')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (negocio_id, user_id)
+);
+
+CREATE OR REPLACE FUNCTION public.finalizar_turno_con_pago(
+  p_turno_id BIGINT,
+  p_negocio_id TEXT,
+  p_monto NUMERIC,
+  p_metodo_pago TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_turno record;
+  v_cliente_id UUID;
+  v_puntos INTEGER;
+  v_ok BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.roles_negocio
+    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
+  ) INTO v_ok;
+
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
+  SELECT * INTO v_turno
+  FROM public.turnos
+  WHERE id = p_turno_id AND negocio_id = p_negocio_id
+  FOR UPDATE;
+
+  IF v_turno IS NULL THEN
+    RAISE EXCEPTION 'Turno no encontrado';
+  END IF;
+
+  IF v_turno.estado = 'Atendido' THEN
+    RETURN jsonb_build_object('success', true, 'message', 'Turno ya atendido');
+  END IF;
+
+  UPDATE public.turnos
+  SET estado = 'Atendido',
+      monto_cobrado = p_monto,
+      metodo_pago = p_metodo_pago,
+      updated_at = NOW()
+  WHERE id = p_turno_id;
+
+  v_puntos := FLOOR(COALESCE(p_monto, 0) * 0.1);
+
+  IF v_puntos > 0 AND v_turno.telefono IS NOT NULL THEN
+    UPDATE public.clientes
+    SET puntos_actuales = COALESCE(puntos_actuales, 0) + v_puntos,
+        puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + v_puntos,
+        ultima_visita = NOW()
+    WHERE negocio_id = p_negocio_id AND telefono = v_turno.telefono
+    RETURNING id INTO v_cliente_id;
+
+    IF v_cliente_id IS NOT NULL THEN
+      INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo, referencia_pago_id)
+      VALUES (p_negocio_id, v_cliente_id, v_puntos, 'GANADO', p_turno_id);
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'puntos_ganados', v_puntos);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.canjear_puntos(
+  p_negocio_id TEXT,
+  p_cliente_id UUID,
+  p_puntos INTEGER
+) RETURNS JSONB AS $$
+DECLARE
+  v_saldo INTEGER;
+  v_ok BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.roles_negocio
+    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
+  ) INTO v_ok;
+
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
+  SELECT puntos_actuales INTO v_saldo
+  FROM public.clientes
+  WHERE id = p_cliente_id AND negocio_id = p_negocio_id
+  FOR UPDATE;
+
+  IF v_saldo IS NULL THEN
+    RAISE EXCEPTION 'Cliente no encontrado';
+  END IF;
+
+  IF p_puntos <= 0 THEN
+    RAISE EXCEPTION 'Monto inválido';
+  END IF;
+
+  IF v_saldo < p_puntos THEN
+    RAISE EXCEPTION 'Saldo insuficiente';
+  END IF;
+
+  UPDATE public.clientes
+  SET puntos_actuales = puntos_actuales - p_puntos
+  WHERE id = p_cliente_id AND negocio_id = p_negocio_id;
+
+  INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo)
+  VALUES (p_negocio_id, p_cliente_id, p_puntos, 'CANJE');
+
+  RETURN jsonb_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ==============================================================================
 -- 9) Tabla: Clientes (Perfil y Auth Personalizado)
 -- ==============================================================================
@@ -787,3 +910,79 @@ ALTER TABLE public.citas
 
 ALTER TABLE public.clientes
   ADD COLUMN IF NOT EXISTS last_marketing_email_sent_at TIMESTAMPTZ;
+
+-- Fidelización avanzada: puntos actuales vs históricos
+ALTER TABLE public.clientes
+  ADD COLUMN IF NOT EXISTS puntos_actuales INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS puntos_totales_historicos INTEGER DEFAULT 0;
+
+-- Movimientos de puntos con referencia de pago
+CREATE TABLE IF NOT EXISTS public.movimientos_puntos (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT NOT NULL,
+  cliente_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
+  puntos INTEGER NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('GANADO','CANJE')),
+  referencia_pago_id BIGINT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Desactivar trigger antiguo de suma automática
+DROP TRIGGER IF EXISTS trg_sumar_puntos ON public.turnos;
+DROP FUNCTION IF EXISTS public.sumar_puntos_turno();
+
+-- RPC: Finalizar turno con pago y sumar puntos
+CREATE OR REPLACE FUNCTION public.finalizar_turno_con_pago(
+  p_turno_id BIGINT,
+  p_negocio_id TEXT,
+  p_monto NUMERIC,
+  p_metodo_pago TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_turno record;
+  v_cliente_id UUID;
+  v_puntos INTEGER;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  SELECT * INTO v_turno
+  FROM public.turnos
+  WHERE id = p_turno_id AND negocio_id = p_negocio_id
+  FOR UPDATE;
+
+  IF v_turno IS NULL THEN
+    RAISE EXCEPTION 'Turno no encontrado';
+  END IF;
+
+  IF v_turno.estado = 'Atendido' THEN
+    RETURN jsonb_build_object('success', true, 'message', 'Turno ya atendido');
+  END IF;
+
+  UPDATE public.turnos
+  SET estado = 'Atendido',
+      monto_cobrado = p_monto,
+      metodo_pago = p_metodo_pago,
+      updated_at = NOW()
+  WHERE id = p_turno_id;
+
+  v_puntos := FLOOR(COALESCE(p_monto, 0) * 0.1);
+
+  IF v_puntos > 0 AND v_turno.telefono IS NOT NULL THEN
+    UPDATE public.clientes
+    SET puntos_actuales = COALESCE(puntos_actuales, 0) + v_puntos,
+        puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + v_puntos,
+        ultima_visita = NOW()
+    WHERE negocio_id = p_negocio_id AND telefono = v_turno.telefono
+    RETURNING id INTO v_cliente_id;
+
+    IF v_cliente_id IS NOT NULL THEN
+      INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo, referencia_pago_id)
+      VALUES (p_negocio_id, v_cliente_id, v_puntos, 'GANADO', p_turno_id);
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'puntos_ganados', v_puntos);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

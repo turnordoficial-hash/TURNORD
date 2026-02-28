@@ -533,7 +533,35 @@
     </div>
 
     <div id="tab-perfil-panel" class="hidden animate-fade-in">
-        <!-- Contenido Perfil -->
+        <!-- Loyalty Card / Recompensas -->
+        <div class="mt-8 bg-zinc-900 dark:bg-black/40 rounded-[2.5rem] p-6 border border-white/5 relative overflow-hidden shadow-2xl">
+            <div class="absolute top-0 right-0 p-4 opacity-10">
+                <svg class="w-24 h-24 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z"/>
+                </svg>
+            </div>
+            <div class="relative z-10">
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    Mi Club VIP JBarber
+                </h4>
+                
+                <div id="profile-rewards-grid" class="grid grid-cols-3 gap-3">
+                    <!-- Se llena dinámicamente desde panel-cliente.js -->
+                </div>
+
+                <!-- Sistema de Referidos (Engagement) -->
+                <div class="mt-6 pt-6 border-t border-white/5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold text-white">Refiere a un amigo</p>
+                            <p class="text-[10px] text-gray-500">Gana 20 pts por cada uno</p>
+                        </div>
+                        <button id="share-referral" class="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white transition-all">Compartir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Calificación -->

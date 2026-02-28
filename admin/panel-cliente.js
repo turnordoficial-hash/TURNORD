@@ -1,7 +1,7 @@
-import { ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js';
+import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 
 const negocioId = 'barberia005';
-const supabase = await ensureSupabase();
 
 // Estado centralizado para la aplicación, eliminando variables globales.
 const appState = {
@@ -86,8 +86,8 @@ function getSaludo() {
 }
 
 function calcularNivelInfo(puntos) {
-  // Asumimos 10 puntos por servicio
-  const servicios = Math.floor((puntos || 0) / 10);
+  // Asumimos 50 puntos por servicio (Ticket promedio RD$500 * 0.1)
+  const servicios = Math.floor((puntos || 0) / 50);
   
   const niveles = [
     { min: 0, max: 4, nombre: "Nuevo Cliente", icon: "💈", mensaje: "Bienvenido a la familia", color: "text-gray-500", bg: "bg-gray-500" },
@@ -131,8 +131,9 @@ class SmartMarketingEngine {
 
   getMessages() {
     const points = this.profile?.puntos || 0;
-    const nextReward = points < 100 ? 100 : (points < 150 ? 150 : 200);
-    const pointsNeeded = nextReward - points;
+    const nextRewardTier = RECOMPENSAS.find(r => points < r.pts);
+    const nextRewardPts = nextRewardTier ? nextRewardTier.pts : (RECOMPENSAS.length > 0 ? RECOMPENSAS[RECOMPENSAS.length - 1].pts : 0);
+    const pointsNeeded = Math.max(0, nextRewardPts - points);
 
     const commonMessages = [
       { title: "Tu estilo, tu regla.", subtitle: "Acumula puntos con cada corte y desbloquea recompensas.", badge: "💎 JBarber Club" },
@@ -397,6 +398,32 @@ function setupStaticEventHandlers() {
 
 const slotsCache = {};
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos de vida para el caché
+
+/**
+ * Sistema de Caché Profesional con TTL
+ */
+function setSlotsCache(key, data) {
+  slotsCache[key] = {
+    data,
+    timestamp: Date.now()
+  };
+  // Limpieza preventiva si el caché crece demasiado
+  if (Object.keys(slotsCache).length > 100) {
+    const oldestKey = Object.keys(slotsCache).sort((a, b) => slotsCache[a].timestamp - slotsCache[b].timestamp)[0];
+    delete slotsCache[oldestKey];
+  }
+}
+
+function getSlotsCache(key, ttl = CACHE_TTL_MS) {
+  const cached = slotsCache[key];
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > ttl) {
+    delete slotsCache[key];
+    return null;
+  }
+  return cached.data;
+}
+
 let lastSlotsParams = '';
 
 window.switchTab = (tab) => {
@@ -491,6 +518,21 @@ async function init() {
   document.getElementById('select-barbero-cita')?.addEventListener('change', updateBarberInfo);
   document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
   document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
+
+  // Evento Compartir Referido
+  document.getElementById('share-referral')?.addEventListener('click', () => {
+    const text = `¡Ven a JBarber! Agenda tu turno aquí: ${window.location.origin}/login_cliente.html y menciona mi número ${appState.profile?.telefono || ''} para ganar puntos.`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Referido JBarber',
+        text: text,
+        url: window.location.origin
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text);
+      showToast('Enlace de referido copiado al portapapeles', 'info');
+    }
+  });
 
   const formPerfil = document.getElementById('form-perfil');
   if (formPerfil) {
@@ -746,15 +788,8 @@ function renderStructure() {
 
   const perfilPanel = document.getElementById('tab-perfil-panel');
   if (perfilPanel) {
-    const puntos = appState.profile?.puntos || 0;    
-    const nivelInfo = calcularNivelInfo(puntos);
-    
-    // Recompensas estáticas (Configurable)
-    const recompensas = [
-        { pts: 100, label: "50% Descuento", icon: "✂️" },
-        { pts: 150, label: "Lavado Gratis", icon: "🧴" },
-        { pts: 200, label: "Corte Gratis", icon: "🎁" }
-    ];
+    const puntosHist = appState.profile?.puntos_totales_historicos || 0;    
+    const nivelInfo = calcularNivelInfo(puntosHist);
 
     perfilPanel.innerHTML = `
           <div id="perfil-promo-container" class="mb-6"></div>
@@ -788,21 +823,21 @@ function renderStructure() {
                     <div>
                         <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Progreso de Nivel</p>
                         <p class="text-2xl font-black text-gray-900 dark:text-white mt-1">
-                            ${nivelInfo.servicios} <span class="text-sm font-medium text-gray-500">servicios</span>
+                            <span id="profile-services-count">${nivelInfo.servicios}</span> <span class="text-sm font-medium text-gray-500">servicios</span>
                         </p>
                     </div>
                     <div class="text-right">
                         <p class="text-xs font-bold text-gray-400">Siguiente Nivel</p>
-                        <p class="text-sm font-bold ${nivelInfo.color}">${nivelInfo.nextLevel ? nivelInfo.nextLevel.nombre : 'Máximo'}</p>
+                        <p id="profile-next-level-name" class="text-sm font-bold ${nivelInfo.color}">${nivelInfo.nextLevel ? nivelInfo.nextLevel.nombre : 'Máximo'}</p>
                     </div>
                 </div>
                 
                 <div class="w-full h-4 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden mb-2">
-                    <div class="h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative" style="width: ${nivelInfo.progress}%">
+                    <div id="profile-progress-bar" class="h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative" style="width: ${nivelInfo.progress}%">
                         <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
                     </div>
                 </div>
-                <p class="text-xs text-center text-gray-500 dark:text-gray-400 font-medium">
+                <p id="profile-missing-text" class="text-xs text-center text-gray-500 dark:text-gray-400 font-medium">
                     ${nivelInfo.nextLevel ? `Te faltan ${nivelInfo.nextLevel.min - nivelInfo.servicios} servicios para subir de nivel` : '¡Has alcanzado la cima!'}
                 </p>
             </div>
@@ -813,8 +848,8 @@ function renderStructure() {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#C1121F]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
                     Premios Disponibles
                 </h4>
-                <div class="grid grid-cols-3 gap-3">
-                    ${recompensas.map(r => {
+                <div id="profile-rewards-grid" class="grid grid-cols-3 gap-3">
+                    ${RECOMPENSAS.map(r => {
                         const unlocked = puntos >= r.pts;
                         return `
                         <div class="flex flex-col items-center justify-center p-3 rounded-2xl border ${unlocked ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-lg shadow-red-900/20 animate-pulse' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-400 grayscale'} transition-all">
@@ -932,8 +967,7 @@ function renderProfile(data) {
        saludoEl.textContent = `${getSaludo()}, ${data.nombre.split(' ')[0]}`;
     }
 
-    // 🔥 Nivel de Cliente
-    const nivelInfo = calcularNivelInfo(data.puntos || 0);
+    const nivelInfo = calcularNivelInfo(data.puntos_totales_historicos || 0);
     const badge = document.getElementById('profile-level-badge');
     if (badge) badge.textContent = `${nivelInfo.icon} ${nivelInfo.nombre}`;
 
@@ -942,6 +976,46 @@ function renderProfile(data) {
     if (navAvatar) navAvatar.src = avatarUrl;
     const profileAvatar = document.getElementById('profile-avatar');
     if (profileAvatar) profileAvatar.src = avatarUrl;
+
+    const recompensas = obtenerRecompensasDisponibles(data.puntos_actuales || 0);
+    const badge2 = document.getElementById('profile-level-badge');
+    if (badge2) badge2.innerHTML = `${nivelInfo.icon} ${nivelInfo.nombre}`;
+
+    const servicesCount = document.getElementById('profile-services-count');
+    if (servicesCount) animateNumber(servicesCount, nivelInfo.servicios);
+
+    const nextLevelName = document.getElementById('profile-next-level-name');
+    if (nextLevelName) {
+        nextLevelName.textContent = nivelInfo.nextLevel ? nivelInfo.nextLevel.nombre : 'Máximo';
+        nextLevelName.className = `text-sm font-bold ${nivelInfo.color}`;
+    }
+
+    const progressBar = document.getElementById('profile-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = `${nivelInfo.progress}%`;
+        progressBar.className = `h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative`;
+        progressBar.innerHTML = '<div class="absolute inset-0 bg-white/20 animate-pulse"></div>';
+    }
+
+    const missingText = document.getElementById('profile-missing-text');
+    if (missingText) {
+        missingText.textContent = nivelInfo.nextLevel 
+            ? `Te faltan ${nivelInfo.nextLevel.min - nivelInfo.servicios} servicios para subir de nivel` 
+            : '¡Has alcanzado la cima!';
+    }
+
+    const rewardsGrid = document.getElementById('profile-rewards-grid');
+    if (rewardsGrid) {
+        rewardsGrid.innerHTML = recompensas.map(r => `
+            <div class="flex flex-col items-center justify-center p-3 rounded-2xl border ${r.desbloqueado ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-lg shadow-red-900/20 animate-pulse' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-400 grayscale'} transition-all relative overflow-hidden">
+                ${!r.desbloqueado ? `<div class="absolute bottom-0 left-0 h-1 bg-red-500/20 w-full"><div class="h-full bg-red-500" style="width: ${r.progreso}%"></div></div>` : ''}
+                <span class="text-2xl mb-1">${r.icon}</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider mb-1">${r.pts} pts</span>
+                <span class="text-xs font-bold text-center leading-tight">${r.label}</span>
+                ${r.desbloqueado ? '<div class="mt-1 text-[10px] bg-white/20 px-2 py-0.5 rounded-full">Canjeable</div>' : ''}
+            </div>
+        `).join('');
+    }
 }
 
 window.copiarLinkReferido = () => {
@@ -971,7 +1045,7 @@ async function cargarHistorialPuntos() {
     if (!container) return;
 
     const { data, error } = await supabase
-        .from('historial_puntos')
+        .from('movimientos_puntos')
         .select('*')
         .eq('cliente_id', clienteId)
         .order('created_at', { ascending: false })
@@ -989,7 +1063,7 @@ async function cargarHistorialPuntos() {
                 <p class="text-[10px] text-gray-500">${new Date(item.created_at).toLocaleDateString()}</p>
             </div>
             <span class="text-sm font-bold ${item.tipo === 'GANADO' ? 'text-green-500' : 'text-red-500'}">
-                ${item.tipo === 'GANADO' ? '+' : '-'}${item.monto}
+                ${item.tipo === 'GANADO' ? '+' : '-'}${item.puntos}
             </span>
         </div>
     `).join('');
@@ -1004,7 +1078,7 @@ async function cargarPerfil() {
   }
 
   // 2. Obtener datos frescos
-  const { data, error } = await supabase.from('clientes').select('*, puntos, ultima_visita').eq('id', clienteId).single();
+  const { data, error } = await supabase.from('clientes').select('*, puntos_actuales, puntos_totales_historicos, ultima_visita').eq('id', clienteId).single();
   
   if (error) {
     if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) return;
@@ -1018,11 +1092,10 @@ async function cargarPerfil() {
   
   if (data) {
     // Detectar si se desbloqueó una recompensa
-    const oldPoints = appState.profile?.puntos || 0;
-    const newPoints = data.puntos || 0;
+    const oldPoints = appState.profile?.puntos_actuales || 0;
+    const newPoints = data.puntos_actuales || 0;
     if (newPoints > oldPoints) {
-        const rewards = [100, 150, 200];
-        const unlocked = rewards.some(r => oldPoints < r && newPoints >= r);
+        const unlocked = RECOMPENSAS.some(r => oldPoints < r.pts && newPoints >= r.pts);
         if (unlocked && typeof confetti === 'function') {
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
             showToast('¡Felicidades! Has desbloqueado una recompensa 🎉', 'success');
@@ -1607,10 +1680,14 @@ window.tomarTurno = async () => {
   const barberSel = barberEl ? barberEl.value : '';
   if (!barberSel) return showToast('Selecciona un barbero', 'error');
 
-  const nombreEl = document.getElementById('profile-name');
-  const phoneEl = document.getElementById('profile-phone');
-  const nombre = nombreEl ? nombreEl.textContent : '';
-  const telefono = phoneEl ? phoneEl.textContent : '';
+  // SEGURIDAD: No confiar en el DOM para datos del usuario
+  const nombre = appState.profile?.nombre || 'Cliente';
+  const telefono = appState.profile?.telefono;
+
+  if (!telefono) {
+    showToast('No se pudo identificar tu número de teléfono. Reingresa a la aplicación.', 'error');
+    return;
+  }
 
   const btn = document.getElementById('btn-tomar-turno');
   if (btn) {
@@ -1836,6 +1913,232 @@ function updateBarberInfo() {
   }
 }
 
+/**
+ * CAPA 1: DATOS - Obtiene toda la información necesaria de Supabase para un día
+ */
+async function fetchDayData(negocioId, barberId, dateStr, telefono) {
+  const parts = dateStr.split('-');
+  const baseDay = new Date(parts[0], parts[1] - 1, parts[2]);
+  
+  const startDayDB = new Date(baseDay);
+  const endDayDB = new Date(baseDay); 
+  endDayDB.setHours(23, 59, 59, 999);
+  
+  const startDayISO = startDayDB.toISOString();
+  const endDayISO = endDayDB.toISOString();
+
+  const promises = [];
+  
+  // 1. Citas del barbero
+  const pCitas = supabase
+    .from('citas')
+    .select('start_at, end_at')
+    .eq('negocio_id', negocioId)
+    .eq('barber_id', Number(barberId))
+    .neq('estado', 'Cancelada')
+    .gte('start_at', startDayISO)
+    .lte('start_at', endDayISO);
+  
+  // 2. Mi cita del día (limitación de una por día)
+  let pMisCitas = Promise.resolve({ data: [] });
+  if (telefono && telefono !== '...') {
+    pMisCitas = supabase
+      .from('citas')
+      .select('id')
+      .eq('negocio_id', negocioId)
+      .eq('cliente_telefono', telefono)
+      .neq('estado', 'Cancelada')
+      .gte('start_at', startDayISO)
+      .lte('start_at', endDayISO);
+  }
+
+  // 3. Configuración de breaks/horarios
+  const pEstado = supabase.from('estado_negocio').select('weekly_breaks').eq('negocio_id', negocioId).maybeSingle();
+
+  // 4. Turnos activos del barbero (En atención)
+  const pTurnos = supabase
+    .from('turnos')
+    .select('started_at, hora, servicio')
+    .eq('negocio_id', negocioId)
+    .eq('barber_id', Number(barberId))
+    .eq('estado', 'En atención')
+    .eq('fecha', dateStr);
+
+  const [resCitas, resMisCitas, resEstado, resTurnos] = await Promise.all([pCitas, pMisCitas, pEstado, pTurnos]);
+
+  return {
+    citas: resCitas.data || [],
+    misCitas: resMisCitas.data || [],
+    estadoNegocio: resEstado.data,
+    turnosActivos: resTurnos.data || [],
+    baseDay
+  };
+}
+
+/**
+ * CAPA 2: LÓGICA - Genera los slots disponibles basados en las reglas de negocio
+ */
+function calculateAvailableSlots({ baseDay, apStr, ciStr, duracion, citas, turnosActivos, weeklyBreaks, isToday }) {
+  const slots = [];
+  const ap = apStr.split(':').map(Number);
+  const ci = ciStr.split(':').map(Number);
+  
+  const startDay = new Date(baseDay);
+  startDay.setHours(ap[0], ap[1], 0, 0);
+  
+  const endDay = new Date(baseDay);
+  if (ci[0] === 0 && ci[1] === 0) endDay.setHours(24, 0, 0, 0);
+  else endDay.setHours(ci[0], ci[1], 0, 0);
+
+  if (endDay <= startDay) endDay.setDate(endDay.getDate() + 1);
+
+  // Consolidar bloqueos (breaks + turnos activos)
+  const blockages = [];
+  
+  // Breaks semanales
+  const dayNum = baseDay.getDay();
+  const brk = weeklyBreaks.find(x => x.day === dayNum);
+  if (brk && brk.start && brk.end) {
+    const bs = new Date(baseDay); const be = new Date(baseDay);
+    const s = brk.start.split(':').map(Number); const e = brk.end.split(':').map(Number);
+    bs.setHours(s[0], s[1], 0, 0); be.setHours(e[0], e[1], 0, 0);
+    blockages.push([bs.getTime(), be.getTime()]);
+  }
+
+  // Turnos en atención
+  const bufferMin = configCache?.reserva_buffer_min || 5;
+  turnosActivos.forEach(t => {
+    let s;
+    if (t.started_at) s = new Date(t.started_at);
+    else if (t.hora) {
+      const [h, m] = t.hora.split(':');
+      s = new Date(baseDay); s.setHours(h, m, 0, 0);
+    } else return;
+    
+    const d = serviciosCache[t.servicio] || 30;
+    const e = new Date(s);
+    e.setMinutes(e.getMinutes() + d + bufferMin);
+    blockages.push([s.getTime(), e.getTime()]);
+  });
+
+  const step = duracion + bufferMin;
+  const now = new Date();
+  const bufferTime = new Date(now.getTime() + (configCache?.reserva_buffer_min || 10) * 60000);
+
+  const tmp = new Date(startDay);
+  while (tmp < endDay) {
+    const currentSlot = new Date(tmp);
+    if (isToday && currentSlot < bufferTime) {
+      tmp.setMinutes(tmp.getMinutes() + step);
+      continue;
+    }
+
+    const slotEnd = new Date(currentSlot);
+    slotEnd.setMinutes(slotEnd.getMinutes() + duracion);
+    if (slotEnd > endDay) break;
+
+    if (slotDisponible(currentSlot, duracion, citas, blockages)) {
+      slots.push(new Date(currentSlot));
+    }
+    tmp.setMinutes(tmp.getMinutes() + step);
+  }
+
+  return slots;
+}
+
+/**
+ * CAPA 3: RENDER - Dibuja los slots en el DOM
+ */
+function renderSlotsToUI(slots, dateStr) {
+  const container = document.getElementById('slots-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (slots.length === 0) {
+    container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">No hay horarios disponibles para este servicio hoy.</div>';
+    return;
+  }
+
+  slots.forEach(slot => {
+    const btn = document.createElement('button');
+    btn.className = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm outline-none focus:ring-2 focus:ring-[#C1121F] active:scale-95 bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-[#C1121F] dark:hover:border-[#C1121F] hover:text-[#C1121F] dark:hover:text-[#C1121F] cursor-pointer group';
+    
+    const timeStr = slot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    btn.innerHTML = `
+      <span class="text-gray-900 dark:text-gray-200 group-hover:text-[#C1121F] dark:group-hover:text-[#C1121F] transition-colors">${timeStr}</span>
+    `;
+    
+    btn.onclick = () => seleccionarHora(slot, btn);
+    container.appendChild(btn);
+  });
+
+  // Scroll automático a la sección de horarios cargados
+  const horariosSection = document.getElementById('horarios-libres');
+  if (horariosSection) {
+      setTimeout(() => {
+          horariosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+  }
+}
+
+/**
+ * CAPA 4: ORQUESTADOR - Coordina el flujo de carga de slots
+ */
+async function cargarSlotsInteligente() {
+  const dp = document.getElementById('date-picker');
+  const barberSelEl = document.getElementById('select-barbero-cita');
+  const servicioSelEl = document.getElementById('select-servicio-cita');
+  const servicioAltEl = document.getElementById('select-servicio');
+  
+  const dateStr = dp?.value;
+  const barberId = barberSelEl?.value;
+  const servicioSel = servicioSelEl?.value || servicioAltEl?.value;
+  const duracion = serviciosCache[servicioSel] || 30;
+
+  if (!barberId || !dateStr || !servicioSel) return;
+
+  const cacheKey = `${dateStr}_${barberId}_${duracion}`;
+  const cachedData = getSlotsCache(cacheKey);
+
+  if (cachedData) {
+    renderSlotsToUI(cachedData, dateStr);
+    return;
+  }
+
+  // UI Loading
+  const container = document.getElementById('slots-container');
+  if (container) container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 animate-pulse">Buscando disponibilidad...</div>';
+  document.getElementById('horarios-libres')?.classList.remove('hidden');
+
+  try {
+    const telefono = appState.profile?.telefono;
+    const { citas, misCitas, estadoNegocio, turnosActivos, baseDay } = await fetchDayData(negocioId, barberId, dateStr, telefono);
+
+    if (misCitas.length > 0) {
+      if (container) container.innerHTML = '<div class="col-span-full p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30 text-center text-amber-800 dark:text-amber-400 font-bold">Ya tienes una cita hoy.</div>';
+      return;
+    }
+
+    const slots = calculateAvailableSlots({
+      baseDay,
+      apStr: configCache?.hora_apertura || '08:00',
+      ciStr: configCache?.hora_cierre || '21:00',
+      duracion,
+      citas,
+      turnosActivos,
+      weeklyBreaks: estadoNegocio?.weekly_breaks || [],
+      isToday: dateStr === new Date().toLocaleDateString('en-CA')
+    });
+
+    setSlotsCache(cacheKey, slots);
+    renderSlotsToUI(slots, dateStr);
+
+  } catch (err) {
+    console.error('Error cargando slots:', err);
+    showToast('Error al buscar disponibilidad', 'error');
+  }
+}
+
 async function renderSlotsForSelectedDate() {
   await cargarConfigNegocio();
   const dp = document.getElementById('date-picker');
@@ -1847,15 +2150,12 @@ async function renderSlotsForSelectedDate() {
   const servicioSel = servicioSelEl?.value || servicioAltEl?.value;
 
   const slotsContainer = document.getElementById('slots-container');
-  const rangoDisplay = document.getElementById('rango-horario-display');
-  const actionContainer = document.getElementById('action-container');
 
   // Asegurar que la info del barbero esté actualizada
   updateBarberInfo();
 
   if (!negocioId) { console.error('negocioId es undefined'); return; }
   
-  // 🔥 FIX: Validación correcta de barbero seleccionado
   if (!barberSel) {
     showToast('Por favor selecciona un barbero', 'error');
     if (slotsContainer) slotsContainer.innerHTML = '';
@@ -1867,251 +2167,16 @@ async function renderSlotsForSelectedDate() {
     return;
   }
 
-  const dur = serviciosCache[servicioSel] || 30;
-  const cacheKey = `${dateStr}_${barberSel}_${dur}`;
+  if (!servicioSel) {
+    showToast('Por favor selecciona un servicio', 'error');
+    return;
+  }
 
   appState.selectedTimeSlot = null;
+  const actionContainer = document.getElementById('action-container');
   if (actionContainer) actionContainer.classList.add('hidden');
 
-  if (!dateStr || !barberSel || !servicioSel) {
-    if (slotsContainer) slotsContainer.innerHTML = '';
-    if (rangoDisplay) rangoDisplay.textContent = '';
-    return;
-  }
-
-  // Lógica de limpieza de caché
-  if (Object.keys(slotsCache).length > 50) {
-    slotsCache = {}; // Reiniciar caché si excede el límite
-  }
-
-  // Validación de caché con TTL (Evita datos sucios)
-  if (slotsCache[cacheKey] && (Date.now() - slotsCache[cacheKey].timestamp < CACHE_TTL_MS)) {
-    renderSlotsFromData(slotsCache[cacheKey].data, dateStr, serviciosCache[servicioSel] || 30);
-    return;
-  }
-
-  // Mostrar contenedor de horarios
-  const horariosLibres = document.getElementById('horarios-libres');
-  if (horariosLibres) horariosLibres.classList.remove('hidden');
-
-  if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 animate-pulse">Buscando disponibilidad...</div>';
-
-  const promises = [];
-
-  const apStr = configCache?.hora_apertura || '08:00';
-  const ciStr = configCache?.hora_cierre || '21:00';
-  const ap = apStr.split(':').map(Number);
-  const ci = ciStr.split(':').map(Number);
-
-  if (rangoDisplay) {
-    rangoDisplay.textContent = `Horario disponible: ${apStr} - ${ciStr}`;
-    // rangoDisplay.className = 'mt-4 text-center text-sm font-medium text-black/60 dark:text-white/60 bg-[#F8F8F9] dark:bg-black/30 py-2 rounded-lg border border-black/5 dark:border-white/10';
-  }
-
-  // Corrección Timezone: Construir fecha localmente sin UTC shift
-  const parts = dateStr.split('-');
-  const baseDay = new Date(parts[0], parts[1] - 1, parts[2]); // Fecha base limpia
-  const startDay = new Date(baseDay);
-
-  const dayNum = startDay.getDay();
-
-  if (diasOperacionNum.length && !diasOperacionNum.includes(dayNum)) {
-    if (slotsContainer) {
-      slotsContainer.innerHTML = '<div class="col-span-full flex flex-col items-center justify-center text-gray-500 py-8"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>El negocio no opera este día.</span></div>';
-      // Scroll automático para mostrar el mensaje
-      document.getElementById('horarios-libres')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    return;
-  }
-
-  // Rangos para DB (ISO UTC)
-  const startDayDB = new Date(startDay);
-  const endDayDB = new Date(startDay); endDayDB.setHours(23, 59, 59, 999);
-  const startDayISO = startDayDB.toISOString();
-  const endDayISO = endDayDB.toISOString();
-
-  startDay.setHours(ap[0], ap[1], 0, 0);
-  const endDay = new Date(startDay); // Clonar para fin de jornada local
-  if (ci[0] === 0 && ci[1] === 0) {
-    endDay.setHours(24, 0, 0, 0);
-  } else {
-    endDay.setHours(ci[0], ci[1], 0, 0);
-  }
-
-  if (endDay <= startDay) endDay.setDate(endDay.getDate() + 1);
-
-  const telefono = appState.profile?.telefono;
-  let misCitas = [];
-  if (telefono && telefono !== '...') {
-    const pMisCitas = supabase
-      .from('citas')
-      .select('id')
-      .eq('negocio_id', negocioId)
-      .eq('cliente_telefono', telefono)
-      .neq('estado', 'Cancelada')
-      .gte('start_at', startDayISO)
-      .lte('start_at', endDayISO);
-    promises.push(pMisCitas.then(r => { misCitas = r.data || []; }));
-  }
-
-  let citas = [];
-  const pCitas = supabase
-    .from('citas')
-    .select('start_at, end_at')
-    .eq('negocio_id', negocioId)
-    .eq('barber_id', Number(barberSel))
-    .neq('estado', 'Cancelada')
-    .gte('start_at', startDayISO)
-    .lte('start_at', endDayISO);
-  promises.push(pCitas.then(r => { citas = r.data || []; }));
-
-  let estadoNegocio = null;
-  // Obtener breaks desde estado_negocio para definir horario real del barbero
-  const pEstado = supabase.from('estado_negocio').select('weekly_breaks').eq('negocio_id', negocioId).maybeSingle();
-  promises.push(pEstado.then(r => { estadoNegocio = r.data; }));
-
-  let turnosActivos = [];
-  const pTurnos = supabase
-    .from('turnos')
-    .select('started_at, hora, servicio')
-    .eq('negocio_id', negocioId)
-    .eq('barber_id', Number(barberSel))
-    .eq('estado', 'En atención')
-    .eq('fecha', dateStr);
-  promises.push(pTurnos.then(r => { turnosActivos = r.data || []; }));
-
-  await Promise.all(promises);
-
-  if (misCitas.length > 0) {
-    if (slotsContainer) {
-      slotsContainer.innerHTML = `
-              <div class="col-span-full flex flex-col items-center justify-center p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-amber-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <h3 class="text-lg font-bold text-amber-800 dark:text-amber-400 mb-1">Ya tienes una cita</h3>
-                  <p class="text-sm text-amber-700 dark:text-amber-300 text-center">Solo se permite una reserva por día.</p>
-              </div>
-          `;
-      // Scroll automático para mostrar el mensaje
-      document.getElementById('horarios-libres')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    return;
-  }
-
-  const wb = estadoNegocio?.weekly_breaks || [];
-  const brk = wb.find(x => x.day === dayNum);
-  const breaks = [];
-  
-  // Construir breaks usando la fecha base local correcta
-  if (brk && brk.start && brk.end) {
-    const bs = new Date(baseDay); bs.setHours(0,0,0,0);
-    const be = new Date(baseDay); be.setHours(0,0,0,0);
-    const s = brk.start.split(':').map(Number); 
-    const e = brk.end.split(':').map(Number);
-    bs.setHours(s[0], s[1], 0, 0); be.setHours(e[0], e[1], 0, 0);
-    breaks.push([bs.getTime(), be.getTime()]);
-  }
-
-  (turnosActivos || []).forEach(t => {
-    // Convertir hora de turno a objeto Date seguro
-    let s;
-    if (t.started_at) {
-      s = new Date(t.started_at);
-    } else {
-      if (t.hora) {
-          const [h, m] = t.hora.split(':');
-          s = new Date(startDay);
-          s.setHours(h, m, 0, 0);
-      } else {
-          return; // Saltar si no hay hora
-      }
-    }
-    const d = serviciosCache[t.servicio] || 30;
-    const e = new Date(s);
-    e.setMinutes(e.getMinutes() + d + (configCache?.reserva_buffer_min || 5)); // Agregar buffer al turno activo
-    breaks.push([s.getTime(), e.getTime()]);
-  });
-
-  // Comparación segura de "Hoy" usando localDateString
-  const isToday = dateStr === new Date().toLocaleDateString('en-CA');
-  const dataToCache = { startDay, endDay, citas, breaks, isToday };
-  
-  // Guardar en caché con timestamp
-  slotsCache[cacheKey] = { data: dataToCache, timestamp: Date.now() };
-
-  renderSlotsFromData(dataToCache, dateStr, dur);
-}
-
-function renderSlotsFromData(data, dateStr, dur) {
-  const { startDay, endDay, citas, breaks, isToday } = data;
-  const slotsContainer = document.getElementById('slots-container');
-  if (!slotsContainer) return;
-
-  slotsContainer.innerHTML = '';
-
-  const bufferSlotMinutes = 5;
-  // Grid dinámico: Duración + Buffer (Agenda Inteligente)
-  const step = dur + bufferSlotMinutes; 
-  
-  const tmp = new Date(startDay);
-  const now = new Date();
-  
-  // Buffer de seguridad configurable
-  const bufferMinutes = configCache?.reserva_buffer_min || 10;
-  const bufferTime = new Date(now.getTime() + bufferMinutes * 60000);
-
-  while (tmp < endDay) {
-    const currentSlot = new Date(tmp);
-
-    // Filtro estricto de horas pasadas
-    if (isToday && currentSlot < bufferTime) {
-        tmp.setMinutes(tmp.getMinutes() + step);
-        continue;
-    }
-
-    const slotEnd = new Date(currentSlot);
-    slotEnd.setMinutes(slotEnd.getMinutes() + dur);
-    if (slotEnd > endDay) break;
-
-    const disponible = slotDisponible(currentSlot, dur, citas || [], breaks);
-
-    const btn = document.createElement('button');
-    const baseClass = 'slot-enter py-3 rounded-xl font-bold text-sm border transition-all duration-200 relative overflow-hidden flex flex-col items-center justify-center shadow-sm outline-none focus:ring-2 focus:ring-[#C1121F] active:scale-95';
-
-    if (disponible) {
-      btn.className = `${baseClass} bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-[#C1121F] dark:hover:border-[#C1121F] hover:text-[#C1121F] dark:hover:text-[#C1121F] cursor-pointer group`;
-      btn.onclick = () => seleccionarHora(currentSlot, btn);
-      // Highlight first available
-      if (slotsContainer.children.length === 0) {
-          // Optional: Add "Next" badge logic here if needed
-      }
-    } else {
-      btn.className = `${baseClass} bg-gray-50 dark:bg-white/5 border-transparent text-gray-300 dark:text-gray-700 cursor-not-allowed`;
-      btn.disabled = true;
-    }
-
-    const timeStr = currentSlot.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-
-    btn.innerHTML = `
-            <span class="${disponible ? 'text-gray-900 dark:text-gray-200 group-hover:text-[#C1121F] dark:group-hover:text-[#C1121F]' : ''}">${timeStr}</span>
-        `;
-
-    slotsContainer.appendChild(btn);
-    tmp.setMinutes(tmp.getMinutes() + step);
-  }
-
-  if (slotsContainer.children.length === 0) {
-    slotsContainer.innerHTML = '<div class="col-span-full text-center text-black/50 dark:text-white/50 py-4">No hay horarios disponibles.</div>';
-  }
-
-  // Scroll automático a la sección de horarios cargados
-  const horariosSection = document.getElementById('horarios-libres');
-  if (horariosSection) {
-      setTimeout(() => {
-          horariosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-  }
+  await cargarSlotsInteligente();
 }
 
 function seleccionarHora(date, btnElement) {
@@ -2308,8 +2373,8 @@ window.subirAvatar = async (input) => {
 
     showToast('Avatar actualizado con éxito.', 'success');
     await cargarPerfil();
-  } catch (error) {
-    console.warn('Fallo subida a Storage, intentando fallback Data URL:', error);
+    } catch (error) {
+      console.warn('Fallo subida a Storage, intentando fallback Data URL:', error);
 
     try {
       const reader = new FileReader();

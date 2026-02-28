@@ -359,105 +359,93 @@
       </div>
 
       <!-- Modal de cobro -->
-      <div id="modalPago" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl w-full max-w-sm shadow-xl transform transition-all">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold dark:text-white flex items-center">
-              <span class="mr-2">💵</span> Finalizar Turno
-            </h2>
-            <button onclick="cerrarModalPago()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <form id="formPago">
-            <div class="mb-2">
-              <div class="flex items-center justify-between text-sm">
-                <span class="font-medium text-gray-700 dark:text-gray-300">Precio predeterminado</span>
-                <span id="precioPredeterminado" class="font-bold text-green-600 dark:text-green-400">RD$ 0.00</span>
-              </div>
-            </div>
-            <div class="mb-4">
-              <label class="block font-medium text-gray-700 dark:text-gray-300 mb-1">Monto cobrado:</label>
-              <div class="relative mt-1">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span class="text-gray-500 dark:text-gray-400">RD$</span>
-                </div>
-                <input type="number" id="montoCobrado" required class="w-full pl-12 p-3 border dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
-              </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Ingrese el monto exacto cobrado al cliente.</p>
-            </div>
-            <div class="grid grid-cols-2 gap-3 mb-4">
+      <div id="modalPago" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-[100] p-4">
+        <div class="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden transform transition-all">
+          <div class="p-8">
+            <div class="flex justify-between items-center mb-8">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descuento</label>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
-                  </div>
-                  <input type="number" id="descuentoMonto" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
-                </div>
+                <h2 class="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Finalizar Turno</h2>
+                <p class="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Gestión de Cobro Profesional</p>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Impuesto</label>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
-                  </div>
-                  <input type="number" id="impuestoMonto" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
-                </div>
-              </div>
+              <button onclick="cerrarModalPago()" class="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl text-gray-500 hover:text-red-500 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-            <div class="grid grid-cols-2 gap-3 mb-6">
+
+            <form id="formPago" class="space-y-6">
+              <!-- Resumen de Servicio -->
+              <div class="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl border border-emerald-100 dark:border-emerald-500/20 flex justify-between items-center">
+                <div>
+                  <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Precio Base</p>
+                  <p id="precioPredeterminado" class="text-xl font-black text-emerald-700 dark:text-emerald-300">RD$ 0.00</p>
+                </div>
+                <div class="text-right">
+                  <span class="text-2xl">💈</span>
+                </div>
+              </div>
+
+              <!-- Input de Cobro -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Efectivo recibido</label>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
-                  </div>
-                  <input type="number" id="efectivoRecibido" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
+                <label class="block text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Monto Final a Cobrar</label>
+                <div class="relative group">
+                  <div class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-xl group-focus-within:text-red-500 transition-colors">$</div>
+                  <input type="number" id="montoCobrado" step="0.01" class="w-full bg-gray-50 dark:bg-zinc-800 border-2 border-transparent focus:border-red-500 rounded-2xl py-5 pl-12 pr-6 text-gray-900 dark:text-white font-black text-3xl transition-all outline-none shadow-inner" required>
                 </div>
               </div>
-              <div class="flex items-end">
-                <div class="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-                  <div class="text-xs text-gray-500 dark:text-gray-400">Cambio</div>
-                  <div id="cambioCalculado" class="font-bold text-gray-900 dark:text-white">RD$ 0.00</div>
+
+              <!-- Descuento e Impuesto -->
+              <div class="grid grid-cols-2 gap-4">
+                <div id="seccion-descuento-pago" class="hidden">
+                  <label class="block text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">Descuento</label>
+                  <input type="number" id="descuentoMonto" step="0.01" class="w-full bg-red-50 dark:bg-red-500/5 border-2 border-transparent focus:border-red-500 rounded-2xl py-4 px-5 text-red-600 dark:text-red-400 font-black text-lg transition-all outline-none" placeholder="0.00">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Impuesto (ITBIS)</label>
+                  <input type="number" id="impuestoMonto" step="0.01" class="w-full bg-gray-50 dark:bg-zinc-800 border-2 border-transparent focus:border-red-500 rounded-2xl py-4 px-5 text-gray-900 dark:text-white font-black text-lg transition-all outline-none" placeholder="0.00">
                 </div>
               </div>
-            </div>
-            <div class="mb-6">
-                <label class="block font-medium text-gray-700 dark:text-gray-300 mb-2">Método de pago:</label>
+
+              <!-- Cambio y Efectivo -->
+              <div class="p-6 bg-gray-50 dark:bg-white/5 rounded-[2rem] space-y-4">
+                <div class="flex justify-between items-center">
+                  <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Efectivo Recibido</label>
+                  <input type="number" id="efectivoRecibido" step="0.01" class="w-32 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-right font-black text-gray-900 dark:text-white outline-none focus:border-red-500" placeholder="0.00">
+                </div>
+                <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-white/5">
+                  <span class="text-xs font-bold text-gray-500 uppercase tracking-tighter">Su Cambio</span>
+                  <span id="cambioCalculado" class="text-xl font-black text-gray-900 dark:text-white">RD$ 0.00</span>
+                </div>
+              </div>
+
+              <!-- Método de Pago -->
+              <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Método de Pago</label>
                 <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <input type="radio" name="metodo_pago" id="pago-efectivo" value="Efectivo" class="hidden peer" checked>
-                        <label for="pago-efectivo" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Efectivo</label>
-                    </div>
-                    <div>
-                        <input type="radio" name="metodo_pago" id="pago-tarjeta" value="Tarjeta" class="hidden peer">
-                        <label for="pago-tarjeta" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Tarjeta</label>
-                    </div>
-                    <div>
-                        <input type="radio" name="metodo_pago" id="pago-transferencia" value="Transferencia" class="hidden peer">
-                        <label for="pago-transferencia" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Transferencia</label>
-                    </div>
-                    <div>
-                        <input type="radio" name="metodo_pago" id="pago-otro" value="Otro" class="hidden peer">
-                        <label for="pago-otro" class="block cursor-pointer text-center p-2 rounded-lg border border-gray-300 dark:border-gray-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">Otro</label>
-                    </div>
+                  <label class="relative cursor-pointer group">
+                    <input type="radio" name="metodo_pago" value="Efectivo" class="peer hidden" checked>
+                    <div class="p-3 text-center rounded-xl border-2 border-gray-100 dark:border-white/5 text-xs font-black uppercase tracking-widest text-gray-400 peer-checked:border-red-500 peer-checked:text-red-500 peer-checked:bg-red-500/5 transition-all">💵 Efectivo</div>
+                  </label>
+                  <label class="relative cursor-pointer group">
+                    <input type="radio" name="metodo_pago" value="Tarjeta" class="peer hidden">
+                    <div class="p-3 text-center rounded-xl border-2 border-gray-100 dark:border-white/5 text-xs font-black uppercase tracking-widest text-gray-400 peer-checked:border-blue-500 peer-checked:text-blue-500 peer-checked:bg-blue-500/5 transition-all">💳 Tarjeta</div>
+                  </label>
+                  <label class="relative cursor-pointer group">
+                    <input type="radio" name="metodo_pago" value="Transferencia" class="peer hidden">
+                    <div class="p-3 text-center rounded-xl border-2 border-gray-100 dark:border-white/5 text-xs font-black uppercase tracking-widest text-gray-400 peer-checked:border-emerald-500 peer-checked:text-emerald-500 peer-checked:bg-emerald-500/5 transition-all">🏦 Transf</div>
+                  </label>
+                  <label class="relative cursor-pointer group">
+                    <input type="radio" name="metodo_pago" value="Otro" class="peer hidden">
+                    <div class="p-3 text-center rounded-xl border-2 border-gray-100 dark:border-white/5 text-xs font-black uppercase tracking-widest text-gray-400 peer-checked:border-purple-500 peer-checked:text-purple-500 peer-checked:bg-purple-500/5 transition-all">⚡ Otros</div>
+                  </label>
                 </div>
-            </div>
-            <div class="flex justify-end space-x-2">
-              <button type="button" onclick="cerrarModalPago()" class="bg-gray-300 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
-                Cancelar
+              </div>
+
+              <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-red-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                Finalizar y Cobrar
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
               </button>
-              <button type="submit" class="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-                Guardar y Avanzar
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
 
