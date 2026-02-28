@@ -29,7 +29,7 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
-  <link rel="manifest" href="imegenlogin/site.webmanifest">
+  <link rel="manifest" href="manifest.json">
 
 
 
@@ -360,6 +360,12 @@
             </button>
           </div>
           <form id="formPago">
+            <div class="mb-2">
+              <div class="flex items-center justify-between text-sm">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Precio predeterminado</span>
+                <span id="precioPredeterminado" class="font-bold text-green-600 dark:text-green-400">RD$ 0.00</span>
+              </div>
+            </div>
             <div class="mb-4">
               <label class="block font-medium text-gray-700 dark:text-gray-300 mb-1">Monto cobrado:</label>
               <div class="relative mt-1">
@@ -369,6 +375,43 @@
                 <input type="number" id="montoCobrado" required class="w-full pl-12 p-3 border dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Ingrese el monto exacto cobrado al cliente.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descuento</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
+                  </div>
+                  <input type="number" id="descuentoMonto" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Impuesto</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
+                  </div>
+                  <input type="number" id="impuestoMonto" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Efectivo recibido</label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-gray-500 dark:text-gray-400">RD$</span>
+                  </div>
+                  <input type="number" id="efectivoRecibido" class="w-full pl-12 p-2.5 border dark:border-gray-600 rounded-lg focus:outline-none dark:bg-gray-700 dark:text-white" min="0" placeholder="0.00" />
+                </div>
+              </div>
+              <div class="flex items-end">
+                <div class="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+                  <div class="text-xs text-gray-500 dark:text-gray-400">Cambio</div>
+                  <div id="cambioCalculado" class="font-bold text-gray-900 dark:text-white">RD$ 0.00</div>
+                </div>
+              </div>
             </div>
             <div class="mb-6">
                 <label class="block font-medium text-gray-700 dark:text-gray-300 mb-2">Método de pago:</label>

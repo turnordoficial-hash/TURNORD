@@ -56,10 +56,12 @@ serve(async (req) => {
       url: (typeof clickUrl === 'string' && clickUrl.length > 0) ? clickUrl : "/panel_cliente.html",
       chrome_web_icon: "jbarber/jjj.png",
       chrome_web_badge: "imegenlogin/favicon-32x32.png",
+      // CORRECCIÓN: Usar 'external_id' estándar.
+      // El cliente debe haber ejecutado OneSignal.login(telefono) para que esto funcione.
       include_aliases: {
-        telefono: [telefono],
-        negocio_id: [negocio_id],
+        external_id: [telefono]
       },
+      target_channel: "push",
       priority: 10,
       ttl: 3600
     };

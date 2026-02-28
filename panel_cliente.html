@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+  <link rel="manifest" href="manifest.json">
   
   <!-- Optimización de Carga -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -658,9 +659,15 @@
       const supabase = await ensureSupabase();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('clientes').select('telefono').eq('id', user.id).maybeSingle();
+        const { data: profile } = await supabase.from('clientes').select('telefono, nombre').eq('id', user.id).maybeSingle();
         const tel = profile?.telefono || user.user_metadata?.telefono;
-        if (tel) OneSignal.User.addAlias('telefono', String(tel));
+        const name = profile?.nombre || user.user_metadata?.nombre;
+        if (tel) {
+            // CORRECCIÓN: Usar login para establecer external_id y coincidir con la Edge Function
+            OneSignal.login(String(tel));
+            // Agregar nombre como tag para que aparezca en el dashboard de OneSignal
+            if (name) OneSignal.User.addTag("nombre", name);
+        }
       }
     });
   </script>

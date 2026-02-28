@@ -19,6 +19,7 @@ let barberosActivosList = []; // Cache para lógica de disponibilidad
 let __pushSubsCount = 0;
 let isSubmittingTurn = false; // Flag para evitar doble submit
 let agendaInterval = null; // Intervalo para actualizar línea de tiempo y estados
+let basePricePago = 0;
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
@@ -1305,6 +1306,11 @@ function abrirModalPago(turnId) {
         // Buscar el turno para obtener el servicio y precio
         const turno = enAtencionCache.find(t => t.id == turnId) || dataRender.find(t => t.id == turnId);
         const inputMonto = document.getElementById('montoCobrado');
+        const precioPredEl = document.getElementById('precioPredeterminado');
+        const descEl = document.getElementById('descuentoMonto');
+        const impEl = document.getElementById('impuestoMonto');
+        const efecEl = document.getElementById('efectivoRecibido');
+        const cambioEl = document.getElementById('cambioCalculado');
         
         // --- CONTROL DINÁMICO DE CLIENTE (NUEVO) ---
         const infoClienteDiv = document.getElementById('info-cliente-pago') || document.createElement('div');
@@ -1333,11 +1339,43 @@ function abrirModalPago(turnId) {
 
         if (inputMonto) {
             if (turno && turno.servicio && preciosCache[turno.servicio] !== undefined) {
-                inputMonto.value = preciosCache[turno.servicio];
+                basePricePago = Number(preciosCache[turno.servicio]) || 0;
+                inputMonto.value = basePricePago.toFixed(2);
             } else {
+                basePricePago = 0;
                 inputMonto.value = '';
             }
         }
+        if (precioPredEl) precioPredEl.textContent = `RD$ ${basePricePago.toFixed(2)}`;
+        if (descEl) descEl.value = '';
+        if (impEl) impEl.value = '';
+        if (efecEl) efecEl.value = '';
+        if (cambioEl) cambioEl.textContent = 'RD$ 0.00';
+
+        const recalcTotals = () => {
+            const desc = Number(descEl?.value || 0) || 0;
+            const imp = Number(impEl?.value || 0) || 0;
+            const total = Math.max(0, basePricePago - desc + imp);
+            if (inputMonto) inputMonto.value = total.toFixed(2);
+            const efectivo = Number(efecEl?.value || 0) || 0;
+            const cambio = Math.max(0, efectivo - total);
+            if (cambioEl) cambioEl.textContent = `RD$ ${cambio.toFixed(2)}`;
+        };
+        const recalcCambioOnly = () => {
+            const total = Number(inputMonto?.value || 0) || 0;
+            const efectivo = Number(efecEl?.value || 0) || 0;
+            const cambio = Math.max(0, efectivo - total);
+            if (cambioEl) cambioEl.textContent = `RD$ ${cambio.toFixed(2)}`;
+        };
+        descEl?.removeEventListener('input', recalcTotals);
+        impEl?.removeEventListener('input', recalcTotals);
+        efecEl?.removeEventListener('input', recalcTotals);
+        inputMonto?.removeEventListener('input', recalcCambioOnly);
+        descEl?.addEventListener('input', recalcTotals);
+        impEl?.addEventListener('input', recalcTotals);
+        efecEl?.addEventListener('input', recalcTotals);
+        inputMonto?.addEventListener('input', recalcCambioOnly);
+        recalcTotals();
 
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -1370,7 +1408,7 @@ async function notificarAvanceFila() {
     }
 
     const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || supabase.supabaseKey;
+        const token = session?.access_token || (supabase.supabaseKey || 'ANON_KEY_FALLBACK');
 
     // Notificar a todos los clientes en espera sobre el avance
     const promesas = turnosEnEspera.map(async (turno, i) => {

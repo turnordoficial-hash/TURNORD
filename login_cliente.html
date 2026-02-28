@@ -14,6 +14,15 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+  <link rel="manifest" href="imegenlogin/site.webmanifest">
+  
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: '85f98db3-968a-4580-bb02-8821411a6bee' });
+    });
+  </script>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#C1121F">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -342,13 +351,29 @@
             localStorage.setItem(`cliente_nombre_${negocioId}`, perfilFinal.nombre);
             localStorage.setItem(`cliente_telefono_${negocioId}`, perfilFinal.telefono);
             localStorage.setItem(`cliente_avatar_${negocioId}`, perfilFinal.avatar_url || '');
+            
+            // OneSignal Login
+            if (perfilFinal.telefono) {
+              OneSignalDeferred.push(function(OneSignal) {
+                OneSignal.login(String(perfilFinal.telefono));
+                if (perfilFinal.nombre) OneSignal.User.addTag("nombre", perfilFinal.nombre);
+              });
+            }
         } else {
             // Fallback: Si no hay perfil en tabla clientes, guardamos al menos el ID de auth
             localStorage.setItem(`cliente_id_${negocioId}`, signInData.user.id);
             // CORRECCIÓN: Guardar metadata para evitar pantalla blanca en panel
             if (signInData.user.user_metadata) {
-                 if (signInData.user.user_metadata.nombre) localStorage.setItem(`cliente_nombre_${negocioId}`, signInData.user.user_metadata.nombre);
-                 if (signInData.user.user_metadata.telefono) localStorage.setItem(`cliente_telefono_${negocioId}`, signInData.user.user_metadata.telefono);
+                 const mNombre = signInData.user.user_metadata.nombre;
+                 const mTel = signInData.user.user_metadata.telefono;
+                 if (mNombre) localStorage.setItem(`cliente_nombre_${negocioId}`, mNombre);
+                 if (mTel) {
+                   localStorage.setItem(`cliente_telefono_${negocioId}`, mTel);
+                   OneSignalDeferred.push(function(OneSignal) {
+                     OneSignal.login(String(mTel));
+                     if (mNombre) OneSignal.User.addTag("nombre", mNombre);
+                   });
+                 }
             }
         }
   

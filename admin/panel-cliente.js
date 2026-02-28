@@ -224,7 +224,8 @@ function updateBanner(mode = 'default') {
   return;
 }
 
-const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
+// Notificaciones Push con OneSignal
+const ONESIGNAL_APP_ID = '85f98db3-968a-4580-bb02-8821411a6bee';
 
 function showToast(message, type = 'success') {
   let container = document.getElementById('toast-container');
@@ -258,6 +259,12 @@ window.toggleFab = () => {
 window.logout = async () => {
   // Limpiar caché de la aplicación al cerrar sesión
   Object.keys(localStorage).filter(k => k.startsWith(`cache_${negocioId}`)).forEach(k => localStorage.removeItem(k));
+  
+  // OneSignal logout
+  if (window.OneSignal) {
+    window.OneSignal.logout();
+  }
+
   await supabase.auth.signOut();
   window.location.href = 'login_cliente.html';
 };
