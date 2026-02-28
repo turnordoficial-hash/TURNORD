@@ -259,21 +259,6 @@ window.logout = async () => {
   // Limpiar caché de la aplicación al cerrar sesión
   Object.keys(localStorage).filter(k => k.startsWith(`cache_${negocioId}`)).forEach(k => localStorage.removeItem(k));
   await supabase.auth.signOut();
-  try {
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        try {
-          await supabase.from('push_subscriptions')
-            .delete()
-            .eq('endpoint', sub.endpoint)
-            .eq('negocio_id', negocioId);
-        } catch {}
-        await sub.unsubscribe();
-      }
-    }
-  } catch {}
   window.location.href = 'login_cliente.html';
 };
 
@@ -860,89 +845,23 @@ function renderStructure() {
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  const swPath = '/sw.js'; 
+  const swPath = '/sw.js';
   fetch(swPath, { method: 'HEAD' })
     .then(res => {
       if (!res.ok) throw new Error('Service worker no disponible en este entorno');
       return navigator.serviceWorker.register(swPath);
     })
-    .then(async (registration) => {
-      console.log('Service Worker registrado con éxito:', registration.scope);
-      try {
-        if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
-          await crearOSincronizarSuscripcionPush();
-        }
-      } catch (err) {
-        console.log('Sincronización push pendiente de permisos.');
-      }
-    })
+    .then(() => {})
     .catch(err => console.warn('SW no registrado:', err.message || err));
 }
 
-async function crearOSincronizarSuscripcionPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  const registration = await navigator.serviceWorker.ready;
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-  }
-  await guardarSuscripcion(subscription);
-}
+ 
 
-async function solicitarPermisoNotificacion() {
-  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Las notificaciones push no son soportadas por este navegador.');
-    return;
-  }
+ 
 
-  if (Notification.permission === 'denied') {
-    console.log('Permiso para notificaciones previamente denegado por el usuario.');
-    return;
-  }
+ 
 
-  if (Notification.permission === 'granted') {
-    try {
-      await crearOSincronizarSuscripcionPush();
-    } catch (err) {
-      console.error('Error al sincronizar la suscripción push:', err);
-    }
-    return;
-  }
-
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') {
-    console.log('Permiso para notificaciones no concedido.');
-    return;
-  }
-
-  try {
-    await crearOSincronizarSuscripcionPush();
-  } catch (err) {
-    console.error('Error al crear la suscripción push:', err);
-  }
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-  return outputArray;
-}
-
-async function guardarSuscripcion(subscription) {
-  const telefono = localStorage.getItem(`cliente_telefono_${negocioId}`);
-  if (telefono) await supabase.from('push_subscriptions').upsert({
-    user_id: telefono,
-    subscription,
-    negocio_id: negocioId,
-    endpoint: subscription.endpoint
-  }, { onConflict: 'user_id, negocio_id' });
-}
+ 
 
 function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarbers) {
   const barberos = Math.max(1, activeBarbers);

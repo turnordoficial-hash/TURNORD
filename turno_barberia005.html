@@ -39,6 +39,30 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+  <script type="module">
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({ appId: '85f98db3-968a-4580-bb02-8821411a6bee' });
+      OneSignal.User.addAlias('negocio_id', 'barberia005');
+    });
+  </script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(function(OneSignal) {
+      var btn = document.getElementById('enable-push-turno');
+      if (!btn) return;
+      OneSignal.Notifications.getPermissionStatus().then(function(status){
+        if (status === 'granted') btn.style.display = 'none';
+      });
+      btn.addEventListener('click', function(){
+        OneSignal.Notifications.requestPermission().catch(function(){});
+      });
+      OneSignal.Notifications.addEventListener('permissionChange', function(e){
+        if (e.permission === 'granted') btn.style.display = 'none';
+      });
+    });
+  </script>
   <script>
     // Configuración de Tailwind para modo oscuro
     tailwind.config = {
@@ -161,7 +185,8 @@
       <div class="max-w-[1600px] mx-auto w-full space-y-3">
         <div class="flex justify-between items-center mb-6 mt-2">
           <h1 class="text-2xl font-bold">Agenda Inteligente</h1>
-          <div class="text-sm text-gray-600 dark:text-gray-400">
+          <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+            <button id="enable-push-turno" class="px-4 py-2 rounded-xl bg-black text-white font-bold hover:bg-black/80 transition-all">Activar Notificaciones</button>
             <span id="fecha-actual"></span> | <span id="hora-actual"></span>
             <div class="mt-1 text-green-600 dark:text-green-400 font-black text-lg flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

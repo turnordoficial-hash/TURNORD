@@ -30,115 +30,25 @@ function getDeadlineKey(turno) {
     return `turnoDeadline:${negocioId}:${turno}`;
 }
 
-// Clave pública VAPID - ¡Esta clave debe ser generada y almacenada de forma segura!
-// Es seguro exponerla en el lado del cliente.
-const VAPID_PUBLIC_KEY = 'BCMJiXkuO_Q_y_JAMO56tAaJw1JVmSOejavwLsLC9OWCBihIxlGuHpgga6qEyuPQ2cF_KLuotZS7YzdUEzAiHlQ';
+ 
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
   navigator.serviceWorker.register(swPath)
-    .then(async () => {
-      try {
-        if ('Notification' in window && 'PushManager' in window && Notification.permission === 'granted') {
-          await crearOSincronizarSuscripcionPush();
-        }
-      } catch (error) {
-        console.error('Error al sincronizar suscripción push tras registrar el Service Worker:', error);
-      }
-    })
+    .then(async () => {})
     .catch(error => {
       console.error('Error al registrar el Service Worker:', error);
     });
 }
 
-/**
- * Convierte la clave VAPID de base64 a un Uint8Array.
- */
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+ 
 
-/**
- * Guarda la suscripción en la base de datos.
- * @param {PushSubscription} subscription - El objeto de suscripción.
- */
-async function guardarSuscripcion(subscription) {
-  if (!telefonoUsuario || !negocioId) return;
+ 
 
-  try {
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({
-        user_id: telefonoUsuario, // Usamos el teléfono como ID de usuario
-        subscription: subscription,
-        negocio_id: negocioId,
-        endpoint: subscription.endpoint // Guardar el endpoint para borrado seguro
-      }, {
-        onConflict: 'user_id, negocio_id' // Si ya existe, actualiza la suscripción
-      });
+ 
 
-    if (error) throw error;
-    console.log('Suscripción guardada en la base de datos.');
-  } catch (error) {
-    console.error('Error al guardar la suscripción:', error);
-  }
-}
-
-async function crearOSincronizarSuscripcionPush() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  const registration = await navigator.serviceWorker.ready;
-  let subscription = await registration.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
-  }
-  await guardarSuscripcion(subscription);
-}
-
-async function solicitarPermisoNotificacion() {
-  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Las notificaciones push no son soportadas por este navegador.');
-    return;
-  }
-
-  if (Notification.permission === 'denied') {
-    console.log('Permiso para notificaciones previamente denegado por el usuario.');
-    return;
-  }
-
-  if (Notification.permission === 'granted') {
-    try {
-      await crearOSincronizarSuscripcionPush();
-    } catch (error) {
-      console.error('Error al sincronizar la suscripción push:', error);
-    }
-    return;
-  }
-
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') {
-    console.log('Permiso para notificaciones no concedido.');
-    return;
-  }
-
-  console.log('Permiso para notificaciones concedido.');
-
-  try {
-    await crearOSincronizarSuscripcionPush();
-  } catch (error) {
-    console.error('Error al suscribirse a las notificaciones push:', error);
-  }
-}
+ 
 
 /**
  * Envía una notificación al usuario si los permisos están concedidos.
@@ -475,7 +385,7 @@ async function verificarTurnoActivo() {
         .eq('telefono', telefonoUsuario)
         .order('created_at', { ascending: false });
     if (error || !data || data.length === 0) return false;
-    solicitarPermisoNotificacion(); // Solicitar permiso si hay un turno activo
+     
     turnoAsignado = data[0].turno;
     await mostrarMensajeConfirmacion(data[0]);
     return true;
@@ -625,7 +535,7 @@ async function tomarTurnoSimple(nombre, telefono, servicio) {
         alert('Error al registrar turno: ' + error.message);
         return;
     }
-    solicitarPermisoNotificacion(); // Solicitar permiso al tomar un nuevo turno
+     
     turnoAsignado = nuevoTurno;
     await mostrarMensajeConfirmacion({ nombre, turno: nuevoTurno });
     document.getElementById('formRegistroNegocio')?.reset();

@@ -1,6 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import webpush from "npm:web-push@3.6.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +7,7 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
-// Clave pública VAPID desde variables de entorno
-const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY");
+const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -22,13 +19,6 @@ serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Faltan variables de entorno SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
     let parsed;
     try {
       parsed = await req.json();
@@ -54,86 +44,41 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "telefono y negocio_id requeridos" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
-    const VAPID_MAILTO = Deno.env.get("VAPID_MAILTO");
-    if (!VAPID_PRIVATE_KEY || !VAPID_MAILTO) {
-      return new Response(JSON.stringify({ error: "Faltan variables de entorno VAPID_PRIVATE_KEY o VAPID_MAILTO" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-    if (!VAPID_PUBLIC_KEY) {
-      return new Response(JSON.stringify({ error: "Falta VAPID_PUBLIC_KEY" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-    try {
-      webpush.setVapidDetails(`mailto:${VAPID_MAILTO}`, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    } catch (e) {
-      return new Response(JSON.stringify({ error: "Error configurando VAPID: " + (e?.message || String(e)) }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY");
+    if (!ONE_SIGNAL_KEY) {
+      return new Response(JSON.stringify({ error: "Falta ONE_SIGNAL_REST_API_KEY" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    // Búsqueda mejorada por teléfono, como sugeriste
-    const { data, error } = await supabase
-      .from("push_subscriptions")
-      .select("subscription, endpoint")
-      .eq("user_id", telefono)
-      .eq("negocio_id", negocio_id);
+    const reqBody: Record<string, unknown> = {
+      app_id: ONESIGNAL_APP_ID,
+      headings: { en: title || "💈 JBarber" },
+      contents: { en: body || "Tienes una actualización en tu turno o cita." },
+      url: (typeof clickUrl === 'string' && clickUrl.length > 0) ? clickUrl : "/panel_cliente.html",
+      chrome_web_icon: "jbarber/jjj.png",
+      chrome_web_badge: "imegenlogin/favicon-32x32.png",
+      include_aliases: {
+        telefono: [telefono],
+        negocio_id: [negocio_id],
+      },
+      priority: 10,
+      ttl: 3600
+    };
 
-    if (error) {
-       return new Response(JSON.stringify({ error: "Error al buscar suscripción: " + error.message }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-    if (!data || data.length === 0) {
-      return new Response(JSON.stringify({ error: "Suscripción no encontrada" }), { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-
-    const payload = JSON.stringify({
-      title: title || "💈 JBarber",
-      body: body || "Tienes una actualización en tu turno o cita.",
-      icon: "jbarber/jjj.png",
-      badge: "imegenlogin/favicon-32x32.png",
-      vibrate: [200, 100, 200],
-      data: {
-        url: (typeof clickUrl === 'string' && clickUrl.length > 0) ? clickUrl : "/panel_cliente.html",
-      }
+    const res = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${ONE_SIGNAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reqBody),
     });
 
-    // Iterar sobre todas las suscripciones encontradas para ese teléfono y limpiar inválidas
-    let sent = 0;
-    const invalidEndpoints: string[] = [];
-    for (const sub of data) {
-      try {
-        // Normalizar/parsear la suscripción si viene en string
-        let subscriptionObj: any = sub?.subscription;
-        if (!subscriptionObj) {
-          if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
-          continue;
-        }
-        if (typeof subscriptionObj === 'string') {
-          try {
-            subscriptionObj = JSON.parse(subscriptionObj);
-          } catch {
-            if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
-            continue;
-          }
-        }
-        if (!subscriptionObj?.endpoint) {
-          if (sub?.endpoint) invalidEndpoints.push(sub.endpoint);
-          continue;
-        }
-        await webpush.sendNotification(subscriptionObj, payload);
-        sent++;
-      } catch (sendError: any) {
-        console.error("Error al enviar notificación a una suscripción:", sendError);
-        if (sendError?.statusCode === 410 || sendError?.statusCode === 404) {
-          if (sub.endpoint) invalidEndpoints.push(sub.endpoint);
-        }
-      }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: json?.errors || json || "Error en OneSignal" }), { status: res.status, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    if (invalidEndpoints.length > 0) {
-      await supabase
-        .from('push_subscriptions')
-        .delete()
-        .in('endpoint', invalidEndpoints);
-    }
-
-    return new Response(JSON.stringify({ success: true, sent, removed: invalidEndpoints.length }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+    return new Response(JSON.stringify({ success: true, result: json }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (err) {
     console.error(err);
     return new Response(JSON.stringify({ error: err?.message || String(err) }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
