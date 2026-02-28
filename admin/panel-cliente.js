@@ -1918,6 +1918,8 @@ async function renderSlotsForSelectedDate() {
   if (diasOperacionNum.length && !diasOperacionNum.includes(dayNum)) {
     if (slotsContainer) {
       slotsContainer.innerHTML = '<div class="col-span-full flex flex-col items-center justify-center text-gray-500 py-8"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>El negocio no opera este día.</span></div>';
+      // Scroll automático para mostrar el mensaje
+      document.getElementById('horarios-libres')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     return;
   }
@@ -1991,6 +1993,8 @@ async function renderSlotsForSelectedDate() {
                   <p class="text-sm text-amber-700 dark:text-amber-300 text-center">Solo se permite una reserva por día.</p>
               </div>
           `;
+      // Scroll automático para mostrar el mensaje
+      document.getElementById('horarios-libres')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     return;
   }
@@ -2099,6 +2103,14 @@ function renderSlotsFromData(data, dateStr, dur) {
 
   if (slotsContainer.children.length === 0) {
     slotsContainer.innerHTML = '<div class="col-span-full text-center text-black/50 dark:text-white/50 py-4">No hay horarios disponibles.</div>';
+  }
+
+  // Scroll automático a la sección de horarios cargados
+  const horariosSection = document.getElementById('horarios-libres');
+  if (horariosSection) {
+      setTimeout(() => {
+          horariosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
   }
 }
 

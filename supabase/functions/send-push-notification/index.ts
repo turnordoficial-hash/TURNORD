@@ -10,28 +10,37 @@ const corsHeaders = {
 const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
 
 serve(async (req) => {
+  // CORS robusto: Manejar OPTIONS inmediatamente
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Manejar GET para pruebas rápidas
   if (req.method === "GET") {
-    return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+    return new Response(JSON.stringify({ ok: true, status: "active" }), { 
+      headers: { "Content-Type": "application/json", ...corsHeaders } 
+    });
   }
 
   try {
+    // 1. Leer el body como texto primero para evitar errores de stream consumido o JSON vacío
+    const bodyText = await req.text().catch(() => "");
+    if (!bodyText || bodyText.trim() === "") {
+      return new Response(JSON.stringify({ error: "Cuerpo de solicitud vacío" }), { 
+        status: 400, 
+        headers: { "Content-Type": "application/json", ...corsHeaders } 
+      });
+    }
+
+    // 2. Intentar parsear el JSON de forma segura
     let parsed;
     try {
-      parsed = await req.json();
+      parsed = JSON.parse(bodyText);
     } catch (e) {
-      const txt = await req.text().catch(() => "");
-      if (!txt) {
-        return new Response(JSON.stringify({ error: "Body vacío" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
-      }
-      try {
-        parsed = JSON.parse(txt);
-      } catch (e2) {
-        return new Response(JSON.stringify({ error: "JSON inválido: " + String(e2?.message || e2) + " - Body recibido: " + txt }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
-      }
+      return new Response(JSON.stringify({ error: "JSON inválido", details: String(e.message) }), { 
+        status: 400, 
+        headers: { "Content-Type": "application/json", ...corsHeaders } 
+      });
     }
 
     const telefono = parsed?.telefono?.toString()?.trim();
