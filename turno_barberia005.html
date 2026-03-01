@@ -42,11 +42,17 @@
   <script type="module">
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({ 
-        appId: '85f98db3-968a-4580-bb02-8821411a6bee',
-        serviceWorkerPath: 'sw.js'
-      });
-      OneSignal.User.addAlias('negocio_id', 'barberia005');
+      if (!window.isSecureContext || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
+      try {
+        await OneSignal.init({ 
+          appId: '85f98db3-968a-4580-bb02-8821411a6bee',
+          serviceWorkerPath: 'sw.js'
+        });
+        OneSignal.User.addAlias('negocio_id', 'barberia005');
+      } catch (e) {
+        // Evitar bloquear página si OneSignal falla
+        return;
+      }
     });
   </script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
