@@ -112,7 +112,7 @@ async function cargarDatos() {
 
     const { data: citasData, error: citasError } = await supabase
       .from('citas')
-      .select('id, cliente_telefono, start_at, estado')
+      .select('id, cliente_telefono, start_at, estado, barber_id, servicio')
       .eq('negocio_id', negocioId)
       .gte('start_at', startOfDay.toISOString())
       .lte('start_at', endOfDay.toISOString())
@@ -124,7 +124,9 @@ async function cargarDatos() {
     let citasConNombre = [];
     if (citasData && citasData.length > 0) {
         const telefonos = [...new Set(citasData.map(c => c.cliente_telefono).filter(Boolean))];
+        const barberIds = [...new Set(citasData.map(c => c.barber_id).filter(Boolean))];
         let clientesMap = {};
+        let barberosMap = {};
         
         if (telefonos.length > 0) {
             const { data: clientes } = await supabase
@@ -134,6 +136,14 @@ async function cargarDatos() {
                 .in('telefono', telefonos);
             
             (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
+        }
+        if (barberIds.length > 0) {
+            const { data: barberos } = await supabase
+                .from('barberos')
+                .select('id, nombre')
+                .eq('negocio_id', negocioId)
+                .in('id', barberIds);
+            (barberos || []).forEach(b => barberosMap[b.id] = b.nombre);
         }
 
         // Asignar código letra+número por día para citas
@@ -152,7 +162,7 @@ async function cargarDatos() {
             return {
                 id: `cita-${c.id}`,
                 turno: codeMap.get(c.id),
-                nombre: clientesMap[c.cliente_telefono] || 'Cliente',
+                nombre: barberosMap[c.barber_id] || 'Barbero',
                 estado: c.estado || 'Cita Programada',
                 hora: hora,
                 servicio: c.servicio || 'Cita',

@@ -610,6 +610,8 @@ ALTER TABLE public.citas
   ADD COLUMN IF NOT EXISTS reminder_15m_sent BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.citas
   ADD COLUMN IF NOT EXISTS notificado_barbero BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.citas
+  ADD COLUMN IF NOT EXISTS recordatorio_barbero_10m BOOLEAN DEFAULT FALSE;
 
 ALTER TABLE public.clientes
   ADD COLUMN IF NOT EXISTS last_marketing_email_sent_at TIMESTAMPTZ;

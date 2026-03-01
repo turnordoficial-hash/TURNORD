@@ -93,7 +93,15 @@ function getSiguienteTurno() {
 
 function iniciarTimerParaTurno(turno) {
     const timerEl = document.getElementById(`timer-${turno.id}`);
-    const duracionMin = (serviciosCache && serviciosCache[turno.servicio]) ? Number(serviciosCache[turno.servicio]) : 30; // fallback 30 min
+    const getDuracion = (svc) => {
+        if (!svc || !serviciosCache) return null;
+        const key = String(svc).trim();
+        if (serviciosCache[key] != null) return Number(serviciosCache[key]);
+        // Búsqueda insensible a mayúsculas/minúsculas
+        const found = Object.keys(serviciosCache).find(k => k.trim().toLowerCase() === key.toLowerCase());
+        return found ? Number(serviciosCache[found]) : null;
+    };
+    const duracionMin = getDuracion(turno.servicio) ?? 30; // fallback 30 min
 
     if (!timerEl) return;
 

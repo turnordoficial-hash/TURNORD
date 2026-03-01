@@ -90,6 +90,12 @@ async function verificarRecordatoriosCitas(supabase: any, negocioId: string) {
       await enviarPush(cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", "Ya casi es tu momento.");
       await supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id);
     }
+    // Recordatorio para barbero 10 minutos antes
+    if (diffMin <= 10 && diffMin > 0 && !cita.recordatorio_barbero_10m && cita.barber_id) {
+      const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      await enviarPush(String(`barber_${cita.barber_id}`), "Cita en 10 minutos 🔔", `Tienes una cita a las ${hora}.`);
+      await supabase.from("citas").update({ recordatorio_barbero_10m: true }).eq("id", cita.id);
+    }
   }
 
   // Notificar al barbero/administración por nuevas citas (creadas recientemente)
