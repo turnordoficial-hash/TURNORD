@@ -11,6 +11,8 @@ const corsHeaders = {
 const ONE_SIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
 const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY") || "";
 
+console.info("Hello from Functions!");
+
 async function enviarPush(telefono: string, title: string, body: string, url = "/panel_cliente.html") {
   if (!ONE_SIGNAL_KEY) return { ok: false, reason: "missing_onesignal_key" };
   const reqBody: Record<string, unknown> = {

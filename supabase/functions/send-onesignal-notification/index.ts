@@ -11,6 +11,8 @@ const corsHeaders = {
 const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
 const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY") || "";
 
+console.info("Hello from Functions!");
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -95,4 +97,3 @@ serve(async (req) => {
     });
   }
 });
-

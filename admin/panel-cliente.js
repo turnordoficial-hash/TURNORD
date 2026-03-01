@@ -219,6 +219,22 @@ async function iniciarMotorMarketing() {
   marketingEngine.startRotation();
 }
 
+async function updateServiceCount() {
+  try {
+    const telefono = appState.profile?.telefono || appState.user?.user_metadata?.telefono;
+    if (!telefono) return;
+    const { count, error } = await supabase
+      .from('turnos')
+      .select('id', { count: 'exact', head: true })
+      .eq('negocio_id', negocioId)
+      .eq('telefono', telefono)
+      .eq('estado', 'Atendido');
+    if (!error && typeof count === 'number') {
+      const el = document.getElementById('profile-services-count');
+      if (el) el.textContent = String(count);
+    }
+  } catch (_) {}
+}
 async function enviarCorreoConfirmacion(startISO, servicio, barberId) {
   try {
     const sb = await ensureSupabase();
@@ -1187,6 +1203,7 @@ async function cargarPerfil() {
     renderProfile(data);
     iniciarMotorMarketing(); // Reiniciar motor con datos frescos
     cargarHistorialPuntos(); // Cargar historial
+    updateServiceCount(); // Conteo real de servicios atendidos
   }
 }
 

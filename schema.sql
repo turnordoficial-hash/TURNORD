@@ -545,11 +545,18 @@ DECLARE
   v_negocio_id TEXT;
   v_referido UUID;
 BEGIN
+  -- Extraer datos de metadata o usar defaults
   v_nombre := COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1));
   v_telefono := COALESCE(NEW.raw_user_meta_data->>'telefono', NULL);
   -- Fallback seguro: si el signup no envía negocio_id, usar 'barberia005'
   v_negocio_id := COALESCE(NEW.raw_user_meta_data->>'negocio_id', 'barberia005');
-  v_referido := NULLIF(NEW.raw_user_meta_data->>'referido_por', '')::uuid;
+  
+  -- Manejo seguro de UUID para referido (evita error si el string no es UUID válido)
+  BEGIN
+    v_referido := NULLIF(NEW.raw_user_meta_data->>'referido_por', '')::uuid;
+  EXCEPTION WHEN OTHERS THEN
+    v_referido := NULL;
+  END;
 
   INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id, referido_por)
   VALUES (NEW.id, NEW.email, v_nombre, v_telefono, v_negocio_id, v_referido)
@@ -633,6 +640,9 @@ CREATE TABLE IF NOT EXISTS public.movimientos_puntos (
   descripcion TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.movimientos_puntos
+  ADD COLUMN IF NOT EXISTS descripcion TEXT;
 
 -- ==============================================================================
 -- 4) Función RPC: Programar Cita (CORREGIDA Y UNIFICADA)
