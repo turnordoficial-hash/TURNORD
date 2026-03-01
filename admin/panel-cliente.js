@@ -1774,12 +1774,14 @@ function renderBarbersList(data) {
 async function cargarBarberos() {
   const cached = getCache('barberos');
   if (cached) renderBarbersList(cached);
+  if (cached) appState.barbers = cached;
 
   const { data } = await supabase.from('barberos').select('id,nombre,usuario,avatar_url').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
   
   if (data) {
     setCache('barberos', data, CACHE_TTL.BARBERS);
     renderBarbersList(data);
+    appState.barbers = data;
   }
 }
 
@@ -1795,6 +1797,7 @@ window.reservarCitaInteligente = async () => {
   end.setMinutes(end.getMinutes() + (window.__duracionServicio__ || 30));
   const barberSel = document.getElementById('select-barbero-cita').value;
   const barberId = barberSel ? Number(barberSel) : null;
+  const servicioSel = document.getElementById('select-servicio-cita')?.value || 'Cita Inteligente';
   const btn = document.querySelector('button[onclick="reservarCitaInteligente()"]');
 
   if (!barberId) {
@@ -1813,17 +1816,23 @@ window.reservarCitaInteligente = async () => {
       p_barber_id: barberId,
       p_cliente_telefono: telefono,
       p_start: start.toISOString(),
-      p_end: end.toISOString()
+      p_end: end.toISOString(),
+      p_servicio: servicioSel
     });
 
     if (error) throw error;
 
     showToast('¡Cita inteligente reservada!');
+    
+    // 1. Notificación Push OneSignal
     await sendPushNotification(
       '💈 JBarber - Cita reservada',
       `Tu cita inteligente para hoy a las ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ha sido confirmada.`,
       '/panel_cliente.html#cita'
     );
+
+    // 2. Correo de Confirmación
+    enviarCorreoConfirmacion(start.toISOString(), servicioSel, barberId);
 
     setTimeout(() => window.location.reload(), 2000);
   } catch (e) {
@@ -2115,10 +2124,10 @@ async function cargarSlotsInteligente() {
     const telefono = appState.profile?.telefono;
     const { citas, misCitas, estadoNegocio, turnosActivos, baseDay } = await fetchDayData(negocioId, barberId, dateStr, telefono);
 
-    if (misCitas.length > 0) {
-      if (container) container.innerHTML = '<div class="col-span-full p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30 text-center text-amber-800 dark:text-amber-400 font-bold">Ya tienes una cita hoy.</div>';
-      return;
-    }
+    // if (misCitas.length > 0) {
+    //   if (container) container.innerHTML = '<div class="col-span-full p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30 text-center text-amber-800 dark:text-amber-400 font-bold">Ya tienes una cita hoy.</div>';
+    //   return;
+    // }
 
     const slots = calculateAvailableSlots({
       baseDay,
@@ -2243,8 +2252,8 @@ async function confirmarReservaManual() {
   const dur = serviciosCache[servicioSel] || 30;
 
   // Validación de doble reserva en el frontend
-  if (appState.hasActiveAppointment || appState.hasActiveTurn) {
-    showToast('Ya tienes una reserva activa para hoy.', 'error');
+  if (appState.hasActiveTurn) {
+    showToast('Ya tienes un turno en espera activo.', 'error');
     return;
   }
 
@@ -2277,11 +2286,15 @@ async function confirmarReservaManual() {
 
         Object.keys(slotsCache).forEach(k => delete slotsCache[k]); 
 
+        // 1. Notificación Push OneSignal
         sendPushNotification(
           '💈 JBarber - Cita confirmada',
           `Tu cita para las ${timeStr} ha sido agendada.`,
           '/panel_cliente.html#cita'
         );
+
+        // 2. Correo de Confirmación
+        enviarCorreoConfirmacion(date.toISOString(), servicioSel, Number(barberSel));
 
         window.location.reload();
       } catch (e) {
