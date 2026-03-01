@@ -782,4 +782,97 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE INDEX IF NOT EXISTS idx_turnos_dashboard
 ON public.turnos (negocio_id, fecha, estado, orden);
 
+-- ==============================================================================
+-- 13) Función RPC: Procesar Cita a Turno (Transaccional)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.procesar_cita_a_turno(
+  p_cita_id BIGINT,
+  p_negocio_id TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_cita record;
+  v_cliente_nombre TEXT;
+  v_nuevo_turno_id BIGINT;
+  v_nuevo_turno_codigo TEXT;
+  v_letra CHAR(1);
+  v_ultimo_turno TEXT;
+  v_nuevo_numero INT;
+  v_fecha DATE := CURRENT_DATE;
+  v_fecha_base DATE := '2024-08-23';
+  v_diff_dias INT;
+BEGIN
+  -- 1. Obtener y bloquear cita
+  SELECT * INTO v_cita
+  FROM public.citas
+  WHERE id = p_cita_id AND negocio_id = p_negocio_id
+  FOR UPDATE;
+
+  IF v_cita IS NULL THEN
+    RAISE EXCEPTION 'Cita no encontrada';
+  END IF;
+
+  IF v_cita.estado = 'Atendida' OR v_cita.estado = 'Cancelada' THEN
+    RAISE EXCEPTION 'La cita ya fue procesada o cancelada';
+  END IF;
+
+  -- 2. Obtener nombre del cliente
+  SELECT nombre INTO v_cliente_nombre
+  FROM public.clientes
+  WHERE negocio_id = p_negocio_id AND telefono = v_cita.cliente_telefono;
+
+  IF v_cliente_nombre IS NULL THEN
+    v_cliente_nombre := 'Cliente Cita';
+  END IF;
+
+  -- 3. Generar código de turno (Lógica replicada de registrar_turno para consistencia)
+  v_diff_dias := (v_fecha - v_fecha_base);
+  v_letra := CHR(65 + (MOD((MOD(v_diff_dias, 26) + 26), 26)));
+
+  SELECT turno INTO v_ultimo_turno
+  FROM turnos
+  WHERE negocio_id = p_negocio_id 
+    AND fecha = v_fecha
+    AND turno LIKE v_letra || '%'
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_ultimo_turno IS NULL THEN
+    v_nuevo_numero := 1;
+  ELSE
+    v_nuevo_numero := CAST(SUBSTRING(v_ultimo_turno FROM 2) AS INT) + 1;
+  END IF;
+
+  v_nuevo_turno_codigo := v_letra || LPAD(v_nuevo_numero::TEXT, 2, '0');
+
+  -- 4. Insertar Turno (En atención directamente)
+  INSERT INTO public.turnos (
+    negocio_id, turno, nombre, telefono, servicio, barber_id, estado, fecha, hora, started_at
+  ) VALUES (
+    p_negocio_id,
+    v_nuevo_turno_codigo,
+    v_cliente_nombre,
+    v_cita.cliente_telefono,
+    v_cita.servicio,
+    v_cita.barber_id,
+    'En atención',
+    v_fecha,
+    TO_CHAR(NOW(), 'HH24:MI'),
+    NOW()
+  ) RETURNING id INTO v_nuevo_turno_id;
+
+  -- 5. Actualizar Cita
+  UPDATE public.citas
+  SET estado = 'Atendida',
+      updated_at = NOW()
+  WHERE id = p_cita_id;
+
+  RETURN jsonb_build_object(
+    'success', true, 
+    'turno_id', v_nuevo_turno_id, 
+    'turno_codigo', v_nuevo_turno_codigo,
+    'nombre_cliente', v_cliente_nombre
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 COMMIT;

@@ -137,6 +137,8 @@ function iniciarTimerParaTurno(turno) {
     activeTurnIntervals[turno.id] = setInterval(updateTimer, 1000);
 }
 
+let lastNotificationTime = 0;
+
 let __refreshTimer = null;
 let refreshTimeout = null;
 function safeRefresh() {
@@ -2001,8 +2003,14 @@ async function guardarPago(event) {
        return;
     }
 
+    const turnoId = parseInt(activeTurnIdForPayment);
+    if (isNaN(turnoId)) {
+        mostrarNotificacion('ID de turno inválido.', 'error');
+        return;
+    }
+
     const { data: rpcData, error: rpcError } = await supabase.rpc('finalizar_turno_con_pago', {
-        p_turno_id: parseInt(activeTurnIdForPayment),
+        p_turno_id: turnoId,
         p_negocio_id: negocioId,
         p_monto: monto,
         p_metodo_pago: metodoPago
@@ -2067,57 +2075,40 @@ async function confirmarAtenderCita() {
 }
 
 async function procesarAtencionCita(citaId, negocioId) {
-    // 1. Obtener la cita
-    const { data: cita, error: errCita } = await supabase
-        .from('citas')
-        .select('*')
-        .eq('id', citaId)
-        .single();
-    if (errCita) throw new Error('Cita no encontrada');
+    try {
+        // 1. Validar estado previo localmente para feedback rápido
+        const { data: cita, error: citaError } = await supabase
+            .from('citas')
+            .select('estado, cliente_telefono, barber_id, start_at')
+            .eq('id', citaId)
+            .single();
 
-    // 2. Obtener nombre del cliente
-    let nombreCliente = 'Cliente Cita';
-    if (cita.cliente_telefono) {
-        const { data: cliente } = await supabase
-            .from('clientes')
-            .select('nombre')
-            .eq('negocio_id', negocioId)
-            .eq('telefono', cita.cliente_telefono)
-            .maybeSingle();
-        if (cliente) nombreCliente = cliente.nombre;
-    }
-
-    // 3. Crear el turno
-    const { data: resTurno, error: errTurno } = await supabase.rpc('registrar_turno', {
-        p_negocio_id: negocioId,
-        p_nombre: nombreCliente,
-        p_telefono: cita.cliente_telefono || '0000000000',
-        p_servicio: cita.servicio || 'Cita',
-        p_barber_id: cita.barber_id
-    });
-
-    let turnoId = null;
-    if (errTurno) throw errTurno;
-
-    if (!resTurno.success) {
-        // Si ya tiene turno, buscamos el activo para actualizarlo
-        if (resTurno.message && resTurno.message.includes('activo')) {
-             const { data: turnoExistente } = await supabase.from('turnos').select('id').eq('negocio_id', negocioId).eq('telefono', cita.cliente_telefono).in('estado', ['En espera', 'En atención']).maybeSingle();
-             if (turnoExistente) turnoId = turnoExistente.id;
-             else throw new Error(resTurno.message);
-        } else {
-            throw new Error(resTurno.message);
+        if (citaError || !cita) throw new Error('Cita no encontrada');
+        
+        if (cita.estado === 'Atendida' || cita.estado === 'Cancelada') {
+            mostrarNotificacion('Esta cita ya fue procesada anteriormente.', 'warning');
+            return;
         }
-    } else {
-        turnoId = resTurno.id;
+
+        // 2. Ejecutar transacción atómica en base de datos
+        const { data: resultado, error: rpcError } = await supabase.rpc('procesar_cita_a_turno', {
+            p_cita_id: citaId,
+            p_negocio_id: negocioId
+        });
+
+        if (rpcError) throw rpcError;
+
+        // 3. Notificar éxito
+        const nombreCliente = resultado.nombre_cliente || 'Cliente';
+        mostrarNotificacion(`Turno generado para ${nombreCliente}`, 'success');
+        
+        // 4. Notificaciones Push (Efecto secundario no crítico para la transacción)
+        await notificarCitaAceptada(cita.cliente_telefono || '', nombreCliente, cita.start_at);
+
+    } catch (error) {
+        console.error('Error procesando cita:', error);
+        mostrarNotificacion(error.message || 'Error al procesar la cita', 'error');
     }
-
-    const { error: errUpdTurno } = await supabase.from('turnos').update({ estado: 'En atención', started_at: new Date().toISOString(), barber_id: cita.barber_id, servicio: cita.servicio || 'Cita' }).eq('id', turnoId);
-    if (errUpdTurno) throw errUpdTurno;
-    const { error: errUpdCita } = await supabase.from('citas').update({ estado: 'Atendida' }).eq('id', citaId);
-    if (errUpdCita) throw errUpdCita;
-
-    await notificarCitaAceptada(cita.cliente_telefono || '', nombreCliente, cita.start_at);
 }
 
 async function confirmarCancelarCita() {
@@ -2140,6 +2131,10 @@ window.confirmarAtenderCita = confirmarAtenderCita;
 window.confirmarCancelarCita = confirmarCancelarCita;
 
 function mostrarNotificacion(mensaje, tipo = 'info') {
+    const now = Date.now();
+    if (now - lastNotificationTime < 800) return; // Evitar spam
+    lastNotificationTime = now;
+
     const iconos = { success: 'success', error: 'error', warning: 'warning', info: 'info' };
     Swal.fire({
         title: tipo === 'error' ? 'Error' : tipo === 'success' ? 'Éxito' : 'Información',
@@ -2165,6 +2160,7 @@ window.atenderAhora = atenderAhora;
 
 let recognition = null;
 let isRecognizing = false;
+let recognitionTimeout = null;
 
 function iniciarReconocimientoVoz() {
     const voiceCommandButton = document.getElementById('voice-command-button');
@@ -2187,7 +2183,7 @@ function iniciarReconocimientoVoz() {
     }
 
     recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
+    recognition.lang = 'es-DO';
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -2198,6 +2194,12 @@ function iniciarReconocimientoVoz() {
         voiceCommandText.textContent = 'Escuchando...';
         voiceCommandButton.classList.add('bg-red-500', 'hover:bg-red-600');
         voiceCommandButton.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+        
+        // Timeout de seguridad
+        if (recognitionTimeout) clearTimeout(recognitionTimeout);
+        recognitionTimeout = setTimeout(() => {
+            if (isRecognizing && recognition) recognition.stop();
+        }, 10000);
     };
 
     recognition.onend = () => {
@@ -2207,7 +2209,7 @@ function iniciarReconocimientoVoz() {
         voiceCommandText.textContent = 'Comando de Voz';
         voiceCommandButton.classList.remove('bg-red-500', 'hover:bg-red-600');
         voiceCommandButton.classList.add('bg-purple-600', 'hover:bg-purple-700');
-        recognition = null; // Clean up
+        if (recognitionTimeout) clearTimeout(recognitionTimeout);
     };
 
     recognition.onerror = (event) => {
@@ -2228,7 +2230,11 @@ function iniciarReconocimientoVoz() {
         procesarComandoVoz(transcript);
     };
 
-    recognition.start();
+    try {
+        recognition.start();
+    } catch (e) {
+        console.error("Error al iniciar reconocimiento:", e);
+    }
 }
 
 window.iniciarReconocimientoVoz = iniciarReconocimientoVoz;
@@ -2346,16 +2352,8 @@ async function handleDoubleClickDelete(event) {
 // --- AUTOMATIZACIÓN DE CORREOS Y MARKETING (Value Prop: Fidelización Automática) ---
 
 function initEmailAutomation() {
-    console.log('📧 Iniciando motor de automatización de correos...');
-    // Verificar recordatorios cada 1 minuto
-    setInterval(verificarRecordatoriosCitas, 60000);
-    
-    // Verificar inactividad cada 1 hora (para no saturar)
-    setInterval(verificarClientesInactivos, 3600000);
-    
-    // Ejecución inicial diferida para no bloquear carga
-    setTimeout(verificarRecordatoriosCitas, 5000);
-    setTimeout(verificarClientesInactivos, 15000);
+    console.log('📧 Automatización de correos delegada al backend.');
+    // La lógica de setInterval se ha eliminado para evitar ejecución en frontend.
 }
 
 async function verificarRecordatoriosCitas() {
