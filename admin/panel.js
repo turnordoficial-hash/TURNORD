@@ -162,7 +162,7 @@ async function cargarDatos() {
             return {
                 id: `cita-${c.id}`,
                 turno: codeMap.get(c.id),
-                nombre: barberosMap[c.barber_id] || 'Barbero',
+                nombre: clientesMap[c.cliente_telefono] || (c.cliente_telefono || 'Cliente'),
                 estado: c.estado || 'Cita Programada',
                 hora: hora,
                 servicio: c.servicio || 'Cita',
