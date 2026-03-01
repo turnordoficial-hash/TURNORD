@@ -301,7 +301,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         .subscribe();
 
     // Event Listeners para botones (Arquitectura SaaS)
-    document.getElementById('btnDevolver')?.addEventListener('click', devolverTurno);
     document.getElementById('btnAtender')?.addEventListener('click', atenderAhora);
     document.getElementById('btnTomarTurnoManual')?.addEventListener('click', abrirModal);
     document.getElementById('formTurno')?.addEventListener('submit', tomarTurno);
@@ -1288,7 +1287,6 @@ function abrirModalPago(turnId) {
         const inputMonto = document.getElementById('montoCobrado');
         const precioPredEl = document.getElementById('precioPredeterminado');
         const descEl = document.getElementById('descuentoMonto');
-        const impEl = document.getElementById('impuestoMonto');
         const efecEl = document.getElementById('efectivoRecibido');
         const cambioEl = document.getElementById('cambioCalculado');
         
@@ -1343,14 +1341,12 @@ function abrirModalPago(turnId) {
 
         if (precioPredEl) precioPredEl.textContent = `RD$ ${basePricePago.toFixed(2)}`;
         if (descEl) descEl.value = '';
-        if (impEl) impEl.value = '';
         if (efecEl) efecEl.value = '';
         if (cambioEl) cambioEl.textContent = 'RD$ 0.00';
 
         const recalcTotals = () => {
             const desc = Number(descEl?.value || 0) || 0;
-            const imp = Number(impEl?.value || 0) || 0;
-            const total = Math.max(0, basePricePago - desc + imp);
+            const total = Math.max(0, basePricePago - desc);
             if (inputMonto) inputMonto.value = total.toFixed(2);
             const efectivo = Number(efecEl?.value || 0) || 0;
             const cambio = Math.max(0, efectivo - total);
@@ -1363,11 +1359,9 @@ function abrirModalPago(turnId) {
             if (cambioEl) cambioEl.textContent = `RD$ ${cambio.toFixed(2)}`;
         };
         descEl?.removeEventListener('input', recalcTotals);
-        impEl?.removeEventListener('input', recalcTotals);
         efecEl?.removeEventListener('input', recalcTotals);
         inputMonto?.removeEventListener('input', recalcCambioOnly);
         descEl?.addEventListener('input', recalcTotals);
-        impEl?.addEventListener('input', recalcTotals);
         efecEl?.addEventListener('input', recalcTotals);
         inputMonto?.addEventListener('input', recalcCambioOnly);
         recalcTotals();
@@ -2032,32 +2026,7 @@ async function guardarPago(event) {
     await notificarAvanceFila();
 }
 
-async function devolverTurno() {
-    const turnoParaDevolver = getSiguienteTurno();
-    if (!turnoParaDevolver) {
-        mostrarNotificacion('No hay turno que devolver.', 'warning');
-        return;
-    }
-    if (!confirm(`¿Enviar el turno ${turnoParaDevolver.turno} al final de la cola?`)) {
-        return;
-    }
-    
-    try {
-        // RPC atómica para mover turno al final y evitar condiciones de carrera
-        const { error } = await supabase.rpc('devolver_turno', {
-            p_turno_id: turnoParaDevolver.id,
-            p_negocio_id: negocioId
-        });
-
-        if (error) throw error;
-
-        mostrarNotificacion(`Turno ${turnoParaDevolver.turno} enviado al final de la cola`, 'info');
-        refrescarUI();
-    } catch (error) {
-        console.error('Error al devolver turno:', error);
-        mostrarNotificacion('Error al devolver turno: ' + error.message, 'error');
-    }
-}
+ 
 
 // --- Lógica Modal Acciones Cita ---
 let selectedCitaId = null;
@@ -2192,7 +2161,6 @@ window.tomarTurno = tomarTurno;
 window.abrirModal = abrirModal;
 window.cerrarModal = cerrarModal;
 window.cerrarModalPago = cerrarModalPago;
-window.devolverTurno = devolverTurno;
 window.atenderAhora = atenderAhora;
 
 let recognition = null;

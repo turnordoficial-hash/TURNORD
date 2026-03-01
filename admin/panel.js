@@ -136,16 +136,26 @@ async function cargarDatos() {
             (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
         }
 
+        // Asignar código letra+número por día para citas
+        const baseDate = new Date('2024-08-23T00:00:00Z');
+        const getLetterForDate = (d) => {
+            const diffDays = Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())) / 86400000);
+            const idx = ((diffDays % 26) + 26) % 26;
+            return String.fromCharCode(65 + idx);
+        };
+        const sortedCitas = [...citasData].sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+        const codeMap = new Map(sortedCitas.map((c, i) => [c.id, `${getLetterForDate(new Date(c.start_at))}${String(i + 1).padStart(2, '0')}`]));
+
         citasConNombre = citasData.map(c => {
             const fecha = new Date(c.start_at);
             const hora = fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             return {
                 id: `cita-${c.id}`,
-                turno: '📅',
-                nombre: clientesMap[c.cliente_telefono] || 'Cliente Cita',
-                estado: 'Cita Programada',
+                turno: codeMap.get(c.id),
+                nombre: clientesMap[c.cliente_telefono] || 'Cliente',
+                estado: c.estado || 'Cita Programada',
                 hora: hora,
-                servicio: 'Cita',
+                servicio: c.servicio || 'Cita',
                 created_at: c.start_at,
                 isCita: true
             };
