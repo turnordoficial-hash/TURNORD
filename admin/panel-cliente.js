@@ -88,6 +88,7 @@ function getSaludo() {
 function calcularNivelInfo(puntos) {
   // Asumimos 50 puntos por servicio (Ticket promedio RD$500 * 0.1)
   const servicios = Math.floor((puntos || 0) / 50);
+  const serviciosExactos = (puntos || 0) / 50;
   
   const niveles = [
     { min: 0, max: 4, nombre: "Nuevo Cliente", icon: "💈", mensaje: "Bienvenido a la familia", color: "text-gray-500", bg: "bg-gray-500" },
@@ -101,7 +102,7 @@ function calcularNivelInfo(puntos) {
   const nextLevel = niveles[niveles.indexOf(nivelActual) + 1];
   
   const totalRange = nextLevel ? nextLevel.min - nivelActual.min : 1;
-  const currentInLevel = servicios - nivelActual.min;
+  const currentInLevel = serviciosExactos - nivelActual.min;
   const progress = nextLevel ? Math.min(100, (currentInLevel / totalRange) * 100) : 100;
 
   return { ...nivelActual, progress, servicios, nextLevel };
@@ -868,7 +869,7 @@ function renderStructure() {
                 </div>
                 
                 <div class="w-full h-4 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden mb-2">
-                    <div id="profile-progress-bar" class="h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative" style="width: ${nivelInfo.progress}%">
+                    <div id="profile-progress-bar" class="h-full bg-[#C1121F] transition-all duration-1000 ease-out relative" style="width: ${nivelInfo.progress}%">
                         <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
                     </div>
                 </div>
@@ -1036,7 +1037,7 @@ function renderProfile(data) {
     const progressBar = document.getElementById('profile-progress-bar');
     if (progressBar) {
         progressBar.style.width = `${nivelInfo.progress}%`;
-        progressBar.className = `h-full ${nivelInfo.bg} transition-all duration-1000 ease-out relative`;
+        progressBar.className = `h-full bg-[#C1121F] transition-all duration-1000 ease-out relative`;
         progressBar.innerHTML = '<div class="absolute inset-0 bg-white/20 animate-pulse"></div>';
     }
 
@@ -1152,11 +1153,18 @@ async function cargarPerfil() {
     // Detectar si se desbloqueó una recompensa
     const oldPoints = appState.profile?.puntos_actuales || 0;
     const newPoints = data.puntos_actuales || 0;
+    
+    const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
+    const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);
+
     if (newPoints > oldPoints) {
         const unlocked = RECOMPENSAS.some(r => oldPoints < r.pts && newPoints >= r.pts);
-        if (unlocked && typeof confetti === 'function') {
+        const levelUp = newLevel.nombre !== oldLevel.nombre;
+
+        if ((unlocked || levelUp) && typeof confetti === 'function') {
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
-            showToast('¡Felicidades! Has desbloqueado una recompensa 🎉', 'success');
+            if (levelUp) showToast(`¡Subiste de nivel a ${newLevel.nombre}! 🚀`, 'success');
+            else showToast('¡Felicidades! Has desbloqueado una recompensa 🎉', 'success');
         }
     }
     setCache('PROFILE', data, 60); // 1 hora de caché

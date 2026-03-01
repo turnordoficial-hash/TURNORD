@@ -4,6 +4,8 @@
 
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- ==============================================================================
 -- 0) Funciones de Utilidad (Shared Functions)
 -- ==============================================================================
@@ -146,6 +148,8 @@ CREATE TABLE IF NOT EXISTS public.estado_negocio (
 );
 ALTER TABLE public.estado_negocio
   ADD COLUMN IF NOT EXISTS weekly_breaks JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.estado_negocio
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_estado_negocio_negocio_id ON public.estado_negocio(negocio_id);
 
@@ -317,18 +321,6 @@ DROP POLICY IF EXISTS "Public-select" ON public.push_subscriptions;
 CREATE POLICY "Public-select" ON public.push_subscriptions 
   FOR SELECT USING (true);
 
--- --- Políticas Citas ---
-DROP POLICY IF EXISTS citas_select ON public.citas;
-CREATE POLICY citas_select ON public.citas 
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS citas_insert ON public.citas;
-CREATE POLICY citas_insert ON public.citas 
-  FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS citas_update ON public.citas;
-CREATE POLICY citas_update ON public.citas 
-  FOR UPDATE USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- 8) Funciones RPC (Remote Procedure Calls)
@@ -344,8 +336,6 @@ BEGIN
   WHERE t.id = (elem->>'id')::bigint;
 END;
 $$;
-
-CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE TABLE IF NOT EXISTS public.barberos (
   id BIGSERIAL PRIMARY KEY,
@@ -389,48 +379,25 @@ ALTER TABLE public.citas ADD COLUMN IF NOT EXISTS servicio TEXT;
 
 ALTER TABLE public.citas ENABLE ROW LEVEL SECURITY;
 
+-- --- Políticas Citas (Movidas aquí para asegurar que la tabla existe) ---
+DROP POLICY IF EXISTS citas_select ON public.citas;
+CREATE POLICY citas_select ON public.citas 
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS citas_insert ON public.citas;
+CREATE POLICY citas_insert ON public.citas 
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS citas_update ON public.citas;
+CREATE POLICY citas_update ON public.citas 
+  FOR UPDATE USING (true) WITH CHECK (true);
+
 ALTER TABLE public.citas DROP CONSTRAINT IF EXISTS citas_no_overlap;
 ALTER TABLE public.citas
   ADD CONSTRAINT citas_no_overlap EXCLUDE USING gist (
     barber_id WITH =,
     tstzrange(start_at, end_at, '[)') WITH &&
   );
-
-CREATE OR REPLACE FUNCTION public.programar_cita(
-  p_negocio_id TEXT,
-  p_barber_id BIGINT,
-  p_cliente_telefono TEXT,
-  p_start TIMESTAMPTZ,
-  p_end TIMESTAMPTZ,
-  p_servicio TEXT DEFAULT NULL
-) RETURNS public.citas AS $$
-DECLARE
-  conflicto_turno INTEGER;
-  nueva public.citas;
-BEGIN
-  -- 1. BLOQUEO FUERTE: Bloquear el registro del barbero para serializar transacciones
-  -- Esto obliga a que las reservas para este barbero se procesen una por una.
-  PERFORM 1 FROM public.barberos WHERE id = p_barber_id FOR UPDATE;
-
-  -- 2. Validar conflicto con turnos en atención (Bloqueo dinámico)
-  SELECT COUNT(*) INTO conflicto_turno
-  FROM public.turnos t
-  WHERE t.negocio_id = p_negocio_id
-    AND t.barber_id = p_barber_id
-    AND t.estado = 'En atención'
-    AND t.started_at IS NOT NULL;
-    
-  IF conflicto_turno > 0 THEN
-    RAISE EXCEPTION 'El barbero está atendiendo un turno en este momento y no puede recibir citas.';
-  END IF;
-  -- 3. Insertar cita (La restricción EXCLUDE en la tabla citas manejará solapamientos de citas)
-  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
-  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
-  RETURNING * INTO nueva;
-
-  RETURN nueva;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TABLE IF NOT EXISTS public.roles_negocio (
   negocio_id TEXT NOT NULL,
@@ -440,120 +407,13 @@ CREATE TABLE IF NOT EXISTS public.roles_negocio (
   UNIQUE (negocio_id, user_id)
 );
 
-CREATE OR REPLACE FUNCTION public.finalizar_turno_con_pago(
-  p_turno_id BIGINT,
-  p_negocio_id TEXT,
-  p_monto NUMERIC,
-  p_metodo_pago TEXT
-) RETURNS JSONB AS $$
-DECLARE
-  v_turno record;
-  v_cliente_id UUID;
-  v_puntos INTEGER;
-  v_ok BOOLEAN;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'No autenticado';
-  END IF;
+ALTER TABLE public.roles_negocio ENABLE ROW LEVEL SECURITY;
 
-  SELECT EXISTS(
-    SELECT 1 FROM public.roles_negocio
-    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
-  ) INTO v_ok;
-
-  IF NOT v_ok THEN
-    RAISE EXCEPTION 'No autorizado';
-  END IF;
-
-  SELECT * INTO v_turno
-  FROM public.turnos
-  WHERE id = p_turno_id AND negocio_id = p_negocio_id
-  FOR UPDATE;
-
-  IF v_turno IS NULL THEN
-    RAISE EXCEPTION 'Turno no encontrado';
-  END IF;
-
-  IF v_turno.estado = 'Atendido' THEN
-    RETURN jsonb_build_object('success', true, 'message', 'Turno ya atendido');
-  END IF;
-
-  UPDATE public.turnos
-  SET estado = 'Atendido',
-      monto_cobrado = p_monto,
-      metodo_pago = p_metodo_pago,
-      updated_at = NOW()
-  WHERE id = p_turno_id;
-
-  v_puntos := FLOOR(COALESCE(p_monto, 0) * 0.1);
-
-  IF v_puntos > 0 AND v_turno.telefono IS NOT NULL THEN
-    UPDATE public.clientes
-    SET puntos_actuales = COALESCE(puntos_actuales, 0) + v_puntos,
-        puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + v_puntos,
-        ultima_visita = NOW()
-    WHERE negocio_id = p_negocio_id AND telefono = v_turno.telefono
-    RETURNING id INTO v_cliente_id;
-
-    IF v_cliente_id IS NOT NULL THEN
-      INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo, referencia_pago_id)
-      VALUES (p_negocio_id, v_cliente_id, v_puntos, 'GANADO', p_turno_id);
-    END IF;
-  END IF;
-
-  RETURN jsonb_build_object('success', true, 'puntos_ganados', v_puntos);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.canjear_puntos(
-  p_negocio_id TEXT,
-  p_cliente_id UUID,
-  p_puntos INTEGER
-) RETURNS JSONB AS $$
-DECLARE
-  v_saldo INTEGER;
-  v_ok BOOLEAN;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'No autenticado';
-  END IF;
-
-  SELECT EXISTS(
-    SELECT 1 FROM public.roles_negocio
-    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
-  ) INTO v_ok;
-
-  IF NOT v_ok THEN
-    RAISE EXCEPTION 'No autorizado';
-  END IF;
-
-  SELECT puntos_actuales INTO v_saldo
-  FROM public.clientes
-  WHERE id = p_cliente_id AND negocio_id = p_negocio_id
-  FOR UPDATE;
-
-  IF v_saldo IS NULL THEN
-    RAISE EXCEPTION 'Cliente no encontrado';
-  END IF;
-
-  IF p_puntos <= 0 THEN
-    RAISE EXCEPTION 'Monto inválido';
-  END IF;
-
-  IF v_saldo < p_puntos THEN
-    RAISE EXCEPTION 'Saldo insuficiente';
-  END IF;
-
-  UPDATE public.clientes
-  SET puntos_actuales = puntos_actuales - p_puntos
-  WHERE id = p_cliente_id AND negocio_id = p_negocio_id;
-
-  INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo)
-  VALUES (p_negocio_id, p_cliente_id, p_puntos, 'CANJE');
-
-  RETURN jsonb_build_object('success', true);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+DROP POLICY IF EXISTS roles_select ON public.roles_negocio;
+CREATE POLICY roles_select
+ON public.roles_negocio
+FOR SELECT
+USING (auth.uid() = user_id);
 
 -- ==============================================================================
 -- 9) Tabla: Clientes (Perfil y Auth Personalizado)
@@ -570,7 +430,8 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   email TEXT NOT NULL,
   documento_identidad TEXT, -- Cédula o Código (Opcional)
   avatar_url TEXT,
-  puntos INTEGER DEFAULT 0,
+  puntos_actuales INTEGER DEFAULT 0,
+  puntos_totales_historicos INTEGER DEFAULT 0,
   ultima_visita TIMESTAMPTZ,
   referido_por UUID REFERENCES public.clientes(id),
   recompensa_referido_aplicada BOOLEAN DEFAULT FALSE,
@@ -594,64 +455,6 @@ DROP TRIGGER IF EXISTS trg_set_timestamp_updated_at_clientes ON public.clientes;
 CREATE TRIGGER trg_set_timestamp_updated_at_clientes
 BEFORE UPDATE ON public.clientes
 FOR EACH ROW EXECUTE FUNCTION public.set_timestamp_updated_at();
-
--- Tabla: Historial de Puntos
-CREATE TABLE IF NOT EXISTS public.historial_puntos (
-  id BIGSERIAL PRIMARY KEY,
-  negocio_id TEXT NOT NULL,
-  cliente_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
-  tipo TEXT NOT NULL, -- 'GANADO', 'GASTADO'
-  monto INTEGER NOT NULL,
-  descripcion TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Trigger para sumar puntos automáticamente al finalizar un turno
-CREATE OR REPLACE FUNCTION public.sumar_puntos_turno() RETURNS TRIGGER AS $$
-DECLARE
-  v_cliente_id UUID;
-  v_referido_por UUID;
-  v_recompensa_aplicada BOOLEAN;
-  v_puntos_referido INT := 50; -- Puntos por defecto para el que refiere
-BEGIN
-  -- Si el turno pasa a 'Atendido', sumar 10 puntos y actualizar última visita
-  IF NEW.estado = 'Atendido' AND OLD.estado <> 'Atendido' THEN
-    UPDATE public.clientes
-    SET puntos = COALESCE(puntos, 0) + 10,
-        ultima_visita = NOW()
-    WHERE telefono = NEW.telefono AND negocio_id = NEW.negocio_id
-    RETURNING id, referido_por, recompensa_referido_aplicada INTO v_cliente_id, v_referido_por, v_recompensa_aplicada;
-
-    -- Registrar en historial
-    INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
-    VALUES (NEW.negocio_id, v_cliente_id, 'GANADO', 10, 'Servicio completado: ' || COALESCE(NEW.servicio, 'General'));
-
-    -- Lógica de Referidos: Si tiene un "padrino" y aún no se ha pagado la recompensa
-    IF v_referido_por IS NOT NULL AND v_recompensa_aplicada = FALSE THEN
-        -- 1. Pagar al que refirió (Padrino)
-        UPDATE public.clientes
-        SET puntos = COALESCE(puntos, 0) + v_puntos_referido
-        WHERE id = v_referido_por;
-
-        INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
-        VALUES (NEW.negocio_id, v_referido_por, 'GANADO', v_puntos_referido, 'Bono por referido: ' || NEW.nombre);
-
-        -- 2. Marcar como pagado para que no se repita
-        UPDATE public.clientes
-        SET recompensa_referido_aplicada = TRUE
-        WHERE id = v_cliente_id;
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_sumar_puntos ON public.turnos;
-CREATE TRIGGER trg_sumar_puntos
-AFTER UPDATE ON public.turnos
-FOR EACH ROW EXECUTE FUNCTION public.sumar_puntos_turno();
-
-COMMIT;
 
 CREATE OR REPLACE FUNCTION registrar_turno(
   p_negocio_id TEXT,
@@ -725,37 +528,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Función RPC para obtener email de forma segura, sin exponer otros datos.
--- SECURITY DEFINER permite a la función saltarse RLS temporalmente para esta consulta específica.
-CREATE OR REPLACE FUNCTION public.get_email_by_document(p_documento_identidad TEXT, p_negocio_id TEXT)
-RETURNS TEXT
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_email TEXT;
-BEGIN
-  SELECT email INTO v_email
-  FROM public.clientes
-  WHERE documento_identidad = p_documento_identidad AND public.clientes.negocio_id = p_negocio_id;
-  RETURN v_email;
-END;
-$$;
-
--- Función RPC para verificar si un documento ya existe de forma segura.
-CREATE OR REPLACE FUNCTION public.documento_existe(p_documento_identidad TEXT, p_negocio_id TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.clientes
-    WHERE documento_identidad = p_documento_identidad AND public.clientes.negocio_id = p_negocio_id
-  );
-END;
-$$;
-
 -- ==============================================================================
 -- 10) Trigger para creación automática de perfil (Solución Error 403 RLS)
 -- ==============================================================================
@@ -782,87 +554,9 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-
--- Función RPC mejorada con bloqueo transaccional para evitar Doble Reserva
-CREATE OR REPLACE FUNCTION public.programar_cita(
-  p_negocio_id TEXT,
-  p_barber_id BIGINT,
-  p_cliente_telefono TEXT,
-  p_start TIMESTAMPTZ,
-  p_end TIMESTAMPTZ,
-  p_servicio TEXT DEFAULT NULL
-) RETURNS public.citas AS $$
-DECLARE
-  conflicto_turno INTEGER;
-  nueva public.citas;
-BEGIN
-  -- 1. BLOQUEO FUERTE: Bloquear el registro del barbero para serializar transacciones
-  -- Esto obliga a que las reservas para este barbero se procesen una por una.
-  PERFORM 1 FROM public.barberos WHERE id = p_barber_id FOR UPDATE;
-
-  -- 2. Validar conflicto con turnos en atención (Bloqueo dinámico)
-  SELECT COUNT(*) INTO conflicto_turno
-  FROM public.turnos t
-  WHERE t.negocio_id = p_negocio_id
-    AND t.barber_id = p_barber_id
-    AND t.estado = 'En atención'
-    AND t.started_at IS NOT NULL
-    -- Verificar solapamiento de rangos de tiempo
-    AND tstzrange(t.started_at, COALESCE(t.ended_at, t.started_at + INTERVAL '3 hours')) && tstzrange(p_start, p_end);
-
-  IF conflicto_turno > 0 THEN
-    RAISE EXCEPTION 'El barbero está atendiendo un turno en este momento y no puede recibir citas.';
-  END IF;
-
-  -- 3. Insertar cita (La restricción EXCLUDE en la tabla citas manejará solapamientos de citas)
-  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
-  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
-  RETURNING * INTO nueva;
-
-  RETURN nueva;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- ==============================================================================
 -- 11) Sistema de Promociones y Puntos (Admin)
 -- ==============================================================================
-
--- RPC para canjear puntos manualmente desde el panel de administración
-CREATE OR REPLACE FUNCTION public.canjear_puntos(
-  p_negocio_id TEXT,
-  p_cliente_telefono TEXT,
-  p_puntos INT,
-  p_concepto TEXT
-) RETURNS JSONB AS $$
-DECLARE
-  v_cliente_id UUID;
-  v_saldo_actual INT;
-BEGIN
-  -- Obtener cliente
-  SELECT id, puntos INTO v_cliente_id, v_saldo_actual
-  FROM public.clientes
-  WHERE negocio_id = p_negocio_id AND telefono = p_cliente_telefono;
-
-  IF v_cliente_id IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Cliente no encontrado');
-  END IF;
-
-  IF v_saldo_actual < p_puntos THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Saldo insuficiente');
-  END IF;
-
-  -- Descontar puntos
-  UPDATE public.clientes
-  SET puntos = puntos - p_puntos
-  WHERE id = v_cliente_id;
-
-  -- Registrar historial
-  INSERT INTO public.historial_puntos (negocio_id, cliente_id, tipo, monto, descripcion)
-  VALUES (p_negocio_id, v_cliente_id, 'GASTADO', p_puntos, p_concepto);
-
-  RETURN jsonb_build_object('success', true, 'nuevo_saldo', v_saldo_actual - p_puntos);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Tabla de Promociones
 CREATE TABLE IF NOT EXISTS public.promociones (
@@ -913,11 +607,6 @@ ALTER TABLE public.citas
 ALTER TABLE public.clientes
   ADD COLUMN IF NOT EXISTS last_marketing_email_sent_at TIMESTAMPTZ;
 
--- Fidelización avanzada: puntos actuales vs históricos
-ALTER TABLE public.clientes
-  ADD COLUMN IF NOT EXISTS puntos_actuales INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS puntos_totales_historicos INTEGER DEFAULT 0;
-
 -- Movimientos de puntos con referencia de pago
 CREATE TABLE IF NOT EXISTS public.movimientos_puntos (
   id BIGSERIAL PRIMARY KEY,
@@ -926,14 +615,41 @@ CREATE TABLE IF NOT EXISTS public.movimientos_puntos (
   puntos INTEGER NOT NULL,
   tipo TEXT NOT NULL CHECK (tipo IN ('GANADO','CANJE')),
   referencia_pago_id BIGINT,
+  descripcion TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Desactivar trigger antiguo de suma automática
-DROP TRIGGER IF EXISTS trg_sumar_puntos ON public.turnos;
-DROP FUNCTION IF EXISTS public.sumar_puntos_turno();
+-- ==============================================================================
+-- 4) Función RPC: Programar Cita (CORREGIDA Y UNIFICADA)
+-- ==============================================================================
+-- Ya no valida contra turnos en atención, solo bloquea al barbero para evitar race conditions
+-- y confía en la restricción EXCLUDE de la tabla citas para solapamientos.
+CREATE OR REPLACE FUNCTION public.programar_cita(
+  p_negocio_id TEXT,
+  p_barber_id BIGINT,
+  p_cliente_telefono TEXT,
+  p_start TIMESTAMPTZ,
+  p_end TIMESTAMPTZ,
+  p_servicio TEXT DEFAULT NULL
+) RETURNS public.citas AS $$
+DECLARE
+  nueva public.citas;
+BEGIN
+  -- 1. BLOQUEO FUERTE: Bloquear el registro del barbero para serializar transacciones
+  PERFORM 1 FROM public.barberos WHERE id = p_barber_id FOR UPDATE;
 
--- RPC: Finalizar turno con pago y sumar puntos
+  -- 2. Insertar cita (La restricción EXCLUDE en la tabla citas manejará solapamientos de citas)
+  INSERT INTO public.citas (negocio_id, barber_id, cliente_telefono, start_at, end_at, servicio)
+  VALUES (p_negocio_id, p_barber_id, p_cliente_telefono, p_start, p_end, p_servicio)
+  RETURNING * INTO nueva;
+
+  RETURN nueva;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==============================================================================
+-- 5) Función RPC: Finalizar Turno (UNIFICADA Y SEGURA)
+-- ==============================================================================
 CREATE OR REPLACE FUNCTION public.finalizar_turno_con_pago(
   p_turno_id BIGINT,
   p_negocio_id TEXT,
@@ -944,11 +660,23 @@ DECLARE
   v_turno record;
   v_cliente_id UUID;
   v_puntos INTEGER;
+  v_ok BOOLEAN;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'No autenticado';
   END IF;
 
+  -- 1. Validar Rol (Seguridad)
+  SELECT EXISTS(
+    SELECT 1 FROM public.roles_negocio
+    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
+  ) INTO v_ok;
+
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
+  -- 2. Obtener y Bloquear Turno
   SELECT * INTO v_turno
   FROM public.turnos
   WHERE id = p_turno_id AND negocio_id = p_negocio_id
@@ -962,6 +690,7 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'message', 'Turno ya atendido');
   END IF;
 
+  -- 3. Actualizar Turno
   UPDATE public.turnos
   SET estado = 'Atendido',
       monto_cobrado = p_monto,
@@ -969,6 +698,7 @@ BEGIN
       updated_at = NOW()
   WHERE id = p_turno_id;
 
+  -- 4. Calcular y Asignar Puntos (10% del monto)
   v_puntos := FLOOR(COALESCE(p_monto, 0) * 0.1);
 
   IF v_puntos > 0 AND v_turno.telefono IS NOT NULL THEN
@@ -980,11 +710,71 @@ BEGIN
     RETURNING id INTO v_cliente_id;
 
     IF v_cliente_id IS NOT NULL THEN
-      INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo, referencia_pago_id)
-      VALUES (p_negocio_id, v_cliente_id, v_puntos, 'GANADO', p_turno_id);
+      INSERT INTO public.movimientos_puntos(negocio_id, cliente_id, puntos, tipo, referencia_pago_id, descripcion)
+      VALUES (p_negocio_id, v_cliente_id, v_puntos, 'GANADO', p_turno_id, 'Puntos por servicio');
     END IF;
   END IF;
 
   RETURN jsonb_build_object('success', true, 'puntos_ganados', v_puntos);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==============================================================================
+-- 6) Función RPC: Canjear Puntos (UNIFICADA Y SEGURA)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.canjear_puntos(
+  p_negocio_id TEXT,
+  p_cliente_telefono TEXT,
+  p_puntos INT,
+  p_concepto TEXT
+) RETURNS JSONB AS $$
+DECLARE
+  v_cliente_id UUID;
+  v_saldo_actual INT;
+  v_ok BOOLEAN;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  -- 1. Validar Rol
+  SELECT EXISTS(
+    SELECT 1 FROM public.roles_negocio
+    WHERE negocio_id = p_negocio_id AND user_id = auth.uid() AND rol IN ('admin','staff')
+  ) INTO v_ok;
+
+  IF NOT v_ok THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
+  -- 2. Obtener cliente
+  SELECT id, puntos_actuales INTO v_cliente_id, v_saldo_actual
+  FROM public.clientes
+  WHERE negocio_id = p_negocio_id AND telefono = p_cliente_telefono;
+
+  IF v_cliente_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Cliente no encontrado');
+  END IF;
+
+  IF v_saldo_actual < p_puntos THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Saldo insuficiente');
+  END IF;
+
+  -- 3. Descontar puntos
+  UPDATE public.clientes
+  SET puntos_actuales = puntos_actuales - p_puntos
+  WHERE id = v_cliente_id;
+
+  -- 4. Registrar movimiento
+  INSERT INTO public.movimientos_puntos (negocio_id, cliente_id, tipo, puntos, descripcion)
+  VALUES (p_negocio_id, v_cliente_id, 'CANJE', p_puntos, p_concepto);
+
+  RETURN jsonb_build_object('success', true, 'nuevo_saldo', v_saldo_actual - p_puntos);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Índice recomendado para optimizar dashboard en tiempo real
+CREATE INDEX IF NOT EXISTS idx_turnos_dashboard
+ON public.turnos (negocio_id, fecha, estado, orden);
+
+COMMIT;

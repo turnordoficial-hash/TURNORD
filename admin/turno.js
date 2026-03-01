@@ -370,7 +370,7 @@ async function abrirModalCanjePuntos() {
     });
 
     if (telefono) {
-        const { data: cliente } = await supabase.from('clientes').select('nombre, puntos').eq('negocio_id', negocioId).eq('telefono', telefono).maybeSingle();
+        const { data: cliente } = await supabase.from('clientes').select('nombre, puntos_actuales').eq('negocio_id', negocioId).eq('telefono', telefono).maybeSingle();
         
         if (!cliente) {
             mostrarNotificacion('Cliente no encontrado', 'error');
@@ -382,7 +382,7 @@ async function abrirModalCanjePuntos() {
             html: `
                 <div class="text-center mb-4">
                     <p class="text-sm text-gray-500">Puntos Disponibles</p>
-                    <p class="text-4xl font-black text-emerald-600">${cliente.puntos || 0}</p>
+                    <p class="text-4xl font-black text-emerald-600">${cliente.puntos_actuales || 0}</p>
                 </div>
                 <input id="swal-puntos" type="number" class="swal2-input" placeholder="Puntos a canjear">
                 <input id="swal-concepto" class="swal2-input" placeholder="Concepto (ej. Corte Gratis)">
@@ -1302,11 +1302,11 @@ function abrirModalPago(turnId) {
 
         if (turno && turno.telefono) {
             // Verificar estado del cliente en segundo plano
-            supabase.from('clientes').select('puntos, nombre').eq('negocio_id', negocioId).eq('telefono', turno.telefono).maybeSingle()
+            supabase.from('clientes').select('puntos_actuales, nombre').eq('negocio_id', negocioId).eq('telefono', turno.telefono).maybeSingle()
             .then(({ data: cliente }) => {
-                if (cliente && RECOMPENSAS.length > 0 && cliente.puntos >= RECOMPENSAS[0].pts) { // Ejemplo: Meta al primer nivel de recompensa
+                if (cliente && RECOMPENSAS.length > 0 && cliente.puntos_actuales >= RECOMPENSAS[0].pts) { // Ejemplo: Meta al primer nivel de recompensa
                     infoClienteDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800 flex items-center gap-2 animate-pulse';
-                    infoClienteDiv.innerHTML = `<span>🏆</span> <div><strong>¡Atención!</strong> ${cliente.nombre} tiene <strong>${cliente.puntos} puntos</strong>.<br><span class="text-xs">Puede canjear una recompensa hoy.</span></div>`;
+                    infoClienteDiv.innerHTML = `<span>🏆</span> <div><strong>¡Atención!</strong> ${cliente.nombre} tiene <strong>${cliente.puntos_actuales} puntos</strong>.<br><span class="text-xs">Puede canjear una recompensa hoy.</span></div>`;
                     infoClienteDiv.classList.remove('hidden');
                 } else {
                     infoClienteDiv.classList.add('hidden');
@@ -2092,7 +2092,7 @@ async function procesarAtencionCita(citaId, negocioId) {
         p_negocio_id: negocioId,
         p_nombre: nombreCliente,
         p_telefono: cita.cliente_telefono || '0000000000',
-        p_servicio: 'Cita Programada',
+        p_servicio: cita.servicio || 'Cita',
         p_barber_id: cita.barber_id
     });
 
@@ -2112,7 +2112,7 @@ async function procesarAtencionCita(citaId, negocioId) {
         turnoId = resTurno.id;
     }
 
-    const { error: errUpdTurno } = await supabase.from('turnos').update({ estado: 'En atención', started_at: new Date().toISOString(), barber_id: cita.barber_id }).eq('id', turnoId);
+    const { error: errUpdTurno } = await supabase.from('turnos').update({ estado: 'En atención', started_at: new Date().toISOString(), barber_id: cita.barber_id, servicio: cita.servicio || 'Cita' }).eq('id', turnoId);
     if (errUpdTurno) throw errUpdTurno;
     const { error: errUpdCita } = await supabase.from('citas').update({ estado: 'Atendida' }).eq('id', citaId);
     if (errUpdCita) throw errUpdCita;
