@@ -438,7 +438,7 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   puntos_actuales INTEGER DEFAULT 0,
   puntos_totales_historicos INTEGER DEFAULT 0,
   ultima_visita TIMESTAMPTZ,
-  referido_por UUID REFERENCES public.clientes(id),
+  referido_por UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
   recompensa_referido_aplicada BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -539,16 +539,22 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_nombre TEXT;
+  v_telefono TEXT;
+  v_negocio_id TEXT;
+  v_referido UUID;
 BEGIN
+  v_nombre := COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1));
+  v_telefono := COALESCE(NEW.raw_user_meta_data->>'telefono', NULL);
+  -- Fallback seguro: si el signup no envía negocio_id, usar 'barberia005'
+  v_negocio_id := COALESCE(NEW.raw_user_meta_data->>'negocio_id', 'barberia005');
+  v_referido := NULLIF(NEW.raw_user_meta_data->>'referido_por', '')::uuid;
+
   INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id, referido_por)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    NEW.raw_user_meta_data->>'nombre',
-    NEW.raw_user_meta_data->>'telefono',
-    NEW.raw_user_meta_data->>'negocio_id',
-    NULLIF(NEW.raw_user_meta_data->>'referido_por', '')::uuid
-  );
+  VALUES (NEW.id, NEW.email, v_nombre, v_telefono, v_negocio_id, v_referido)
+  ON CONFLICT (id) DO NOTHING;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -590,7 +596,7 @@ CREATE TABLE IF NOT EXISTS public.historial_uso_promociones (
   id BIGSERIAL PRIMARY KEY,
   negocio_id TEXT NOT NULL,
   promocion_id BIGINT REFERENCES public.promociones(id),
-  cliente_id UUID REFERENCES public.clientes(id),
+  cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
   turno_id BIGINT REFERENCES public.turnos(id),
   monto_ahorrado NUMERIC DEFAULT 0,
   fecha_uso TIMESTAMPTZ DEFAULT NOW()

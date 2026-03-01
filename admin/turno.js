@@ -1426,7 +1426,7 @@ async function notificarAvanceFila() {
             console.log(`Notificando avance a ${turno.nombre} (${turno.telefono})...`);
             let data, error;
             try {
-                ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+                ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
                     body: {
                         telefono: turno.telefono,
                         negocio_id: negocioId,
@@ -1565,7 +1565,7 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
 
         let data, error;
         try {
-            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
                 body: {
                     telefono: telefono,
                     negocio_id: negocioId,
@@ -1628,7 +1628,7 @@ async function notificarRecordatorioCita(cita) {
 
         let data, error;
         try {
-            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
                 body: {
                     telefono,
                     negocio_id: negocioId,
@@ -1683,7 +1683,7 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
 
         let data, error;
         try {
-            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
+            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
                 body: {
                     telefono,
                     negocio_id: negocioId,

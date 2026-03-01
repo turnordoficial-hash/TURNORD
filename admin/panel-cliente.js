@@ -1660,7 +1660,7 @@ async function sendPushNotification(title, body, url) {
   
   console.log(`Intentando enviar notificación push a ${telefono}...`);
   try {
-    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+    const { data, error } = await supabase.functions.invoke('send-onesignal-notification', {
       body: { telefono, negocio_id: negocioId, title, body, url }
     });
     if (error) throw error;
