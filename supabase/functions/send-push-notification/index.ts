@@ -10,6 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
   "Access-Control-Max-Age": "86400",
+  "Vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
 };
 
 const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
@@ -17,7 +18,7 @@ const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-458
 serve(async (req) => {
   // 1. CORS Pre-flight: Manejar OPTIONS de inmediato sin leer nada más
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   // 2. Health check / Pruebas
@@ -69,7 +70,7 @@ serve(async (req) => {
     }
 
     // 5. Preparar llamada a OneSignal
-    const reqBody = {
+    const reqBody: Record<string, unknown> = {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: body },
@@ -81,6 +82,8 @@ serve(async (req) => {
       },
       target_channel: "push"
     };
+    // Compatibilidad adicional
+    (reqBody as any).include_external_user_ids = [telefono];
 
     const osResponse = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",

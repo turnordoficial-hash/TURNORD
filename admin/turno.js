@@ -2002,7 +2002,7 @@ async function guardarPago(event) {
     }
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('finalizar_turno_con_pago', {
-        p_turno_id: activeTurnIdForPayment,
+        p_turno_id: parseInt(activeTurnIdForPayment),
         p_negocio_id: negocioId,
         p_monto: monto,
         p_metodo_pago: metodoPago

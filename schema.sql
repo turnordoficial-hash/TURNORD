@@ -121,6 +121,11 @@ CREATE TABLE IF NOT EXISTS public.configuracion_negocio (
     UNIQUE (negocio_id)
 );
 
+-- Migración: Agregar columnas de tema si no existen para evitar error 400 en frontend
+ALTER TABLE public.configuracion_negocio
+  ADD COLUMN IF NOT EXISTS theme_primary TEXT DEFAULT '#C1121F',
+  ADD COLUMN IF NOT EXISTS theme_mode TEXT DEFAULT 'light';
+
 CREATE INDEX IF NOT EXISTS idx_configuracion_negocio_negocio_id ON public.configuracion_negocio(negocio_id);
 
 DROP TRIGGER IF EXISTS set_timestamp_updated_at_configuracion_negocio ON public.configuracion_negocio;

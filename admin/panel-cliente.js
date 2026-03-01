@@ -1,6 +1,17 @@
 import { supabase, ensureSupabase } from '../database.js';
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 
+// Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason && (
+      e.reason.name === 'UnknownError' || 
+      (e.reason.message && e.reason.message.includes('indexedDB'))
+  )) {
+      console.warn('Supressed OneSignal IndexedDB error to prevent crash.');
+      e.preventDefault();
+  }
+});
+
 const negocioId = 'barberia005';
 
 // Estado centralizado para la aplicación, eliminando variables globales.
@@ -1015,7 +1026,11 @@ function renderProfile(data) {
     const badge = document.getElementById('profile-level-badge');
     if (badge) badge.textContent = `${nivelInfo.icon} ${nivelInfo.nombre}`;
 
-    const avatarUrl = data.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
+    // Validación de URL de avatar para evitar errores de blob revocados
+    const avatarUrl = (data.avatar_url && !data.avatar_url.startsWith('blob:')) 
+        ? data.avatar_url 
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
+
     const navAvatar = document.getElementById('nav-avatar');
     if (navAvatar) navAvatar.src = avatarUrl;
     const profileAvatar = document.getElementById('profile-avatar');
