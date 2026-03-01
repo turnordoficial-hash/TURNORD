@@ -48,7 +48,15 @@
           appId: '85f98db3-968a-4580-bb02-8821411a6bee',
           serviceWorkerPath: 'sw.js'
         });
-        OneSignal.User.addAlias('negocio_id', 'barberia005');
+        const negocioId = 'barberia005';
+        OneSignal.User.addAlias('negocio_id', negocioId);
+        // Login con alias de administración para recibir alertas backend
+        const currentExternalId = OneSignal.User.externalId;
+        const desiredId = `admin_${negocioId}`;
+        if (currentExternalId && currentExternalId !== desiredId) {
+          await OneSignal.logout();
+        }
+        await OneSignal.login(desiredId);
       } catch (e) {
         // Evitar bloquear página si OneSignal falla
         return;

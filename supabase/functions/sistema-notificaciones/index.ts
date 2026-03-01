@@ -91,6 +91,25 @@ async function verificarRecordatoriosCitas(supabase: any, negocioId: string) {
       await supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id);
     }
   }
+
+  // Notificar al barbero/administración por nuevas citas (creadas recientemente)
+  const cincoMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
+  const { data: nuevas } = await supabase
+    .from("citas")
+    .select("id, barber_id, cliente_telefono, start_at, created_at")
+    .eq("negocio_id", negocioId)
+    .eq("notificado_barbero", false)
+    .gte("created_at", cincoMinAgo);
+  for (const c of (nuevas || [])) {
+    const hora = c.start_at ? new Date(c.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    // Enviar al alias por barbero si existe
+    if (c.barber_id) {
+      await enviarPush(String(`barber_${c.barber_id}`), "Nueva cita asignada 📅", `Tienes una cita a las ${hora}.`);
+    }
+    // Enviar a alias general de administración por negocio
+    await enviarPush(String(`admin_${negocioId}`), "Nueva cita programada 📅", `Se creó una cita a las ${hora}.`);
+    await supabase.from("citas").update({ notificado_barbero: true }).eq("id", c.id);
+  }
 }
 
 serve(async (req) => {
@@ -132,4 +151,3 @@ serve(async (req) => {
     });
   }
 });
-
