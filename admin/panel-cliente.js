@@ -15,8 +15,8 @@ const appState = {
   serviceDuration: 30,
 };
 
-// Obtener usuario desde la sesión como fuente de verdad, no desde localStorage.
-const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+const sb = await ensureSupabase();
+const { data: { user }, error: sessionError } = await sb.auth.getUser();
 
 if (sessionError || !user) {
     console.error('Authentication error or no user session:', sessionError?.message);

@@ -681,10 +681,15 @@
     import { ensureSupabase } from './database.js';
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({ 
-        appId: '85f98db3-968a-4580-bb02-8821411a6bee',
-        serviceWorkerPath: 'sw.js'
-      });
+      if (!window.isSecureContext || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
+      try {
+        await OneSignal.init({ 
+          appId: '85f98db3-968a-4580-bb02-8821411a6bee',
+          serviceWorkerPath: 'sw.js'
+        });
+      } catch (e) {
+        return;
+      }
       const negocioId = 'barberia005';
       OneSignal.User.addAlias('negocio_id', negocioId);
       const supabase = await ensureSupabase();
