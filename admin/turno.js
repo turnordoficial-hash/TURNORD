@@ -93,29 +93,54 @@ function getSiguienteTurno() {
 
 function iniciarTimerParaTurno(turno) {
     const timerEl = document.getElementById(`timer-${turno.id}`);
-    const getDuracion = (svc) => {
-        if (!svc || !serviciosCache) return null;
-        const key = String(svc).trim();
-        if (serviciosCache[key] != null) return Number(serviciosCache[key]);
-        // Búsqueda insensible a mayúsculas/minúsculas
-        const found = Object.keys(serviciosCache).find(k => k.trim().toLowerCase() === key.toLowerCase());
-        return found ? Number(serviciosCache[found]) : null;
-    };
-    const duracionMin = getDuracion(turno.servicio) ?? 30; // fallback 30 min
-
     if (!timerEl) return;
 
-    // Fallback robusto para start: si no hay started_at aún (race), usa created_at o ahora
-    let startTs = null;
-    if (turno.started_at) {
-        const d = new Date(turno.started_at);
-        if (!isNaN(d)) startTs = d.getTime();
+    // Función de ayuda para obtener la duración. Es más clara y maneja el caché.
+    const getDuracion = (svc) => {
+        if (!svc || !serviciosCache || Object.keys(serviciosCache).length === 0) {
+            return null; // No hay servicio o el caché está vacío
+        }
+        
+        const serviceName = String(svc).trim();
+        
+        // Búsqueda directa (sensible a mayúsculas)
+        if (serviciosCache[serviceName] !== undefined) {
+            return Number(serviciosCache[serviceName]);
+        }
+
+        // Búsqueda insensible a mayúsculas como fallback
+        const cacheKeys = Object.keys(serviciosCache);
+        const foundKey = cacheKeys.find(k => k.trim().toLowerCase() === serviceName.toLowerCase());
+        
+        return foundKey ? Number(serviciosCache[foundKey]) : null;
+    };
+
+    const duracionMin = getDuracion(turno.servicio);
+
+    // Si no se encuentra la duración, no se puede iniciar el timer.
+    // Esto es más seguro que usar un fallback de 30, que puede ser incorrecto.
+    if (duracionMin === null) {
+        console.warn(`No se encontró duración para el servicio "${turno.servicio}". El timer no se iniciará.`);
+        timerEl.textContent = '??:??';
+        return;
     }
-    if (!startTs && turno.created_at) {
-        const d2 = new Date(turno.created_at);
-        if (!isNaN(d2)) startTs = d2.getTime();
+    
+    // Un turno "En atención" DEBE tener un `started_at` válido.
+    // Si no lo tiene, es un error de datos y no debemos inventar un tiempo.
+    if (!turno.started_at) {
+        console.error(`El turno ${turno.id} está 'En atención' pero no tiene 'started_at'.`);
+        timerEl.textContent = 'Error';
+        return;
     }
-    if (!startTs) startTs = Date.now();
+
+    const startTs = new Date(turno.started_at).getTime();
+    
+    // Validar que la fecha de inicio es válida
+    if (isNaN(startTs)) {
+        console.error(`La fecha 'started_at' del turno ${turno.id} es inválida: ${turno.started_at}`);
+        timerEl.textContent = 'Error';
+        return;
+    }
 
     const endTime = startTs + duracionMin * 60 * 1000;
 
@@ -125,7 +150,12 @@ function iniciarTimerParaTurno(turno) {
 
         const minutos = Math.floor(restanteMs / 60000);
         const segundos = Math.floor((restanteMs % 60000) / 1000);
-        timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+        
+        // Asegurarse de que el elemento todavía existe en el DOM
+        const currentTimerEl = document.getElementById(`timer-${turno.id}`);
+        if (currentTimerEl) {
+            currentTimerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+        }
 
         if (restanteMs === 0) {
             if (activeTurnIntervals[turno.id]) {
@@ -135,13 +165,13 @@ function iniciarTimerParaTurno(turno) {
         }
     };
 
-    // Reset si ya había uno
+    // Limpiar cualquier intervalo anterior para este turno
     if (activeTurnIntervals[turno.id]) {
         clearInterval(activeTurnIntervals[turno.id]);
         delete activeTurnIntervals[turno.id];
     }
 
-    updateTimer();
+    updateTimer(); // Ejecutar inmediatamente
     activeTurnIntervals[turno.id] = setInterval(updateTimer, 1000);
 }
 
@@ -1437,7 +1467,7 @@ async function notificarAvanceFila() {
             } catch (eInvoke) {
                 console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
                 try {
-                    const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                    const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
                     const res = await fetch(url, {
                         method: 'POST',
                         headers: { 
@@ -1503,7 +1533,7 @@ async function notificarSiguienteEnCola() {
         } catch (eInvoke) {
             console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 
@@ -1576,7 +1606,7 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
         } catch (eInvoke) {
             console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 
@@ -1639,7 +1669,7 @@ async function notificarRecordatorioCita(cita) {
         } catch (eInvoke) {
             console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -1694,7 +1724,7 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
         } catch (eInvoke) {
             console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
             try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification';
+                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: {
