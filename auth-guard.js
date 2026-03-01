@@ -32,9 +32,15 @@ function getNegocioId() {
     }
 
     client.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-            redirectToLogin();
-        }
+      if (event === 'SIGNED_OUT') {
+        // Al cerrar sesión en Supabase, también cerramos sesión en OneSignal
+        // para evitar conflictos de identidad si otro usuario inicia sesión.
+        window.OneSignal = window.OneSignal || [];
+        window.OneSignal.push(function() {
+          OneSignal.logout();
+        });
+        redirectToLogin();
+      }
     });
     console.log('Acceso autorizado para:', session.user.email);
 })();

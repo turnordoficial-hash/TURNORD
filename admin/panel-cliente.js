@@ -790,6 +790,7 @@ function renderStructure() {
   if (perfilPanel) {
     const puntosHist = appState.profile?.puntos_totales_historicos || 0;    
     const nivelInfo = calcularNivelInfo(puntosHist);
+    const puntos = appState.profile?.puntos_actuales || 0;
 
     perfilPanel.innerHTML = `
           <div id="perfil-promo-container" class="mb-6"></div>

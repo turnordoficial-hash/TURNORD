@@ -763,14 +763,14 @@ $$;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id)
+  INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id, referido_por)
   VALUES (
     NEW.id,
     NEW.email,
     NEW.raw_user_meta_data->>'nombre',
     NEW.raw_user_meta_data->>'telefono',
     NEW.raw_user_meta_data->>'negocio_id',
-    (NEW.raw_user_meta_data->>'referido_por')::uuid
+    NULLIF(NEW.raw_user_meta_data->>'referido_por', '')::uuid
   );
   RETURN NEW;
 END;
@@ -883,6 +883,7 @@ CREATE TABLE IF NOT EXISTS public.promociones (
 );
 
 ALTER TABLE public.promociones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin manage promociones" ON public.promociones;
 CREATE POLICY "Admin manage promociones" ON public.promociones FOR ALL USING (true) WITH CHECK (true);
 
 -- Tabla Historial de Uso de Promociones (para métricas)
@@ -897,6 +898,7 @@ CREATE TABLE IF NOT EXISTS public.historial_uso_promociones (
 );
 
 ALTER TABLE public.historial_uso_promociones ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin view history" ON public.historial_uso_promociones;
 CREATE POLICY "Admin view history" ON public.historial_uso_promociones FOR SELECT USING (true);
 
 -- ==============================================================================
