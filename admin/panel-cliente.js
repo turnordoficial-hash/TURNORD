@@ -207,6 +207,40 @@ async function iniciarMotorMarketing() {
   marketingEngine.startRotation();
 }
 
+async function enviarCorreoConfirmacion(startISO, servicio, barberId) {
+  try {
+    const sb = await ensureSupabase();
+    const { data: cliente } = await sb
+      .from('clientes')
+      .select('email, nombre')
+      .eq('id', clienteId)
+      .maybeSingle();
+    if (!cliente?.email) return;
+    const hora = startISO ? new Date(startISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const html = `
+      <div style="font-family: sans-serif; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+        <div style="background-color: #C1121F; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">✅ Cita Confirmada</h1>
+        </div>
+        <div style="padding: 20px;">
+          <p style="font-size: 16px;">Hola <strong>${cliente.nombre || 'Cliente'}</strong>,</p>
+          <p style="font-size: 16px;">Tu cita ha sido confirmada${hora ? ` para las <strong>${hora}</strong>` : ''}.</p>
+          <p style="font-size: 16px;">Servicio: <strong>${servicio || 'Cita'}</strong></p>
+          <p style="font-size: 14px; color: #555;">Gracias por elegir JBarber.</p>
+        </div>
+      </div>`;
+    await sb.functions.invoke('send-email', {
+      body: {
+        to: cliente.email,
+        subject: '✅ Cita confirmada',
+        body: html
+      }
+    });
+  } catch (e) {
+    console.warn('No se pudo enviar correo de confirmación:', e.message || e);
+  }
+}
+
 function animateNumber(el, to, duration = 500) {
   if (!el) return;
   const from = parseInt(el.textContent || '0', 10) || 0;
@@ -864,6 +898,14 @@ function renderStructure() {
                 </div>
             </div>
 
+            <div class="mt-6 p-6 bg-white dark:bg-[#141416] rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+                <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Progreso hacia próxima recompensa</p>
+                <div class="w-full h-4 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden mb-2 mt-2">
+                    <div id="reward-progress-bar" class="h-full bg-[#C1121F] transition-all duration-1000 ease-out"></div>
+                </div>
+                <p id="reward-progress-text" class="text-xs text-center text-gray-500 dark:text-gray-400 font-medium"></p>
+            </div>
+
             <!-- Sistema de Referidos -->
             <div class="mt-8 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-800 relative overflow-hidden">
                 <div class="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl"></div>
@@ -1016,6 +1058,21 @@ function renderProfile(data) {
                 ${r.desbloqueado ? '<div class="mt-1 text-[10px] bg-white/20 px-2 py-0.5 rounded-full">Canjeable</div>' : ''}
             </div>
         `).join('');
+    }
+
+    const puntosAct = data.puntos_actuales || 0;
+    const siguiente = RECOMPENSAS.find(r => puntosAct < r.pts) || null;
+    const rewardBar = document.getElementById('reward-progress-bar');
+    const rewardText = document.getElementById('reward-progress-text');
+    if (rewardBar && rewardText) {
+        if (siguiente) {
+            const prog = Math.min(100, Math.floor((puntosAct / siguiente.pts) * 100));
+            rewardBar.style.width = `${prog}%`;
+            rewardText.textContent = `Te faltan ${siguiente.pts - puntosAct} puntos para ${siguiente.label}`;
+        } else {
+            rewardBar.style.width = '100%';
+            rewardText.textContent = 'Tienes recompensas canjeables';
+        }
     }
 }
 
