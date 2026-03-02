@@ -5,6 +5,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 type Turno = {
   id: number;
   telefono?: string;
+  nombre?: string;
   notificado_cerca?: boolean;
   notificado_siguiente?: boolean;
   notificado_llamado?: boolean;
@@ -20,6 +21,7 @@ type Cita = {
   recordatorio_15m?: boolean;
   recordatorio_barbero_10m?: boolean;
   notificado_barbero?: boolean;
+  clientes?: { nombre: string };
 };
 
 const corsHeaders = {
@@ -101,13 +103,15 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
     const posicion = index + 1;
 
     if (posicion <= 2 && !turno.notificado_cerca && turno.telefono) {
-      const { ok } = await enviarPush(turno.telefono, "Tu turno está cerca ✂️", "Quedan pocas personas antes de ti.");
+      const nombre = turno.nombre || "Cliente";
+      const { ok } = await enviarPush(turno.telefono, "Tu turno está cerca ✂️", `Hola ${nombre}, quedan pocas personas antes de ti.`);
       if (ok) {
         await supabase.from("turnos").update({ notificado_cerca: true }).eq("id", turno.id);
       }
     }
     if (posicion === 1 && !turno.notificado_siguiente && turno.telefono) {
-      const { ok } = await enviarPush(turno.telefono, "Prepárate, eres el siguiente 🔔", "Serás atendido en breve.");
+      const nombre = turno.nombre || "Cliente";
+      const { ok } = await enviarPush(turno.telefono, "Prepárate, eres el siguiente 🔔", `Hola ${nombre}, serás atendido en breve.`);
       if (ok) {
         await supabase.from("turnos").update({ notificado_siguiente: true }).eq("id", turno.id);
       }
@@ -116,7 +120,8 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
 
   const enAtencion = turnos.find((t: any) => t.estado === "En atención");
   if (enAtencion && !enAtencion.notificado_llamado && enAtencion.telefono) {
-    const { ok } = await enviarPush(enAtencion.telefono, "Es tu turno ahora", "Te estamos llamando. ¡Pasa!");
+    const nombre = enAtencion.nombre || "Cliente";
+    const { ok } = await enviarPush(enAtencion.telefono, "Es tu turno ahora", `¡Pasa ${nombre}! Te estamos llamando.`);
     if (ok) {
       await supabase.from("turnos").update({ notificado_llamado: true }).eq("id", enAtencion.id);
     }
@@ -129,10 +134,10 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
   // Rango de tiempo más preciso: desde ahora hasta 61 minutos en el futuro
   const unaHoraDespues = new Date(ahora.getTime() + 61 * 60 * 1000);
 
-  // ✅ 5. Filtro optimizado en consulta
+  // ✅ 5. Filtro optimizado en consulta con JOIN a clientes
   const { data: citas, error: citasError } = await supabase
     .from("citas")
-    .select<"*", Cita>("*")
+    .select<"*", Cita>("*, clientes(nombre)")
     .eq("negocio_id", negocioId)
     .in("estado", ["Programada", "Confirmada"])
     .gte("start_at", ahora.toISOString())
@@ -149,18 +154,19 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
     for (const cita of citas) {
       const startTs = new Date(cita.start_at).getTime();
       const diffMin = Math.floor((startTs - ahoraTs) / 60000);
+      const nombreCliente = cita.clientes?.nombre || "Cliente";
 
       if (diffMin <= 60 && diffMin > 15 && !cita.recordatorio_1h && cita.cliente_telefono) {
-        const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 1 hora 📅", "Te esperamos en JBarber.");
+        const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 1 hora 📅", `Hola ${nombreCliente}, te esperamos en JBarber.`);
         if (ok) await supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id);
       } else if (diffMin <= 15 && diffMin > 0 && !cita.recordatorio_15m && cita.cliente_telefono) {
-        const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", "Ya casi es tu momento.");
+        const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", `Ya casi es tu momento, ${nombreCliente}.`);
         if (ok) await supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id);
       }
       
       if (diffMin <= 10 && diffMin > 0 && !cita.recordatorio_barbero_10m && cita.barber_id) {
         const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        const { ok } = await enviarPush(String(`barber_${cita.barber_id}`), "Cita en 10 minutos 🔔", `Tienes una cita a las ${hora}.`);
+        const { ok } = await enviarPush(String(`barber_${cita.barber_id}`), "Cita en 10 minutos 🔔", `Tienes una cita con ${nombreCliente} a las ${hora}.`);
         if (ok) await supabase.from("citas").update({ recordatorio_barbero_10m: true }).eq("id", cita.id);
       }
     }
@@ -170,7 +176,7 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
   const cincoMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
   const { data: nuevas, error: nuevasError } = await supabase
     .from("citas")
-    .select<"*, barber_id, cliente_telefono, start_at, created_at", Cita>("id, barber_id, cliente_telefono, start_at, created_at")
+    .select<"*, clientes(nombre)", Cita>("id, barber_id, cliente_telefono, start_at, created_at, clientes(nombre)")
     .eq("negocio_id", negocioId)
     .eq("notificado_barbero", false)
     .gte("created_at", cincoMinAgo);
@@ -183,16 +189,17 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
   if (nuevas && nuevas.length > 0) {
     for (const c of nuevas) {
       const hora = c.start_at ? new Date(c.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      const nombreCliente = c.clientes?.nombre || "un cliente";
       
       // ✅ 4. Control de rate limit: Usar Promise.all para enviar en paralelo pero esperar a que terminen
       const notificaciones = [];
       
       // Notificación a admin
-      notificaciones.push(enviarPush(String(`admin_${negocioId}`), "Nueva cita programada 📅", `Se creó una cita a las ${hora}.`));
+      notificaciones.push(enviarPush(String(`admin_${negocioId}`), "Nueva cita programada 📅", `Cita para ${nombreCliente} a las ${hora}.`));
       
       // Notificación a barbero
       if (c.barber_id) {
-        notificaciones.push(enviarPush(String(`barber_${c.barber_id}`), "Nueva cita asignada 📅", `Tienes una cita a las ${hora}.`));
+        notificaciones.push(enviarPush(String(`barber_${c.barber_id}`), "Nueva cita asignada 📅", `Cita con ${nombreCliente} a las ${hora}.`));
       }
 
       const resultados = await Promise.all(notificaciones);
