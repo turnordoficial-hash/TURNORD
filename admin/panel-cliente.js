@@ -1,5 +1,6 @@
 import { supabase, ensureSupabase } from '../database.js';
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
+import { OneSignalManager } from './onesignal.js';
 
 // Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
 window.addEventListener('unhandledrejection', (e) => {
@@ -332,8 +333,8 @@ window.logout = async () => {
   
   // OneSignal logout
   if (window.OneSignal) {
-    window.OneSignal.logout();
-  }
+        await OneSignalManager.logout();
+    }
 
   await supabase.auth.signOut();
   window.location.href = 'login_cliente.html';
@@ -527,113 +528,120 @@ window.mostrarSeccion = (seccion) => {
 };
 
 async function init() {
-  if (!clienteId) {
-    window.location.href = 'login_cliente.html';
-    return;
-  }
-  renderStructure();
-  setupStaticEventHandlers();
-  setupThemeToggle();
-  updateBanner();
-
-  // 🔥 OPTIMIZACIÓN: Carga paralela de datos críticos (4x más rápido)
-  await Promise.all([
-    cargarConfigNegocio(),
-    cargarPerfil(), // Carga puntos y datos del cliente
-    cargarServicios(),
-    cargarBarberos()
-  ]);
-
-  // Configurar fecha por defecto a HOY
-  const dp = document.getElementById('date-picker');
-  if (dp) {
-    const today = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
-    dp.value = today;
-    dp.min = today;
-  }
-
-  await verificarCitaActiva();
-  iniciarMotorMarketing(); // Iniciar motor de marketing
-
-  switchTab('inicio'); // Vista de Inicio por defecto
-
-  document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
-  document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
-
-  // Evento Compartir Referido
-  document.getElementById('share-referral')?.addEventListener('click', () => {
-    const text = `¡Ven a JBarber! Agenda tu cita aquí: ${window.location.origin}/login_cliente.html y menciona mi número ${appState.profile?.telefono || ''} para ganar puntos.`;
-    if (navigator.share) {
-      navigator.share({
-        title: 'Referido JBarber',
-        text: text,
-        url: window.location.origin
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text);
-      showToast('Enlace de referido copiado al portapapeles', 'info');
+    if (!clienteId) {
+        window.location.href = 'login_cliente.html';
+        return;
     }
-  });
+    renderStructure();
+    setupStaticEventHandlers();
+    setupThemeToggle();
+    updateBanner();
 
-  const formPerfil = document.getElementById('form-perfil');
-  if (formPerfil) {
-    // Validación en tiempo real para el teléfono (Solo números y máx 10)
-    const telInput = document.getElementById('edit-telefono');
-    if (telInput) {
-        telInput.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+    // 🔥 OPTIMIZACIÓN: Carga paralela de datos críticos (4x más rápido)
+    await Promise.all([
+        cargarConfigNegocio(),
+        cargarPerfil(), // Carga puntos y datos del cliente
+        cargarServicios(),
+        cargarBarberos()
+    ]);
+    
+    window.OneSignalDeferred.push(async () => {
+        await OneSignalManager.init();
+        if (appState.profile && appState.profile.telefono) {
+            OneSignalManager.login(appState.profile.telefono);
+        }
+    });
+
+    // Configurar fecha por defecto a HOY
+    const dp = document.getElementById('date-picker');
+    if (dp) {
+        const today = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+        dp.value = today;
+        dp.min = today;
+    }
+
+    await verificarCitaActiva();
+    iniciarMotorMarketing(); // Iniciar motor de marketing
+
+    switchTab('inicio'); // Vista de Inicio por defecto
+
+    document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
+    document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
+
+    // Evento Compartir Referido
+    document.getElementById('share-referral')?.addEventListener('click', () => {
+        const text = `¡Ven a JBarber! Agenda tu cita aquí: ${window.location.origin}/login_cliente.html y menciona mi número ${appState.profile?.telefono || ''} para ganar puntos.`;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Referido JBarber',
+                text: text,
+                url: window.location.origin
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(text);
+            showToast('Enlace de referido copiado al portapapeles', 'info');
+        }
+    });
+
+    const formPerfil = document.getElementById('form-perfil');
+    if (formPerfil) {
+        // Validación en tiempo real para el teléfono (Solo números y máx 10)
+        const telInput = document.getElementById('edit-telefono');
+        if (telInput) {
+            telInput.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+            });
+        }
+
+        formPerfil.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('edit-nombre').value.trim();
+            const email = document.getElementById('edit-email').value.trim();
+            const telefono = document.getElementById('edit-telefono').value.trim();
+
+            // Validaciones estrictas
+            if (telefono.length !== 10) {
+                showToast('El teléfono debe tener exactamente 10 dígitos.', 'error');
+                return;
+            }
+            if (nombre.length < 3) {
+                showToast('El nombre es muy corto.', 'error');
+                return;
+            }
+
+            const { error } = await supabase.from('clientes').update({ nombre, email, telefono }).eq('id', clienteId);
+            if (error) showToast('Error al actualizar el perfil', 'error');
+            else {
+                showToast('Perfil actualizado con éxito', 'success');
+                cargarPerfil();
+            }
         });
     }
 
-    formPerfil.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const nombre = document.getElementById('edit-nombre').value.trim();
-      const email = document.getElementById('edit-email').value.trim();
-      const telefono = document.getElementById('edit-telefono').value.trim();
+    let refreshTimeout;
+    const safeRefresh = () => {
+        clearTimeout(refreshTimeout);
+        refreshTimeout = setTimeout(() => {
+            verificarCitaActiva();
+            checkPendingRatings();
+            cargarPerfil(); // 🔥 Recargar perfil para actualizar puntos visualmente
+        }, 500);
+    };
 
-      // Validaciones estrictas
-      if (telefono.length !== 10) {
-          showToast('El teléfono debe tener exactamente 10 dígitos.', 'error');
-          return;
-      }
-      if (nombre.length < 3) {
-          showToast('El nombre es muy corto.', 'error');
-          return;
-      }
+    supabase.channel('cliente-updates-v2')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` }, safeRefresh)
+        .subscribe();
 
-      const { error } = await supabase.from('clientes').update({ nombre, email, telefono }).eq('id', clienteId);
-      if (error) showToast('Error al actualizar el perfil', 'error');
-      else {
-        showToast('Perfil actualizado con éxito', 'success');
-        cargarPerfil();
-      }
-    });
-  }
+    registrarServiceWorker();
 
-  let refreshTimeout;
-  const safeRefresh = () => {
-    clearTimeout(refreshTimeout);
-    refreshTimeout = setTimeout(() => {
-      verificarCitaActiva();
-      checkPendingRatings();
-      cargarPerfil(); // 🔥 Recargar perfil para actualizar puntos visualmente
-    }, 500);
-  };
+    const loader = document.getElementById('loading-screen');
+    if (loader) {
+        loader.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => loader.remove(), 500);
+    }
 
-  supabase.channel('cliente-updates-v2')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` }, safeRefresh)
-    .subscribe();
-
-  registrarServiceWorker();
-
-  const loader = document.getElementById('loading-screen');
-  if (loader) {
-    loader.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => loader.remove(), 500);
-  }
-
-  checkPendingRatings();
-  setupPosterTilt();
+    checkPendingRatings();
+    setupPosterTilt();
 }
 
 function renderStructure() {
@@ -1161,6 +1169,9 @@ async function cargarPerfil() {
     setCache('PROFILE', data, 15); // Reducido a 15 min para asegurar frescura de puntos
     appState.profile = data;
     renderProfile(data);
+    if (data.telefono) {
+        OneSignalManager.login(data.telefono);
+    }
     iniciarMotorMarketing(); // Reiniciar motor con datos frescos
     cargarHistorialPuntos(); // Cargar historial
   }
@@ -2166,4 +2177,3 @@ document.addEventListener('DOMContentLoaded', () => {
     setupThemeToggle();
     setupStaticEventHandlers();
 });
-}

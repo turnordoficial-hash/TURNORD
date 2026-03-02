@@ -677,41 +677,6 @@
     </button>
   </div>
 
-  <script type="module">
-    import { ensureSupabase } from './database.js';
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      if (!window.isSecureContext || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
-      try {
-        await OneSignal.init({ 
-          appId: '85f98db3-968a-4580-bb02-8821411a6bee',
-          serviceWorkerPath: 'sw.js'
-        });
-      } catch (e) {
-        return;
-      }
-      const negocioId = 'barberia005';
-      OneSignal.User.addAlias('negocio_id', negocioId);
-      const supabase = await ensureSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('clientes').select('telefono, nombre').eq('id', user.id).maybeSingle();
-        const tel = profile?.telefono || user.user_metadata?.telefono;
-        const name = profile?.nombre || user.user_metadata?.nombre;
-        if (tel) {
-            // CORRECCIÓN: Asegurar identidad limpia para evitar conflictos 409
-            OneSignalDeferred.push(async function(OneSignal) {
-              const currentExternalId = OneSignal.User.externalId;
-              if (currentExternalId && currentExternalId !== String(tel)) {
-                await OneSignal.logout();
-              }
-              await OneSignal.login(String(tel));
-              if (name) OneSignal.User.addTag("nombre", name);
-            });
-        }
-      }
-    });
-  </script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script type="module" src="admin/panel-cliente.js"></script>
   <script>

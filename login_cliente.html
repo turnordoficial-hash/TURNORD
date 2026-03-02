@@ -357,14 +357,7 @@
             
             // OneSignal Login
             if (perfilFinal.telefono) {
-              OneSignalDeferred.push(async function(OneSignal) {
-                const currentExternalId = OneSignal.User.externalId;
-                if (currentExternalId && currentExternalId !== String(perfilFinal.telefono)) {
-                  await OneSignal.logout();
-                }
-                await OneSignal.login(String(perfilFinal.telefono));
-                if (perfilFinal.nombre) OneSignal.User.addTag("nombre", perfilFinal.nombre);
-              });
+              // La identificación de OneSignal se hará en panel_cliente.html
             }
         } else {
             // Fallback: Si no hay perfil en tabla clientes, guardamos al menos el ID de auth

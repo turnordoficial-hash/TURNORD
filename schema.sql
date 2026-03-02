@@ -976,31 +976,180 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Función para invocar la Edge Function
--- ⚠️ IMPORTANTE: Reemplaza TU_PROJECT_REF y TU_SERVICE_ROLE_KEY con tus valores reales antes de ejecutar
-CREATE OR REPLACE FUNCTION public.run_sistema_notificaciones()
+-- Nueva función consolidada para enviar notificaciones directamente desde PostgreSQL
+CREATE OR REPLACE FUNCTION public.enviar_notificaciones_onesignal()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  -- Variables de entorno (simuladas, configúralas en Supabase Vault)
+  v_onesignal_app_id TEXT := '85f98db3-968a-4580-bb02-8821411a6bee'; -- Reemplazar con Vault
+  v_onesignal_api_key TEXT := 'TU_ONE_SIGNAL_REST_API_KEY'; -- Reemplazar con Vault
+  
+  v_negocio RECORD;
+  v_turno RECORD;
+  v_cita RECORD;
+  v_nueva_cita RECORD;
+  v_posicion INTEGER;
+  v_ahora TIMESTAMPTZ := NOW();
+  v_una_hora_despues TIMESTAMPTZ := v_ahora + INTERVAL '61 minutes';
+  v_cinco_min_atras TIMESTAMPTZ := v_ahora - INTERVAL '5 minutes';
+  v_payload JSONB;
+  v_request_id BIGINT;
 BEGIN
-  PERFORM
-    net.http_post(
-      url := 'https://TU_PROJECT_REF.supabase.co/functions/v1/sistema-notificaciones',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer TU_SERVICE_ROLE_KEY'
-      ),
-      body := '{}'::jsonb
-    );
+  -- Iterar sobre cada negocio configurado
+  FOR v_negocio IN
+    SELECT DISTINCT negocio_id FROM public.configuracion_negocio
+  LOOP
+    -- 1. Lógica de Notificaciones de Turnos (antes en `verificarTurnos`)
+    v_posicion := 1;
+    FOR v_turno IN
+      SELECT id, telefono, notificado_cerca, notificado_siguiente
+      FROM public.turnos
+      WHERE negocio_id = v_negocio.negocio_id
+        AND fecha = CURRENT_DATE
+        AND estado = 'En espera'
+      ORDER BY orden ASC, created_at ASC
+    LOOP
+      IF v_posicion <= 2 AND NOT v_turno.notificado_cerca AND v_turno.telefono IS NOT NULL THEN
+        v_payload := jsonb_build_object(
+          'app_id', v_onesignal_app_id,
+          'headings', jsonb_build_object('en', 'Tu turno está cerca ✂️'),
+          'contents', jsonb_build_object('en', 'Quedan pocas personas antes de ti.'),
+          'url', '/panel_cliente.html',
+          'include_aliases', jsonb_build_object('external_id', jsonb_build_array(v_turno.telefono)),
+          'target_channel', 'push'
+        );
+        
+        SELECT net.http_post(
+          url := 'https://api.onesignal.com/notifications',
+          headers := jsonb_build_object(
+            'Authorization', 'Basic ' || v_onesignal_api_key,
+            'Content-Type', 'application/json'
+          ),
+          body := v_payload
+        ) INTO v_request_id;
+        
+        UPDATE public.turnos SET notificado_cerca = TRUE WHERE id = v_turno.id;
+      END IF;
+
+      IF v_posicion = 1 AND NOT v_turno.notificado_siguiente AND v_turno.telefono IS NOT NULL THEN
+        v_payload := jsonb_build_object(
+          'app_id', v_onesignal_app_id,
+          'headings', jsonb_build_object('en', 'Prepárate, eres el siguiente 🔔'),
+          'contents', jsonb_build_object('en', 'Serás atendido en breve.'),
+          'url', '/panel_cliente.html',
+          'include_aliases', jsonb_build_object('external_id', jsonb_build_array(v_turno.telefono)),
+          'target_channel', 'push'
+        );
+        
+        SELECT net.http_post(
+          url := 'https://api.onesignal.com/notifications',
+          headers := jsonb_build_object(
+            'Authorization', 'Basic ' || v_onesignal_api_key,
+            'Content-Type', 'application/json'
+          ),
+          body := v_payload
+        ) INTO v_request_id;
+        
+        UPDATE public.turnos SET notificado_siguiente = TRUE WHERE id = v_turno.id;
+      END IF;
+      
+      v_posicion := v_posicion + 1;
+    END LOOP;
+
+    -- Notificar al que está "En atención"
+    SELECT * INTO v_turno FROM public.turnos 
+    WHERE negocio_id = v_negocio.negocio_id AND fecha = CURRENT_DATE AND estado = 'En atención'
+    LIMIT 1;
+
+    IF FOUND AND NOT v_turno.notificado_llamado AND v_turno.telefono IS NOT NULL THEN
+      v_payload := jsonb_build_object(
+          'app_id', v_onesignal_app_id,
+          'headings', jsonb_build_object('en', 'Es tu turno ahora'),
+          'contents', jsonb_build_object('en', 'Te estamos llamando. ¡Pasa!'),
+          'url', '/panel_cliente.html',
+          'include_aliases', jsonb_build_object('external_id', jsonb_build_array(v_turno.telefono)),
+          'target_channel', 'push'
+        );
+        
+      SELECT net.http_post(
+        url := 'https://api.onesignal.com/notifications',
+        headers := jsonb_build_object(
+          'Authorization', 'Basic ' || v_onesignal_api_key,
+          'Content-Type', 'application/json'
+        ),
+        body := v_payload
+      ) INTO v_request_id;
+      
+      UPDATE public.turnos SET notificado_llamado = TRUE WHERE id = v_turno.id;
+    END IF;
+
+    -- 2. Lógica de Recordatorios de Citas (antes en `verificarRecordatoriosCitas`)
+    FOR v_cita IN
+      SELECT id, cliente_telefono, barber_id, start_at, recordatorio_1h, recordatorio_15m, recordatorio_barbero_10m
+      FROM public.citas
+      WHERE negocio_id = v_negocio.negocio_id
+        AND estado IN ('Programada', 'Confirmada')
+        AND start_at BETWEEN v_ahora AND v_una_hora_despues
+    LOOP
+      DECLARE
+        v_diff_min INTEGER := EXTRACT(EPOCH FROM (v_cita.start_at - v_ahora)) / 60;
+      BEGIN
+        IF v_diff_min <= 60 AND v_diff_min > 15 AND NOT v_cita.recordatorio_1h AND v_cita.cliente_telefono IS NOT NULL THEN
+          v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', 'Tu cita es en 1 hora 📅'), 'contents', jsonb_build_object('en', 'Te esperamos en JBarber.'), 'include_aliases', jsonb_build_object('external_id', jsonb_build_array(v_cita.cliente_telefono)));
+          SELECT net.http_post(url := 'https://api.onesignal.com/notifications', headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'), body := v_payload) INTO v_request_id;
+          UPDATE public.citas SET recordatorio_1h = TRUE WHERE id = v_cita.id;
+        
+        ELSIF v_diff_min <= 15 AND v_diff_min > 0 AND NOT v_cita.recordatorio_15m AND v_cita.cliente_telefono IS NOT NULL THEN
+          v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', 'Tu cita es en 15 minutos 🔔'), 'contents', jsonb_build_object('en', 'Ya casi es tu momento.'), 'include_aliases', jsonb_build_object('external_id', jsonb_build_array(v_cita.cliente_telefono)));
+          SELECT net.http_post(url := 'https://api.onesignal.com/notifications', headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'), body := v_payload) INTO v_request_id;
+          UPDATE public.citas SET recordatorio_15m = TRUE WHERE id = v_cita.id;
+        END IF;
+
+        IF v_diff_min <= 10 AND v_diff_min > 0 AND NOT v_cita.recordatorio_barbero_10m AND v_cita.barber_id IS NOT NULL THEN
+          v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', 'Cita en 10 minutos 🔔'), 'contents', jsonb_build_object('en', 'Tienes una cita a las ' || to_char(v_cita.start_at, 'HH24:MI')), 'include_aliases', jsonb_build_object('external_id', jsonb_build_array('barber_' || v_cita.barber_id)));
+          SELECT net.http_post(url := 'https://api.onesignal.com/notifications', headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'), body := v_payload) INTO v_request_id;
+          UPDATE public.citas SET recordatorio_barbero_10m = TRUE WHERE id = v_cita.id;
+        END IF;
+      END;
+    END LOOP;
+
+    -- 3. Notificar sobre nuevas citas
+    FOR v_nueva_cita IN
+      SELECT id, barber_id, start_at
+      FROM public.citas
+      WHERE negocio_id = v_negocio.negocio_id
+        AND notificado_barbero = FALSE
+        AND created_at >= v_cinco_min_atras
+    LOOP
+      -- Notificación a admin
+      v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', 'Nueva cita programada 📅'), 'contents', jsonb_build_object('en', 'Se creó una cita a las ' || to_char(v_nueva_cita.start_at, 'HH24:MI')), 'include_aliases', jsonb_build_object('external_id', jsonb_build_array('admin_' || v_negocio.negocio_id)));
+      SELECT net.http_post(url := 'https://api.onesignal.com/notifications', headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'), body := v_payload) INTO v_request_id;
+
+      -- Notificación a barbero
+      IF v_nueva_cita.barber_id IS NOT NULL THEN
+        v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', 'Nueva cita asignada 📅'), 'contents', jsonb_build_object('en', 'Tienes una cita a las ' || to_char(v_nueva_cita.start_at, 'HH24:MI')), 'include_aliases', jsonb_build_object('external_id', jsonb_build_array('barber_' || v_nueva_cita.barber_id)));
+        SELECT net.http_post(url := 'https://api.onesignal.com/notifications', headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'), body := v_payload) INTO v_request_id;
+      END IF;
+      
+      UPDATE public.citas SET notificado_barbero = TRUE WHERE id = v_nueva_cita.id;
+    END LOOP;
+
+  END LOOP;
 END;
 $$;
 
--- Programar el job para que corra cada minuto
+-- Programar el job para que corra cada minuto, llamando a la nueva función
 SELECT cron.schedule(
-  'sistema-notificaciones-cada-minuto',
+  'enviar-notificaciones-cada-minuto',
   '* * * * *',
-  $$ SELECT public.run_sistema_notificaciones(); $$
+  $$ SELECT public.enviar_notificaciones_onesignal(); $$
 );
+
+-- Eliminar la tarea de cron antigua si existe
+SELECT cron.unschedule('sistema-notificaciones-cada-minuto');
+
 
 COMMIT;
