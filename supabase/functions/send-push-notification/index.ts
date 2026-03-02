@@ -13,7 +13,8 @@ const corsHeaders = {
   "Vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
 };
 
-const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID") || "85f98db3-968a-4580-bb02-8821411a6bee";
+const ONESIGNAL_APP_ID = Deno.env.get("ONE_SIGNAL_APP_ID");
+const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY");
 
 serve(async (req) => {
   // 1. CORS Pre-flight: Manejar OPTIONS de inmediato sin leer nada más
@@ -23,14 +24,27 @@ serve(async (req) => {
 
   // 2. Health check / Pruebas
   if (req.method === "GET") {
-    return new Response(JSON.stringify({ ok: true, status: "ready", version: "2.0" }), { 
+    return new Response(JSON.stringify({ ok: true, status: "ready", version: "2.1" }), { 
       headers: { "Content-Type": "application/json", ...corsHeaders } 
     });
   }
 
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Método no permitido" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
-    // 3. Lectura segura del cuerpo como texto
-    // NUNCA usar req.json() directamente para evitar SyntaxError en cuerpos vacíos
+    const ct = req.headers.get("content-type") || "";
+    if (!ct.toLowerCase().includes("application/json")) {
+      return new Response(JSON.stringify({ error: "Content-Type debe ser application/json" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     const bodyText = await req.text();
     
     if (!bodyText || bodyText.trim().length === 0) {
@@ -41,7 +55,6 @@ serve(async (req) => {
       });
     }
 
-    // 4. Parseo manual de JSON
     let parsed;
     try {
       parsed = JSON.parse(bodyText);
@@ -54,36 +67,32 @@ serve(async (req) => {
     }
 
     const telefono = parsed?.telefono?.toString()?.trim();
-    const negocio_id = parsed?.negocio_id?.toString()?.trim();
-    const title = parsed?.title || "💈 JBarber";
-    const body = parsed?.body || "Tienes una actualización.";
+    const nombre = parsed?.nombre?.toString()?.trim() || "";
     const clickUrl = parsed?.url || "/panel_cliente.html";
+    const rol = (parsed?.rol || "cliente").toString().toLowerCase();
+    const baseTitle = parsed?.title 
+      || (rol === "barbero" ? "Nueva cita asignada 💈" : "Tu cita está confirmada ✂️");
+    const title = nombre ? `${nombre}, ${baseTitle}` : baseTitle;
+    const body = parsed?.body || "Tienes una actualización importante.";
 
     if (!telefono) {
       return new Response(JSON.stringify({ error: "telefono es requerido" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY");
-    if (!ONE_SIGNAL_KEY) {
-      console.error("Falta ONE_SIGNAL_REST_API_KEY en variables de entorno");
-      return new Response(JSON.stringify({ error: "Configuración de servidor incompleta" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    if (!ONE_SIGNAL_KEY || !ONESIGNAL_APP_ID) {
+      return new Response(JSON.stringify({ error: "Variables de entorno faltantes" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    // 5. Preparar llamada a OneSignal
     const reqBody: Record<string, unknown> = {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: body },
       url: clickUrl,
-      chrome_web_icon: "jbarber/jjj.png",
-      chrome_web_badge: "imegenlogin/favicon-32x32.png",
       include_aliases: {
         external_id: [telefono]
       },
       target_channel: "push"
     };
-    // Compatibilidad adicional
-    (reqBody as any).include_external_user_ids = [telefono];
 
     const osResponse = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",

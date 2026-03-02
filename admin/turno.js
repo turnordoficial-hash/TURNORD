@@ -1,5 +1,5 @@
 import { supabase, ensureSupabase } from '../database.js';
-import { sumarPuntosCliente, calcularPuntosGanados, RECOMPENSAS } from './promociones.js';
+import { RECOMPENSAS } from './promociones.js';
 
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
@@ -97,22 +97,17 @@ function iniciarTimerParaTurno(turno) {
 
     // Función de ayuda para obtener la duración. Es más clara y maneja el caché.
     const getDuracion = (svc) => {
-        if (!svc || !serviciosCache || Object.keys(serviciosCache).length === 0) {
-            return null; // No hay servicio o el caché está vacío
-        }
+        if (!svc) return 30; // Valor por defecto seguro
         
-        const serviceName = String(svc).trim();
+        const key = String(svc).trim();
         
-        // Búsqueda directa (sensible a mayúsculas)
-        if (serviciosCache[serviceName] !== undefined) {
-            return Number(serviciosCache[serviceName]);
-        }
-
-        // Búsqueda insensible a mayúsculas como fallback
-        const cacheKeys = Object.keys(serviciosCache);
-        const foundKey = cacheKeys.find(k => k.trim().toLowerCase() === serviceName.toLowerCase());
+        // 1. Búsqueda exacta
+        if (serviciosCache[key] !== undefined) return Number(serviciosCache[key]);
         
-        return foundKey ? Number(serviciosCache[foundKey]) : null;
+        // 2. Búsqueda insensible a mayúsculas (Robustez)
+        if (serviciosCache[key.toLowerCase()] !== undefined) return Number(serviciosCache[key.toLowerCase()]);
+        
+        return 30; // Fallback si no se encuentra el servicio
     };
 
     const duracionMin = getDuracion(turno.servicio);
@@ -226,9 +221,13 @@ async function cargarServicios() {
         if (error) throw error;
         serviciosCache = {};
         preciosCache = {};
-        (data || []).forEach(s => { 
-            serviciosCache[s.nombre] = s.duracion_min; 
-            preciosCache[s.nombre] = s.precio;
+        (data || []).forEach(s => {
+            const key = s.nombre.trim();
+            serviciosCache[key] = s.duracion_min; 
+            preciosCache[key] = s.precio;
+            // Guardar también en minúsculas para búsquedas robustas
+            serviciosCache[key.toLowerCase()] = s.duracion_min;
+            preciosCache[key.toLowerCase()] = s.precio;
         });
         const sel = document.getElementById('servicio');
         if (sel && data && data.length) {
@@ -696,6 +695,11 @@ async function tomarTurno(event) {
         return;
     }
     const servicio = document.getElementById('servicio').value;
+    if (!servicio) {
+        mostrarNotificacion('Por favor seleccione un servicio.', 'error');
+        isSubmittingTurn = false;
+        return;
+    }
     
     // --- MEJORA DE LÓGICA: Verificar si hay tiempo antes de la próxima cita ---
     // Esto evita que un turno manual se tome justo antes de una cita, creando retrasos.
@@ -1070,14 +1074,15 @@ async function cargarTurnos() {
 
     if (enAtencion.length > 0) {
         // Hay turno activo: Ocultar espera, mostrar finalizar
-        if (containerEspera) containerEspera.style.display = 'none';
+        // MODIFICADO: Mantener visible la lista de espera para gestión continua
+        // if (containerEspera) containerEspera.style.display = 'block'; 
         if (btnFinalizar) {
             btnFinalizar.classList.remove('hidden');
             btnFinalizar.onclick = () => abrirModalPago(enAtencion[0].id); // Asume single-flow por ahora
         }
         if (btnAtender) btnAtender.classList.add('hidden');
     } else {
-        if (containerEspera) containerEspera.style.display = 'block';
+        // if (containerEspera) containerEspera.style.display = 'block';
         if (btnFinalizar) btnFinalizar.classList.add('hidden');
         if (btnAtender) btnAtender.classList.remove('hidden');
     }
@@ -1427,8 +1432,8 @@ function cerrarModalPago() {
  */
 async function notificarAvanceFila() {
     if (!Array.isArray(dataRender)) return;
-    // Optimización: Solo notificar a los primeros 5 de la fila para evitar rate limits y costos
-    const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 5);
+    // Optimización: Solo notificar a los primeros 2 de la fila para evitar spam y costos
+    const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 2);
     
     if (turnosEnEspera.length === 0) {
         console.log('No hay turnos en espera para notificar avance de fila');
@@ -1450,7 +1455,7 @@ async function notificarAvanceFila() {
             } else if (posicionEnFila === 2) {
                 mensaje = '¡Prepárate! Queda 1 persona antes que tú. Dirígete al local.';
             } else {
-                mensaje = `La fila avanzó. Quedan ${turnosDelante} personas antes que tú. Estamos más cerca de tu turno.`;
+                return; // No notificar a posiciones 3+ para evitar spam
             }
 
             console.log(`Notificando avance a ${turno.nombre} (${turno.telefono})...`);
@@ -2386,128 +2391,3 @@ async function handleDoubleClickDelete(event) {
         }
     });
 }
-
-// --- AUTOMATIZACIÓN DE CORREOS Y MARKETING (Value Prop: Fidelización Automática) ---
-
-function initEmailAutomation() {
-    console.log('📧 Automatización de correos delegada al backend.');
-    // La lógica de setInterval se ha eliminado para evitar ejecución en frontend.
-}
-
-async function verificarRecordatoriosCitas() {
-    if (!negocioId) return;
-    const ahora = new Date();
-    
-    // Buscar citas programadas para las próximas 2 horas
-    const inicio = new Date(ahora.getTime() - 5 * 60000).toISOString(); // -5 min buffer
-    const fin = new Date(ahora.getTime() + 120 * 60000).toISOString(); // +2 horas
-
-    const { data: citas, error } = await supabase
-        .from('citas')
-        .select('*, barberos(nombre)')
-        .eq('negocio_id', negocioId)
-        .eq('estado', 'Programada')
-        .gte('start_at', inicio)
-        .lte('start_at', fin);
-
-    if (error || !citas) return;
-
-    for (const cita of citas) {
-        const start = new Date(cita.start_at);
-        const diffMin = (start - ahora) / 60000;
-        let tipoAviso = null;
-        let colUpdate = null;
-
-        // Lógica de intervalos (1h, 30m, 15m)
-        if (diffMin >= 55 && diffMin <= 65 && !cita.reminder_1h_sent) {
-            tipoAviso = '1 hora';
-            colUpdate = { reminder_1h_sent: true };
-        } else if (diffMin >= 25 && diffMin <= 35 && !cita.reminder_30m_sent) {
-            tipoAviso = '30 minutos';
-            colUpdate = { reminder_30m_sent: true };
-        } else if (diffMin >= 10 && diffMin <= 20 && !cita.reminder_15m_sent) {
-            tipoAviso = '15 minutos';
-            colUpdate = { reminder_15m_sent: true };
-        }
-
-        if (tipoAviso && cita.cliente_telefono) {
-            // Obtener email del cliente
-            const { data: cliente } = await supabase
-                .from('clientes')
-                .select('email, nombre')
-                .eq('negocio_id', negocioId)
-                .eq('telefono', cita.cliente_telefono)
-                .maybeSingle();
-
-            if (cliente && cliente.email) {
-                console.log(`📧 Enviando recordatorio de ${tipoAviso} a ${cliente.email}`);
-                
-                await enviarCorreoSistema({
-                    to: cliente.email,
-                    subject: `⏰ Recordatorio: Tu cita es en ${tipoAviso}`,
-                    template: 'cita_recordatorio',
-                    data: {
-                        nombre_cliente: cliente.nombre,
-                        hora_cita: start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                        barbero: cita.barberos?.nombre || 'Barbero',
-                        tiempo_restante: tipoAviso
-                    }
-                });
-
-                // Actualizar flag en DB para no repetir
-                await supabase.from('citas').update(colUpdate).eq('id', cita.id);
-            }
-        }
-    }
-}
-
-async function verificarClientesInactivos() {
-    if (!negocioId) return;
-    const hace2Semanas = new Date();
-    hace2Semanas.setDate(hace2Semanas.getDate() - 14);
-    
-    // Buscar clientes inactivos que no hayan recibido correo recientemente
-    const { data: clientes, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('negocio_id', negocioId)
-        .lt('ultima_visita', hace2Semanas.toISOString())
-        .or(`last_marketing_email_sent_at.is.null,last_marketing_email_sent_at.lt.${hace2Semanas.toISOString()}`)
-        .limit(10); // Lote pequeño para no saturar
-
-    if (error || !clientes) return;
-
-    for (const cliente of clientes) {
-        if (cliente.email) {
-            console.log(`📧 Enviando correo de reactivación a ${cliente.email}`);
-            
-            await enviarCorreoSistema({
-                to: cliente.email,
-                subject: '💈 ¡Te extrañamos en JBarber!',
-                template: 'marketing_inactividad',
-                data: {
-                    nombre_cliente: cliente.nombre,
-                    dias_ausente: Math.floor((Date.now() - new Date(cliente.ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-                }
-            });
-
-            // Actualizar timestamp
-            await supabase.from('clientes').update({ last_marketing_email_sent_at: new Date().toISOString() }).eq('id', cliente.id);
-        }
-    }
-}
-
-async function enviarCorreoSistema(payload) {
-    try {
-        // Invocar Edge Function 'send-email'
-        const { error } = await supabase.functions.invoke('send-email', {
-            body: { ...payload, negocio_id: negocioId }
-        });
-        if (error) console.error('Error enviando correo:', error);
-    } catch (e) {
-        console.error('Excepción enviando correo:', e);
-    }
-}
-
-// Iniciar automatización
-document.addEventListener('DOMContentLoaded', initEmailAutomation);

@@ -19,7 +19,6 @@ const appState = {
   user: null,
   profile: null,
   barbers: [],
-  hasActiveTurn: false,
   hasActiveAppointment: false,
   selectedTimeSlot: null,
   suggestedTime: null,
@@ -219,22 +218,6 @@ async function iniciarMotorMarketing() {
   marketingEngine.startRotation();
 }
 
-async function updateServiceCount() {
-  try {
-    const telefono = appState.profile?.telefono || appState.user?.user_metadata?.telefono;
-    if (!telefono) return;
-    const { count, error } = await supabase
-      .from('turnos')
-      .select('id', { count: 'exact', head: true })
-      .eq('negocio_id', negocioId)
-      .eq('telefono', telefono)
-      .eq('estado', 'Atendido');
-    if (!error && typeof count === 'number') {
-      const el = document.getElementById('profile-services-count');
-      if (el) el.textContent = String(count);
-    }
-  } catch (_) {}
-}
 async function enviarCorreoConfirmacion(startISO, servicio, barberId) {
   try {
     const sb = await ensureSupabase();
@@ -583,7 +566,7 @@ async function init() {
 
   // Evento Compartir Referido
   document.getElementById('share-referral')?.addEventListener('click', () => {
-    const text = `¡Ven a JBarber! Agenda tu turno aquí: ${window.location.origin}/login_cliente.html y menciona mi número ${appState.profile?.telefono || ''} para ganar puntos.`;
+    const text = `¡Ven a JBarber! Agenda tu cita aquí: ${window.location.origin}/login_cliente.html y menciona mi número ${appState.profile?.telefono || ''} para ganar puntos.`;
     if (navigator.share) {
       navigator.share({
         title: 'Referido JBarber',
@@ -616,8 +599,6 @@ async function init() {
   const safeRefresh = () => {
     clearTimeout(refreshTimeout);
     refreshTimeout = setTimeout(() => {
-      // actualizarEstadoFila();
-      // verificarTurnoActivo();
       verificarCitaActiva();
       checkPendingRatings();
       cargarPerfil(); // 🔥 Recargar perfil para actualizar puntos visualmente
@@ -625,7 +606,7 @@ async function init() {
   };
 
   supabase.channel('cliente-updates-v2')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `negocio_id=eq.${negocioId}` }, safeRefresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'citas', filter: `negocio_id=eq.${negocioId}` }, safeRefresh)
     .subscribe();
 
   registrarServiceWorker();
@@ -638,16 +619,13 @@ async function init() {
 
   checkPendingRatings();
   setupPosterTilt();
-  
-  // Auto-actualizar minutos cada 30 segundos
-  // setInterval(() => { actualizarEstadoFila(); }, 30000);
 }
 
 function renderStructure() {
   const statusContainer = document.getElementById('inicio-status-container');
   if (statusContainer) {
     statusContainer.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4">
           <!-- Card Estado (Ultra Design) -->
           <div onclick="switchTab('cita')" class="cursor-pointer relative overflow-hidden rounded-3xl bg-white dark:bg-gradient-to-br dark:from-[#111] dark:to-black border border-gray-200 dark:border-white/10 shadow-xl dark:shadow-2xl group hover:scale-[1.02] transition-transform">
               <div class="absolute top-0 right-0 w-32 h-32 bg-[#C1121F]/10 dark:bg-[#C1121F]/20 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-[#C1121F]/20 dark:group-hover:bg-[#C1121F]/30"></div>
@@ -666,34 +644,6 @@ function renderStructure() {
                   <div id="dash-card-1">
                       <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight">Sin cita</span>
                       <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">Reserva tu espacio</p>
-                  </div>
-              </div>
-          </div>
-
-          <!-- Card Estimado (Ultra Design) -->
-          <div class="relative overflow-hidden rounded-3xl bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 shadow-xl group">
-              <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-              <div class="absolute top-0 right-0 w-20 h-20 bg-yellow-500/20 rounded-full blur-2xl transition-all group-hover:scale-150"></div>
-              
-              <div class="relative z-10 p-6">
-                  <div class="flex justify-between items-start mb-4">
-                      <div class="p-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-black dark:text-white">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      </div>
-                      <span class="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-[10px] font-bold uppercase tracking-widest">
-                          Tiempo
-                      </span>
-                  </div>
-                  
-                  <div id="dash-card-2">
-                       <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight">-- min</span>
-                       <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">Tiempo estimado</p>
-                       <div class="mt-3">
-                          <div class="w-full h-2.5 rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
-                             <div id="turno-progress" class="h-full bg-[#C1121F] rounded-full" style="width:40%;"></div>
-                          </div>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Progreso de tu turno</p>
-                       </div>
                   </div>
               </div>
           </div>
@@ -984,35 +934,6 @@ function registrarServiceWorker() {
     .catch(err => console.warn('SW no registrado:', err.message || err));
 }
 
- 
-
- 
-
- 
-
- 
-
-function calcularTiempoEsperaReal(turnosEnEspera, turnosEnAtencion, activeBarbers) {
-  const barberos = Math.max(1, activeBarbers);
-  let tiempoTotalMinutos = 0;
-
-  (turnosEnAtencion || []).forEach(t => {
-    const duracion = serviciosCache[t.servicio] || 30;
-    const inicio = t.started_at ? new Date(t.started_at) : new Date();
-    const transcurrido = (Date.now() - inicio.getTime()) / 60000;
-    const restante = Math.max(0, duracion - transcurrido);
-    tiempoTotalMinutos += restante;
-  });
-
-  (turnosEnEspera || []).forEach(t => {
-    const duracion = serviciosCache[t.servicio] || 30;
-    tiempoTotalMinutos += duracion;
-  });
-
-  const tiempoEstimado = tiempoTotalMinutos / barberos;
-  return Math.ceil(tiempoEstimado);
-}
-
 function renderProfile(data) {
     const navName = document.getElementById('nav-name');
     if (navName) navName.textContent = data.nombre.split(' ')[0];
@@ -1203,7 +1124,6 @@ async function cargarPerfil() {
     renderProfile(data);
     iniciarMotorMarketing(); // Reiniciar motor con datos frescos
     cargarHistorialPuntos(); // Cargar historial
-    updateServiceCount(); // Conteo real de servicios atendidos
   }
 }
 
@@ -1282,270 +1202,6 @@ async function cargarConfigNegocio() {
   }
 }
 
-async function actualizarEstadoFila() {
-  const hoy = new Date().toISOString().slice(0, 10);
-
-  const [turnosRes, barberosRes] = await Promise.all([
-      supabase.from('turnos')
-        .select('id, estado, servicio, started_at, created_at')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .in('estado', ['En espera', 'En atención']),
-      supabase.from('barberos')
-        .select('*', { count: 'exact', head: true })
-        .eq('negocio_id', negocioId)
-        .eq('activo', true)
-  ]);
-
-  const turnosActivos = turnosRes.data || [];
-  const enEspera = turnosActivos.filter(t => t.estado === 'En espera');
-  const enAtencion = turnosActivos.filter(t => t.estado === 'En atención');
-  const activeBarbers = barberosRes.count || 1;
-
-  const ba = document.getElementById('barberos-activos');
-  if (ba) ba.textContent = activeBarbers;
-  const baCita = document.getElementById('barberos-activos-cita');
-  if (baCita) baCita.textContent = activeBarbers;
-
-  const personasEnCola = enEspera.length;
-
-  const pd = document.getElementById('personas-delante');
-  if (pd) animateNumber(pd, personasEnCola);
-  const pdCita = document.getElementById('personas-delante-cita');
-  if (pdCita) animateNumber(pdCita, personasEnCola);
-
-  if (!appState.hasActiveTurn && !appState.hasActiveAppointment) {
-    if (personasEnCola === 0 && enAtencion.length < activeBarbers) {
-      updateBanner('available');
-    } else {
-      updateBanner('default');
-    }
-  }
-
-  const tiempoEstimado = calcularTiempoEsperaReal(enEspera, enAtencion, activeBarbers);
-
-  let tiempoTexto = '';
-  let estado = 'Fluida';
-  let badgeClass = 'bg-green-100 text-green-700';
-  let demandaTexto = '🟢 Baja';
-
-  if (tiempoEstimado <= 0) {
-    tiempoTexto = 'Atención inmediata';
-    estado = 'Libre';
-  } else {
-    tiempoTexto = `${tiempoEstimado} min`;
-    if (tiempoEstimado > 20) {
-      estado = 'Media';
-      badgeClass = 'bg-yellow-100 text-yellow-700';
-      demandaTexto = '🟡 Media';
-    }
-    if (tiempoEstimado > 45) {
-      estado = 'Alta';
-      badgeClass = 'bg-red-100 text-red-700';
-      demandaTexto = '🔴 Alta';
-    }
-  }
-
-  const te = document.getElementById('tiempo-espera');
-  if (te) te.textContent = tiempoTexto;
-  const teCita = document.getElementById('tiempo-espera-cita');
-  if (teCita) teCita.textContent = tiempoTexto;
-
-  const badge = document.getElementById('estado-barberia-badge');
-  if (badge) {
-    badge.textContent = estado;
-    badge.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
-  }
-
-  const dashCard1 = document.getElementById('dash-card-1');
-  if (dashCard1 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
-    dashCard1.innerHTML = `
-             <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">Sin cita</span>
-             <p class="text-gray-400 text-sm mt-1 font-medium">Reserva tu espacio</p>
-          `;
-  }
-
-  const dashCard2 = document.getElementById('dash-card-2');
-  if (dashCard2 && !appState.hasActiveTurn && !appState.hasActiveAppointment) {
-    const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    let detalleAtencion = '';
-    if (enAtencion.length > 0) {
-        const citasCount = enAtencion.filter(t => t.servicio === 'Cita Programada').length;
-        const turnosCount = enAtencion.length - citasCount;
-        let partes = [];
-        if (citasCount > 0) partes.push(`${citasCount} Cita${citasCount > 1 ? 's' : ''}`);
-        if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
-        detalleAtencion = `<div class="mt-3 inline-block px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold animate-pulse">En curso: ${partes.join(' y ')}</div>`;
-    }
-
-    dashCard2.innerHTML = `
-             <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoTexto}</span>
-             <div class="mt-2">
-                <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Atención aprox: <span class="text-gray-900 dark:text-white font-bold">${horaAprox}</span></p>
-                ${detalleAtencion}
-             </div>
-          `;
-  }
-
-  const badgeCita = document.getElementById('estado-barberia-badge-cita');
-  if (badgeCita) {
-    badgeCita.textContent = estado;
-    badgeCita.className = `text-xs font-bold px-2 py-1 rounded ${badgeClass}`;
-  }
-
-  const textoSug = document.getElementById('texto-sugerencia');
-  if (textoSug) textoSug.textContent = 'Consulta disponibilidad y reserva.';
-
-  window.__duracionServicio__ = 30;
-}
-
-async function verificarTurnoActivo() {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const telefono = appState.profile?.telefono || appState.user?.phone;
-
-  const { data } = await supabase.from('turnos')
-    .select('*')
-    .eq('negocio_id', negocioId)
-    .eq('fecha', hoy)
-    .in('estado', ['En espera', 'En atención'])
-    .eq('telefono', telefono)
-    .maybeSingle();
-
-  // Buscar tarjeta en el panel de citas (ahora es el principal)
-  let card = document.getElementById('card-turno-activo');
-  const form = document.getElementById('seccion-tomar-turno');
-
-  // Si no existe la tarjeta (porque ocultamos el panel turno), la inyectamos en citas
-  if (!card) {
-      const citaPanel = document.getElementById('tab-cita-panel');
-      if (citaPanel) {
-          const div = document.createElement('div');
-          div.id = 'card-turno-activo';
-          div.className = 'hidden mb-6';
-          citaPanel.prepend(div);
-          card = div;
-      }
-  }
-
-  if (data && card) {
-    appState.hasActiveTurn = true;
-    updateBanner('active_turn');
-    card.classList.remove('hidden');
-    if (form) form.classList.add('hidden');
-    
-    const bloqueadoMsg = document.getElementById('bloqueado-msg');
-    if (bloqueadoMsg) bloqueadoMsg.classList.remove('hidden');
-
-    if (data.estado === 'En atención') {
-      // Diseño Premium para "En Atención"
-      card.innerHTML = `
-        <div class="bento-card p-8 relative overflow-hidden group bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-2xl shadow-green-500/30 border-none">
-            <div class="absolute top-0 right-0 p-4 opacity-20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div class="relative z-10 text-center">
-                <div class="inline-block px-4 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-xs font-bold uppercase tracking-widest mb-4 animate-bounce">
-                    🔥 En este momento
-                </div>
-                <h3 class="text-4xl font-display font-bold mb-2">Te están atendiendo</h3>
-                <p class="text-lg text-white/90 font-medium">Relájate y disfruta del servicio.</p>
-                <div class="mt-6 pt-6 border-t border-white/20 flex justify-center gap-4">
-                    <div class="text-center">
-                        <p class="text-xs uppercase tracking-wider opacity-70">Turno</p>
-                        <p class="text-2xl font-bold">${data.turno}</p>
-                    </div>
-                    <div class="w-px bg-white/20"></div>
-                    <div class="text-center">
-                        <p class="text-xs uppercase tracking-wider opacity-70">Servicio</p>
-                        <p class="text-xl font-bold truncate max-w-[150px]">${data.servicio}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-      `;
-    } else {
-      // Diseño para "En Espera" (si llegara a mostrarse, aunque el foco es citas)
-      card.innerHTML = `
-        <div class="bento-card p-6 relative overflow-hidden bg-white dark:bg-[#111113] border-l-4 border-yellow-400 shadow-sm rounded-2xl">
-            <div class="flex justify-between items-center">
-                <div>
-                    <p class="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-1">En cola de espera</p>
-                    <h3 class="text-3xl font-display font-bold title-text text-gray-900 dark:text-white">Turno ${data.turno}</h3>
-                    <p class="text-sm subtitle-text mt-1 text-gray-600 dark:text-gray-400">${data.servicio}</p>
-                </div>
-                <button onclick="cancelarTurno()" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
-        </div>
-      `;
-
-      const { data: allTurns } = await supabase.from('turnos')
-        .select('id, estado, servicio, started_at, created_at')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .in('estado', ['En espera', 'En atención']);
-
-      const enAtencion = (allTurns || []).filter(t => t.estado === 'En atención');
-      const enEsperaAntes = (allTurns || []).filter(t => t.estado === 'En espera' && t.created_at < data.created_at);
-
-      const { count: barberosCount } = await supabase.from('barberos').select('*', { count: 'exact', head: true }).eq('negocio_id', negocioId).eq('activo', true);
-      const activeBarbers = barberosCount || 1;
-
-      const personasDelante = enEsperaAntes.length;
-      const tiempoEstimado = calcularTiempoEsperaReal(enEsperaAntes, enAtencion, activeBarbers);
-
-      let mensajeTiempo = '';
-      if (personasDelante === 0 && enAtencion.length < activeBarbers) {
-        mensajeTiempo = '🚀 ¡Es tu turno ahora mismo!';
-      } else {
-        mensajeTiempo = `⏳ Tiempo estimado: ~${tiempoEstimado} min`;
-      }
-
-      const dashCard2 = document.getElementById('dash-card-2');
-      if (dashCard2) {
-        const horaAprox = new Date(Date.now() + tiempoEstimado * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        let detalleAtencion = '';
-        if (enAtencion.length > 0) {
-            const citasCount = enAtencion.filter(t => t.servicio === 'Cita Programada').length;
-            const turnosCount = enAtencion.length - citasCount;
-            let partes = [];
-            if (citasCount > 0) partes.push(`${citasCount} Cita${citasCount > 1 ? 's' : ''}`);
-            if (turnosCount > 0) partes.push(`${turnosCount} Turno${turnosCount > 1 ? 's' : ''}`);
-            detalleAtencion = `<span class="text-xs text-blue-600 dark:text-blue-400 font-bold block mt-1 animate-pulse">En curso: ${partes.join(' y ')}</span>`;
-        }
-
-        dashCard2.innerHTML = `
-                   <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${tiempoEstimado} min</span>
-                   <div class="mt-2">
-                      <p class="text-gray-500 dark:text-gray-400 text-sm font-medium">Atención aprox: <span class="text-gray-900 dark:text-white font-bold">${horaAprox}</span></p>
-                      ${detalleAtencion}
-                   </div>
-                `;
-      }
-
-    if (personasDelante <= 1 && !appState.notificacionCercaEnviada) {
-        sendPushNotification('💈 JBarber - ¡Ya casi!', `Solo queda ${personasDelante} persona delante. Acércate al local.`, '/panel_cliente.html#turno');
-        window.notificacionCercaEnviada = true;
-      }
-    }
-
-    const citaForm = document.getElementById('form-cita-container');
-    const citaMsg = document.getElementById('bloqueado-cita-msg');
-    if (citaForm) citaForm.classList.add('hidden');
-    if (citaMsg) citaMsg.classList.remove('hidden');
-  } else {
-    appState.hasActiveTurn = false;
-    if (card) card.classList.add('hidden');
-    if (form) form.classList.remove('hidden');
-    const bloqueadoMsg = document.getElementById('bloqueado-msg');
-    if (bloqueadoMsg) bloqueadoMsg.classList.add('hidden');
-    checkPendingRatings();
-  }
-}
-
 async function verificarCitaActiva() {
   const telefono = appState.profile?.telefono || appState.user?.phone;
   const nombreCliente = appState.profile?.nombre || appState.user?.user_metadata?.nombre || 'Cliente';
@@ -1565,20 +1221,12 @@ async function verificarCitaActiva() {
   const estadosNoActivos = ['Cancelada', 'Atendida', 'Cita Atendida', 'Completada', 'Finalizada'];
 
   const cardCita = document.getElementById('card-cita-activa');
-  const seccionTurno = document.getElementById('seccion-tomar-turno');
   const inicioCitaContainer = document.getElementById('inicio-cita-card-container');
   const seccionCita = document.getElementById('seccion-cita-inteligente');
 
   if (cita && !estadosNoActivos.includes(cita.estado) && cardCita) {
     appState.hasActiveAppointment = true;
     cardCita.classList.remove('hidden');
-
-    if (seccionTurno) seccionTurno.classList.add('hidden');
-    if (seccionCita) seccionCita.classList.add('hidden');
-    const bloqueadoMsg = document.getElementById('bloqueado-msg');
-    if (bloqueadoMsg) bloqueadoMsg.classList.remove('hidden');
-    const bloqueadoTexto = document.getElementById('bloqueado-texto');
-    if (bloqueadoTexto) bloqueadoTexto.textContent = 'Tienes una cita programada. No puedes tomar turno.';
 
     const date = new Date(cita.start_at);
     const today = new Date();
@@ -1649,13 +1297,6 @@ async function verificarCitaActiva() {
       dashCard1.innerHTML = `
                    <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">CITA</span>
                    <p class="text-gray-400 text-sm mt-1 font-bold uppercase tracking-wide">PROGRAMADA</p>
-                `;
-    }
-    const dashCard2 = document.getElementById('dash-card-2');
-    if (dashCard2) {
-      dashCard2.innerHTML = `
-                   <span class="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight block">${timeStr}</span>
-                   <p class="text-gray-500 dark:text-gray-400 text-sm mt-1 font-bold uppercase tracking-wide">Hora de atención</p>
                 `;
     }
   } else {
@@ -1729,99 +1370,6 @@ function cerrarModalConfirmacion() {
   setTimeout(() => modal.classList.add('hidden'), 300);
 }
 
-window.tomarTurno = async () => {
-  if (Notification.permission === 'default') await solicitarPermisoNotificacion();
-
-  if (configCache) {
-    const ahora = new Date();
-    const dia = ahora.getDay();
-    const hora = ahora.getHours() * 60 + ahora.getMinutes();
-
-    if (diasOperacionNum.length > 0 && !diasOperacionNum.includes(dia)) {
-      showToast('Hoy no laboramos. Por favor revisa nuestros días de operación.', 'error');
-      return;
-    }
-
-    if (configCache.hora_apertura && configCache.hora_cierre) {
-      const [hAp, mAp] = configCache.hora_apertura.split(':').map(Number);
-      const [hCi, mCi] = configCache.hora_cierre.split(':').map(Number);
-      const minAp = hAp * 60 + mAp;
-      let minCi = hCi * 60 + mCi;
-
-      if (minCi <= minAp) {
-        if (hora < minAp && hora >= minCi) {
-          showToast(`Nuestro horario es de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`, 'error');
-          return;
-        }
-      } else {
-        if (hora < minAp || hora >= minCi) {
-          showToast(`Nuestro horario es de ${configCache.hora_apertura} a ${configCache.hora_cierre}.`, 'error');
-          return;
-        }
-      }
-    }
-  }
-
-  const { data: estadoNegocio } = await supabase.from('estado_negocio').select('en_break, break_end_time').eq('negocio_id', negocioId).maybeSingle();
-  if (estadoNegocio && estadoNegocio.en_break) {
-    const finBreak = new Date(estadoNegocio.break_end_time);
-    if (finBreak > new Date()) {
-      showToast(`Estamos en break hasta las ${finBreak.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`, 'warning');
-      return;
-    }
-  }
-
-  const servicioEl = document.getElementById('select-servicio');
-  const barberEl = document.getElementById('select-barbero-turno');
-  const servicio = servicioEl ? servicioEl.value : '';
-  if (!servicio) return showToast('Selecciona un servicio', 'error');
-  const barberSel = barberEl ? barberEl.value : '';
-  if (!barberSel) return showToast('Selecciona un barbero', 'error');
-
-  // SEGURIDAD: No confiar en el DOM para datos del usuario
-  const nombre = appState.profile?.nombre || 'Cliente';
-  const telefono = appState.profile?.telefono;
-
-  if (!telefono) {
-    showToast('No se pudo identificar tu número de teléfono. Reingresa a la aplicación.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btn-tomar-turno');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reservando...</span>';
-  }
-
-  try {
-    const { data, error } = await supabase.rpc('registrar_turno', {
-      p_negocio_id: negocioId,
-      p_nombre: nombre,
-      p_telefono: telefono,
-      p_servicio: servicio,
-      p_barber_id: Number(barberSel)
-    });
-
-    if (error) throw error;
-    if (!data.success) throw new Error(data.message);
-
-    const nuevoTurno = data.turno;
-    showToast(`¡Turno ${nuevoTurno} reservado!`);
-    sendPushNotification('💈 JBarber - Turno confirmado', `Tu turno ${nuevoTurno} está confirmado. Te avisaremos cuando se acerque tu momento.`, '/panel_cliente.html#turno');
-
-    if (navigator.vibrate) navigator.vibrate(200);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    verificarTurnoActivo();
-  } catch (error) {
-    showToast('Error: ' + error.message, 'error');
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = 'Confirmar Turno';
-    }
-  }
-};
-
 function roundToSlot(date, slotMin = 30) {
   const d = new Date(date);
   const mins = d.getMinutes();
@@ -1854,18 +1402,6 @@ function renderBarbersList(data) {
     });
     if (val) select.value = val;
   }
-  const selectTurno = document.getElementById('select-barbero-turno');
-  if (selectTurno) {
-    const val = selectTurno.value;
-    selectTurno.innerHTML = '<option value="">Selecciona un barbero...</option>';
-    (data || []).forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b.id;
-      opt.textContent = b.nombre || b.usuario;
-      selectTurno.appendChild(opt);
-    });
-    if (val) selectTurno.value = val;
-  }
 }
 
 async function cargarBarberos() {
@@ -1883,6 +1419,7 @@ async function cargarBarberos() {
 }
 
 window.reservarCitaInteligente = async () => {
+  window.__duracionServicio__ = 30; // Valor por defecto
   const phoneEl = document.getElementById('profile-phone');
   const telefono = phoneEl ? phoneEl.textContent : '';
   const start = window.__sugeridaHora__;
@@ -1991,8 +1528,6 @@ function slotDisponible(slotStart, duracion, citas = [], breaks = []) {
 
   const conflictBreak = breaks.some(b => {
     const [bStart, bEnd] = b;
-    // Para breaks/turnos activos, aseguramos que nuestro servicio + buffer no choque con el inicio del break
-    // y que no empecemos antes de que termine el break.
     return startMs < bEnd && (endMs + bufferMs) > bStart;
   });
   if (conflictBreak) return false;
@@ -2062,22 +1597,12 @@ async function fetchDayData(negocioId, barberId, dateStr, telefono) {
   // 3. Configuración de breaks/horarios
   const pEstado = supabase.from('estado_negocio').select('weekly_breaks').eq('negocio_id', negocioId).maybeSingle();
 
-  // 4. Turnos activos del barbero (En atención)
-  const pTurnos = supabase
-    .from('turnos')
-    .select('started_at, hora, servicio')
-    .eq('negocio_id', negocioId)
-    .eq('barber_id', Number(barberId))
-    .eq('estado', 'En atención')
-    .eq('fecha', dateStr);
-
-  const [resCitas, resMisCitas, resEstado, resTurnos] = await Promise.all([pCitas, pMisCitas, pEstado, pTurnos]);
+  const [resCitas, resMisCitas, resEstado] = await Promise.all([pCitas, pMisCitas, pEstado]);
 
   return {
     citas: resCitas.data || [],
     misCitas: resMisCitas.data || [],
     estadoNegocio: resEstado.data,
-    turnosActivos: resTurnos.data || [],
     baseDay
   };
 }
@@ -2085,7 +1610,7 @@ async function fetchDayData(negocioId, barberId, dateStr, telefono) {
 /**
  * CAPA 2: LÓGICA - Genera los slots disponibles basados en las reglas de negocio
  */
-function calculateAvailableSlots({ baseDay, apStr, ciStr, duracion, citas, turnosActivos, weeklyBreaks, isToday }) {
+function calculateAvailableSlots({ baseDay, apStr, ciStr, duracion, citas, weeklyBreaks, isToday }) {
   const slots = [];
   const ap = apStr.split(':').map(Number);
   const ci = ciStr.split(':').map(Number);
@@ -2099,7 +1624,7 @@ function calculateAvailableSlots({ baseDay, apStr, ciStr, duracion, citas, turno
 
   if (endDay <= startDay) endDay.setDate(endDay.getDate() + 1);
 
-  // Consolidar bloqueos (breaks + turnos activos)
+  // Consolidar bloqueos (solo breaks)
   const blockages = [];
   
   // Breaks semanales
@@ -2112,21 +1637,7 @@ function calculateAvailableSlots({ baseDay, apStr, ciStr, duracion, citas, turno
     blockages.push([bs.getTime(), be.getTime()]);
   }
 
-  // Turnos en atención
   const bufferMin = configCache?.reserva_buffer_min || 5;
-  turnosActivos.forEach(t => {
-    let s;
-    if (t.started_at) s = new Date(t.started_at);
-    else if (t.hora) {
-      const [h, m] = t.hora.split(':');
-      s = new Date(baseDay); s.setHours(h, m, 0, 0);
-    } else return;
-    
-    const d = serviciosCache[t.servicio] || 30;
-    const e = new Date(s);
-    e.setMinutes(e.getMinutes() + d + bufferMin);
-    blockages.push([s.getTime(), e.getTime()]);
-  });
 
   const step = duracion + bufferMin;
   const now = new Date();
@@ -2219,7 +1730,7 @@ async function cargarSlotsInteligente() {
 
   try {
     const telefono = appState.profile?.telefono;
-    const { citas, misCitas, estadoNegocio, turnosActivos, baseDay } = await fetchDayData(negocioId, barberId, dateStr, telefono);
+    const { citas, misCitas, estadoNegocio, baseDay } = await fetchDayData(negocioId, barberId, dateStr, telefono);
 
     // if (misCitas.length > 0) {
     //   if (container) container.innerHTML = '<div class="col-span-full p-6 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30 text-center text-amber-800 dark:text-amber-400 font-bold">Ya tienes una cita hoy.</div>';
@@ -2232,7 +1743,6 @@ async function cargarSlotsInteligente() {
       ciStr: configCache?.hora_cierre || '21:00',
       duracion,
       citas,
-      turnosActivos,
       weeklyBreaks: estadoNegocio?.weekly_breaks || [],
       isToday: dateStr === new Date().toLocaleDateString('en-CA')
     });
@@ -2348,11 +1858,7 @@ async function confirmarReservaManual() {
   }
   const dur = serviciosCache[servicioSel] || 30;
 
-  // Validación de doble reserva en el frontend
-  if (appState.hasActiveTurn) {
-    showToast('Ya tienes un turno en espera activo.', 'error');
-    return;
-  }
+  // Validación de doble reserva en el frontend: eliminada para flujo solo citas
 
   const slotEnd = new Date(date);
   slotEnd.setMinutes(slotEnd.getMinutes() + dur);
@@ -2403,30 +1909,6 @@ async function confirmarReservaManual() {
     }
   );
 }
-
-window.cancelarTurno = async () => {
-  confirmarAccion('Cancelar Turno', '¿Estás seguro de que deseas cancelar tu turno actual?', async () => {    const telefono = appState.profile?.telefono;
-    const hoy = new Date().toISOString().slice(0, 10);
-
-    if (!telefono) {
-      showToast('No se pudo identificar al usuario', 'error');
-      return;
-    }
-
-    const { error } = await supabase.from('turnos')
-      .update({ estado: 'Cancelado' })
-      .eq('negocio_id', negocioId)
-      .eq('fecha', hoy)
-      .eq('telefono', telefono)
-      .in('estado', ['En espera']);
-
-    if (error) showToast('Error al cancelar', 'error');
-    else {
-      showToast('Turno cancelado');
-      verificarTurnoActivo();
-    }
-  });
-};
 
 window.cancelarCita = async (idCita = null) => {
   const card = document.querySelector('#card-cita-activa .bento-card'); // Selector más específico

@@ -625,6 +625,20 @@ ALTER TABLE public.citas
   ADD COLUMN IF NOT EXISTS notificado_barbero BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.citas
   ADD COLUMN IF NOT EXISTS recordatorio_barbero_10m BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.citas
+  DROP COLUMN IF EXISTS reminder_30m_sent;
+ALTER TABLE public.citas
+  DROP COLUMN IF EXISTS reminder_1h_sent;
+ALTER TABLE public.citas
+  DROP COLUMN IF EXISTS reminder_15m_sent;
+ALTER TABLE public.citas
+  ADD COLUMN IF NOT EXISTS recordatorio_1h BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.citas
+  ADD COLUMN IF NOT EXISTS recordatorio_15m BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.turnos
+  ADD COLUMN IF NOT EXISTS notificado_cerca BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS notificado_siguiente BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS notificado_llamado BOOLEAN DEFAULT FALSE;
 
 ALTER TABLE public.clientes
   ADD COLUMN IF NOT EXISTS last_marketing_email_sent_at TIMESTAMPTZ;
@@ -894,5 +908,40 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==============================================================================
+-- 14) Configuración de Cron Jobs (Notificaciones Automáticas)
+-- ==============================================================================
+
+-- Habilitar extensiones necesarias
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- Función para invocar la Edge Function
+-- ⚠️ IMPORTANTE: Reemplaza TU_PROJECT_REF y TU_SERVICE_ROLE_KEY con tus valores reales antes de ejecutar
+CREATE OR REPLACE FUNCTION public.run_sistema_notificaciones()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  PERFORM
+    net.http_post(
+      url := 'https://TU_PROJECT_REF.supabase.co/functions/v1/sistema-notificaciones',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer TU_SERVICE_ROLE_KEY'
+      ),
+      body := '{}'::jsonb
+    );
+END;
+$$;
+
+-- Programar el job para que corra cada minuto
+SELECT cron.schedule(
+  'sistema-notificaciones-cada-minuto',
+  '* * * * *',
+  $$ SELECT public.run_sistema_notificaciones(); $$
+);
 
 COMMIT;
