@@ -658,6 +658,65 @@ CREATE TABLE IF NOT EXISTS public.movimientos_puntos (
 ALTER TABLE public.movimientos_puntos
   ADD COLUMN IF NOT EXISTS descripcion TEXT;
 
+-- Sincronización automática de puntos de clientes con movimientos
+CREATE OR REPLACE FUNCTION public.sync_client_points() RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.tipo = 'GANADO' THEN
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) + NEW.puntos,
+          puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + NEW.puntos
+      WHERE id = NEW.cliente_id;
+    ELSE
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) - NEW.puntos
+      WHERE id = NEW.cliente_id;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.tipo = 'GANADO' THEN
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) - OLD.puntos,
+          puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) - OLD.puntos
+      WHERE id = OLD.cliente_id;
+    ELSE
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) + OLD.puntos
+      WHERE id = OLD.cliente_id;
+    END IF;
+
+    IF NEW.tipo = 'GANADO' THEN
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) + NEW.puntos,
+          puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + NEW.puntos
+      WHERE id = NEW.cliente_id;
+    ELSE
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) - NEW.puntos
+      WHERE id = NEW.cliente_id;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    IF OLD.tipo = 'GANADO' THEN
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) - OLD.puntos,
+          puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) - OLD.puntos
+      WHERE id = OLD.cliente_id;
+    ELSE
+      UPDATE public.clientes
+      SET puntos_actuales = COALESCE(puntos_actuales, 0) + OLD.puntos
+      WHERE id = OLD.cliente_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_sync_client_points ON public.movimientos_puntos;
+CREATE TRIGGER trg_sync_client_points
+AFTER INSERT OR UPDATE OR DELETE ON public.movimientos_puntos
+FOR EACH ROW EXECUTE FUNCTION public.sync_client_points();
 -- ==============================================================================
 -- 4) Función RPC: Programar Cita (CORREGIDA Y UNIFICADA)
 -- ==============================================================================

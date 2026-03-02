@@ -96,26 +96,30 @@ function getSaludo() {
 }
 
 function calcularNivelInfo(puntos) {
-  // Asumimos 50 puntos por servicio (Ticket promedio RD$500 * 0.1)
-  const servicios = Math.floor((puntos || 0) / 50);
-  const serviciosExactos = (puntos || 0) / 50;
-  
+  const pts = puntos || 0;
+
   const niveles = [
-    { min: 0, max: 4, nombre: "Nuevo Cliente", icon: "💈", mensaje: "Bienvenido a la familia", color: "text-gray-500", bg: "bg-gray-500" },
-    { min: 5, max: 9, nombre: "Cliente Activo", icon: "⭐", mensaje: "Gracias por confiar", color: "text-blue-500", bg: "bg-blue-500" },
-    { min: 10, max: 19, nombre: "Cliente Frecuente", icon: "⭐⭐", mensaje: "Eres parte de la casa", color: "text-yellow-500", bg: "bg-yellow-500" },
-    { min: 20, max: 39, nombre: "Cliente VIP", icon: "👑", mensaje: "Nivel preferencial", color: "text-purple-500", bg: "bg-purple-500" },
-    { min: 40, max: 9999, nombre: "Leyenda", icon: "💎", mensaje: "Cliente histórico", color: "text-emerald-500", bg: "bg-emerald-500" }
+    { minPts: 0,     nombre: "Nuevo Cliente",     icon: "💈", mensaje: "Bienvenido a la familia",   color: "text-gray-500",   bg: "bg-gray-500" },
+    { minPts: 100,   nombre: "Cliente Activo",    icon: "⭐",  mensaje: "Gracias por confiar",      color: "text-blue-500",   bg: "bg-blue-500" },
+    { minPts: 250,   nombre: "Cliente Frecuente", icon: "⭐⭐", mensaje: "Eres parte de la casa",     color: "text-yellow-500", bg: "bg-yellow-500" },
+    { minPts: 500,   nombre: "Cliente VIP",       icon: "👑", mensaje: "Nivel preferencial",        color: "text-purple-500", bg: "bg-purple-500" },
+    { minPts: 900,   nombre: "Leyenda",           icon: "💎", mensaje: "Cliente histórico",         color: "text-emerald-500",bg: "bg-emerald-500" }
   ];
 
-  const nivelActual = niveles.find(n => servicios >= n.min && servicios <= n.max) || niveles[niveles.length - 1];
-  const nextLevel = niveles[niveles.indexOf(nivelActual) + 1];
-  
-  const totalRange = nextLevel ? nextLevel.min - nivelActual.min : 1;
-  const currentInLevel = serviciosExactos - nivelActual.min;
-  const progress = nextLevel ? Math.min(100, (currentInLevel / totalRange) * 100) : 100;
+  let nivelActual = niveles[0];
+  for (let i = niveles.length - 1; i >= 0; i--) {
+    if (pts >= niveles[i].minPts) { nivelActual = niveles[i]; break; }
+  }
+  const idx = niveles.indexOf(nivelActual);
+  const nextLevel = idx >= 0 && idx < niveles.length - 1 ? niveles[idx + 1] : null;
 
-  return { ...nivelActual, progress, servicios, nextLevel };
+  const levelMin = nivelActual.minPts;
+  const levelMax = nextLevel ? nextLevel.minPts : levelMin + 1;
+  const range = Math.max(1, levelMax - levelMin);
+  const progress = nextLevel ? Math.min(100, ((pts - levelMin) / range) * 100) : 100;
+  const faltanPts = nextLevel ? Math.max(0, nextLevel.minPts - pts) : 0;
+
+  return { ...nivelActual, progress, puntos: pts, nextLevel, faltanPts };
 }
 
 // --- MOTOR DE MARKETING INTELIGENTE ---
@@ -129,7 +133,7 @@ class SmartMarketingEngine {
 
   calculateSegment() {
     if (!this.profile) return 'Nuevo';
-    const visitas = this.profile.puntos ? Math.floor(this.profile.puntos / 10) : 0; // Estimado
+    const visitas = this.profile.puntos_actuales ? Math.floor(this.profile.puntos_actuales / 10) : 0;
     const lastVisit = this.profile.ultima_visita ? new Date(this.profile.ultima_visita) : null;
     const daysSince = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24)) : 999;
 
@@ -141,7 +145,7 @@ class SmartMarketingEngine {
   }
 
   getMessages() {
-    const points = this.profile?.puntos || 0;
+    const points = this.profile?.puntos_actuales || 0;
     const nextRewardTier = RECOMPENSAS.find(r => points < r.pts);
     const nextRewardPts = nextRewardTier ? nextRewardTier.pts : (RECOMPENSAS.length > 0 ? RECOMPENSAS[RECOMPENSAS.length - 1].pts : 0);
     const pointsNeeded = Math.max(0, nextRewardPts - points);
@@ -847,7 +851,7 @@ function renderStructure() {
                     <div>
                         <p class="text-xs font-bold uppercase tracking-widest text-gray-400">Progreso de Nivel</p>
                         <p class="text-2xl font-black text-gray-900 dark:text-white mt-1">
-                            <span id="profile-services-count">${nivelInfo.servicios}</span> <span class="text-sm font-medium text-gray-500">servicios</span>
+                            <span id="profile-points-total">${puntosHist}</span> <span class="text-sm font-medium text-gray-500">pts</span>
                         </p>
                     </div>
                     <div class="text-right">
@@ -862,7 +866,7 @@ function renderStructure() {
                     </div>
                 </div>
                 <p id="profile-missing-text" class="text-xs text-center text-gray-500 dark:text-gray-400 font-medium">
-                    ${nivelInfo.nextLevel ? `Te faltan ${nivelInfo.nextLevel.min - nivelInfo.servicios} servicios para subir de nivel` : '¡Has alcanzado la cima!'}
+                    ${nivelInfo.nextLevel ? `Te faltan ${nivelInfo.faltanPts} puntos para subir de nivel` : '¡Has alcanzado la cima!'}
                 </p>
             </div>
 
@@ -988,8 +992,8 @@ function renderProfile(data) {
     const badge2 = document.getElementById('profile-level-badge');
     if (badge2) badge2.innerHTML = `${nivelInfo.icon} ${nivelInfo.nombre}`;
 
-    const servicesCount = document.getElementById('profile-services-count');
-    if (servicesCount) animateNumber(servicesCount, nivelInfo.servicios);
+    const ptsTotal = document.getElementById('profile-points-total');
+    if (ptsTotal) animateNumber(ptsTotal, nivelInfo.puntos);
 
     const nextLevelName = document.getElementById('profile-next-level-name');
     if (nextLevelName) {
@@ -1007,7 +1011,7 @@ function renderProfile(data) {
     const missingText = document.getElementById('profile-missing-text');
     if (missingText) {
         missingText.textContent = nivelInfo.nextLevel 
-            ? `Te faltan ${nivelInfo.nextLevel.min - nivelInfo.servicios} servicios para subir de nivel` 
+            ? `Te faltan ${nivelInfo.faltanPts} puntos para subir de nivel` 
             : '¡Has alcanzado la cima!';
     }
 
@@ -1113,6 +1117,29 @@ async function cargarPerfil() {
   }
   
   if (data) {
+    // Recalcular puntos estrictamente desde movimientos para asegurar consistencia
+    try {
+      const { data: movs } = await supabase
+        .from('movimientos_puntos')
+        .select('puntos,tipo,negocio_id')
+        .eq('cliente_id', clienteId)
+        .eq('negocio_id', negocioId);
+      let ganado = 0, canje = 0;
+      (movs || []).forEach(m => {
+        if (m.tipo === 'GANADO') ganado += m.puntos || 0;
+        else if (m.tipo === 'CANJE') canje += m.puntos || 0;
+      });
+      const calcActual = Math.max(0, ganado - canje);
+      const calcHist = Math.max(0, ganado);
+      if ((data.puntos_actuales || 0) !== calcActual || (data.puntos_totales_historicos || 0) !== calcHist) {
+        // Intentar reconciliar en base de datos (best effort)
+        await supabase.from('clientes').update({ puntos_actuales: calcActual, puntos_totales_historicos: calcHist }).eq('id', clienteId);
+        data.puntos_actuales = calcActual;
+        data.puntos_totales_historicos = calcHist;
+      }
+    } catch (e) {
+      console.warn('No se pudo recalcular puntos desde movimientos:', e?.message || e);
+    }
     // Detectar si se desbloqueó una recompensa
     // Lógica de puntos siempre fresca
     const oldPoints = appState.profile?.puntos_actuales || 0;
