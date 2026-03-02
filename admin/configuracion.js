@@ -127,7 +127,7 @@ async function subirAvatar(usuario) {
 
   const { data, error } = await supabase
     .storage
-    .from('barber_avatars')
+    .from('avatars') // CORRECCIÓN: Usar bucket 'avatars' existente
     .upload(path, f, {
       cacheControl: '3600',
       upsert: true,
@@ -138,7 +138,7 @@ async function subirAvatar(usuario) {
     console.error('Error subiendo avatar:', error);
     return null;
   }
-  const { data: pub } = await supabase.storage.from('barber_avatars').getPublicUrl(data.path);
+  const { data: pub } = await supabase.storage.from('avatars').getPublicUrl(data.path);
   return pub?.publicUrl || null;
 }
 
@@ -152,10 +152,19 @@ async function guardarBarbero() {
   const uploaded = await subirAvatar(usuario);
   if (uploaded) avatar_url = uploaded;
   const payload = { negocio_id: negocioId, nombre, usuario, password, avatar_url, activo };
-  if (id) {
-    await supabase.from('barberos').update(payload).eq('id', Number(id));
-  } else {
-    await supabase.from('barberos').insert([payload]);
+  
+  try {
+    if (id) {
+      const { error } = await supabase.from('barberos').update(payload).eq('id', Number(id));
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('barberos').insert([payload]);
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Error guardando barbero:', error);
+    alert(error.code === '23505' ? 'Error: El usuario ya existe.' : 'Error al guardar: ' + error.message);
+    return;
   }
   limpiarFormulario();
   await cargarBarberos();

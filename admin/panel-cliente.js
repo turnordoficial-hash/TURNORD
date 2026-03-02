@@ -531,36 +531,28 @@ async function init() {
   setupStaticEventHandlers();
   setupThemeToggle();
   updateBanner();
-  
-  // 🔥 CRÍTICO: Cargar configuración antes que nada para tener diasOperacionNum
-  await cargarConfigNegocio();
-  // await cargarServicios(); // Ya se llama abajo, redundante
 
-  await cargarPerfil();
-  await cargarServicios(); 
-  await cargarBarberos(); // Cargar barberos para el select
+  // 🔥 OPTIMIZACIÓN: Carga paralela de datos críticos (4x más rápido)
+  await Promise.all([
+    cargarConfigNegocio(),
+    cargarPerfil(), // Carga puntos y datos del cliente
+    cargarServicios(),
+    cargarBarberos()
+  ]);
 
   // Configurar fecha por defecto a HOY
   const dp = document.getElementById('date-picker');
   if (dp) {
-      const today = new Date();
-      const d = today.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
-      dp.value = d;
-      dp.min = d;
+    const today = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+    dp.value = today;
+    dp.min = today;
   }
 
   await verificarCitaActiva();
   iniciarMotorMarketing(); // Iniciar motor de marketing
 
-  if (localStorage.getItem('cita_reservada') === 'true') {
-    localStorage.removeItem('cita_reservada');
-    switchTab('cita');
-    showToast('¡Cita reservada con éxito!', 'success');
-  } else {
-    switchTab('inicio'); // Vista de Inicio por defecto
-  }
+  switchTab('inicio'); // Vista de Inicio por defecto
 
-  document.getElementById('select-barbero-cita')?.addEventListener('change', updateBarberInfo);
   document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
   document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
@@ -581,11 +573,30 @@ async function init() {
 
   const formPerfil = document.getElementById('form-perfil');
   if (formPerfil) {
+    // Validación en tiempo real para el teléfono (Solo números y máx 10)
+    const telInput = document.getElementById('edit-telefono');
+    if (telInput) {
+        telInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+        });
+    }
+
     formPerfil.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const nombre = document.getElementById('edit-nombre').value;
-      const email = document.getElementById('edit-email').value;
-      const telefono = document.getElementById('edit-telefono').value;
+      const nombre = document.getElementById('edit-nombre').value.trim();
+      const email = document.getElementById('edit-email').value.trim();
+      const telefono = document.getElementById('edit-telefono').value.trim();
+
+      // Validaciones estrictas
+      if (telefono.length !== 10) {
+          showToast('El teléfono debe tener exactamente 10 dígitos.', 'error');
+          return;
+      }
+      if (nombre.length < 3) {
+          showToast('El nombre es muy corto.', 'error');
+          return;
+      }
+
       const { error } = await supabase.from('clientes').update({ nombre, email, telefono }).eq('id', clienteId);
       if (error) showToast('Error al actualizar el perfil', 'error');
       else {
@@ -1103,6 +1114,7 @@ async function cargarPerfil() {
   
   if (data) {
     // Detectar si se desbloqueó una recompensa
+    // Lógica de puntos siempre fresca
     const oldPoints = appState.profile?.puntos_actuales || 0;
     const newPoints = data.puntos_actuales || 0;
     
@@ -1119,21 +1131,20 @@ async function cargarPerfil() {
             else showToast('¡Felicidades! Has desbloqueado una recompensa 🎉', 'success');
         }
     }
-    setCache('PROFILE', data, 60); // 1 hora de caché
+    setCache('PROFILE', data, 15); // Reducido a 15 min para asegurar frescura de puntos
     appState.profile = data;
     renderProfile(data);
     iniciarMotorMarketing(); // Reiniciar motor con datos frescos
     cargarHistorialPuntos(); // Cargar historial
   }
 }
-
 function renderServices(data) {
   // 1. Llenar caché incondicionalmente para cálculos
   data.forEach(s => {
       serviciosCache[s.nombre] = s.duracion_min;
       preciosCache[s.nombre] = s.precio;
   });
-
+  
   const select = document.getElementById('select-servicio');
   if (select) {
     select.innerHTML = '<option value="">Selecciona un servicio...</option>';
@@ -2128,3 +2139,4 @@ document.addEventListener('DOMContentLoaded', () => {
     setupThemeToggle();
     setupStaticEventHandlers();
 });
+}

@@ -672,8 +672,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     ['telefono', 'nombre'].forEach(id => {
         const input = document.getElementById(id);
         if (input) input.addEventListener('input', () => {
-            input.value = id === 'telefono' ? input.value.replace(/[^0-9]/g, '') : input.value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ ]/g, '');
-        });
+            input.value = id === 'telefono' ? input.value.replace(/[^0-9]/g, '')
     });
     if (await verificarTurnoActivo()) {
         if (btnTomarTurno) btnTomarTurno.disabled = true;
@@ -687,6 +686,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         const servicio = document.getElementById('servicio')?.value;
         if (!nombre || !telefono || !servicio) {
             alert('Por favor complete nombre, teléfono y servicio.');
+            return;
+        }
+        if (telefono.length !== 10) {
+            alert('El teléfono debe tener exactamente 10 dígitos.');
             return;
         }
         await tomarTurnoSimple(nombre, telefono, servicio);

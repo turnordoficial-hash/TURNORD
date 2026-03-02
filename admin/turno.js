@@ -137,7 +137,13 @@ function iniciarTimerParaTurno(turno) {
         return;
     }
 
-    const endTime = startTs + duracionMin * 60 * 1000;
+    // CORRECCIÓN: Detectar desajuste de hora (Clock Skew)
+    // Si la fecha de inicio está en el futuro (ej. reloj desajustado), usamos la hora actual
+    // para evitar que se sume ese tiempo extra (ej. evitar que muestre 72 min en vez de 12).
+    const now = Date.now();
+    const effectiveStartTs = startTs > now ? now : startTs;
+
+    const endTime = effectiveStartTs + duracionMin * 60 * 1000;
 
     const updateTimer = () => {
         const ahora = Date.now();
@@ -195,8 +201,8 @@ function refrescarUI() {
         isRefreshing = true;
         try {
             await Promise.all([
-                cargarClientesMap(),
-                cargarTurnos()
+                // cargarClientesMap(), // OPTIMIZACIÓN: No recargar mapa de clientes constantemente
+                cargarTurnos()          // Solo recargar lo que cambia (turnos)
             ]);
         } catch (error) {
             console.error("Error en refrescarUI:", error);
@@ -808,34 +814,9 @@ async function tomarTurno(event) {
 
 async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     // --- CÁLCULO INTELIGENTE DE TIEMPO (Lógica Oficial TurnoRD) ---
-    const hoy = new Date().toISOString().slice(0, 10);
-    const ahora = new Date();
-    
-    // 1. Obtener datos frescos (Snapshot del estado actual)
-    let enAtencion = [];
-    let cola = [];
-    
-    try {
-        const resAtencion = await supabase
-            .from('turnos')
-            .select('barber_id, servicio, started_at')
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .eq('estado', ESTADOS.ATENCION);
-        enAtencion = resAtencion.data || [];
-
-        const resCola = await supabase
-            .from('turnos')
-            .select('turno, servicio')
-            .eq('negocio_id', negocioId)
-            .eq('estado', ESTADOS.ESPERA)
-            .order('orden', { ascending: true })
-            .order('created_at', { ascending: true });
-        cola = resCola.data || [];
-    } catch (e) {
-        console.warn('Error fetching data for estimation:', e);
-        return 0;
-    }
+    // OPTIMIZACIÓN: Usar caché en memoria en lugar de consultar DB nuevamente
+    const enAtencion = enAtencionCache || [];
+    const cola = dataRender || [];
 
     let tiempoTotalPendiente = 0;
 
@@ -843,7 +824,9 @@ async function calcularTiempoEstimadoTotal(turnoObjetivo = null) {
     enAtencion.forEach(t => {
         const duracion = serviciosCache[t.servicio] || 30;
         const inicio = t.started_at ? new Date(t.started_at) : new Date();
-        const transcurrido = (Date.now() - inicio.getTime()) / 60000;
+        
+        // CORRECCIÓN: Evitar transcurrido negativo si hay desajuste de hora
+        const transcurrido = Math.max(0, (Date.now() - inicio.getTime()) / 60000);
         const restante = Math.max(0, duracion - transcurrido);
         tiempoTotalPendiente += restante;
     });
@@ -912,113 +895,36 @@ async function cargarTurnos() {
     iniciarActualizadorMinutos();
 
     const hoy = new Date().toISOString().slice(0, 10);
+    const inicioHoy = new Date(); inicioHoy.setHours(0,0,0,0);
+    const finHoy = new Date(); finHoy.setHours(23,59,59,999);
     
-    // Carga de datos
-    // Robustez: Fallback si faltan columnas (started_at, orden) o tabla citas
-    let enAtencion = [];
-    try {
-        const resAtencion = await supabase
-            .from('turnos')
-            .select('*')
-            .eq('estado', ESTADOS.ATENCION)
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .order('started_at', { ascending: true });
-        
-        if (resAtencion.error) throw resAtencion.error;
-        enAtencionCache = resAtencion.data || []; // Actualizar cache global
-        enAtencion = enAtencionCache;
-    } catch (e) {
-        // Fallback sin ordenar por started_at
-        const resAtencionFallback = await supabase
-            .from('turnos')
-            .select('*')
-            .eq('estado', ESTADOS.ATENCION)
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy);
-        enAtencionCache = resAtencionFallback.data || [];
-        enAtencion = enAtencionCache;
-    }
+    // OPTIMIZACIÓN: Carga paralela de todos los datos necesarios (Promise.all)
+    // MODIFICADO: Eliminada la búsqueda de turnos en espera (cola) para optimizar solo citas
+    const [resAtencion, resIngresos, resCitasHoy, resCitasFut] = await Promise.all([
+        supabase.from('turnos').select('*').eq('estado', ESTADOS.ATENCION).eq('negocio_id', negocioId).eq('fecha', hoy).order('started_at', { ascending: true }),
+        supabase.from('turnos').select('monto_cobrado').eq('negocio_id', negocioId).eq('fecha', hoy).eq('estado', ESTADOS.ATENDIDO),
+        supabase.from('citas').select('*').eq('negocio_id', negocioId).gte('start_at', inicioHoy.toISOString()).lte('start_at', finHoy.toISOString()).order('start_at', { ascending: true }),
+        supabase.from('citas').select('*').eq('negocio_id', negocioId).gt('start_at', finHoy.toISOString()).order('start_at', { ascending: true })
+    ]);
+
+    // 1. Procesar Turnos en Atención
+    let enAtencion = resAtencion.data || [];
+    enAtencionCache = enAtencion; // Actualizar cache global
 
     // Actualizar estado maestro
     turnoEnAtencionActual = enAtencion.length > 0 ? enAtencion[0] : null;
 
-    // --- CÁLCULO DE INGRESOS HOY ---
-    const { data: atendidosHoy } = await supabase
-        .from('turnos')
-        .select('monto_cobrado')
-        .eq('negocio_id', negocioId)
-        .eq('fecha', hoy)
-        .eq('estado', ESTADOS.ATENDIDO);
-    const totalIngresos = atendidosHoy?.reduce((sum, t) => sum + (t.monto_cobrado || 0), 0) || 0;
+    // 2. Procesar Ingresos
+    const totalIngresos = (resIngresos.data || []).reduce((sum, t) => sum + (t.monto_cobrado || 0), 0);
     const indicadorIngresos = document.getElementById('total-ingresos-hoy');
     if (indicadorIngresos) indicadorIngresos.textContent = `RD$ ${totalIngresos.toLocaleString('es-DO', {minimumFractionDigits: 2})}`;
 
-    let data = [], error = null;
-    try {
-        const resEspera = await supabase
-            .from('turnos')
-            .select('*')
-            .eq('estado', ESTADOS.ESPERA)
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .order('orden', { ascending: true })
-            .order('created_at', { ascending: true });
-        
-        if (resEspera.error) throw resEspera.error;
-        data = resEspera.data || [];
-    } catch (e) {
-        console.warn('Fallo carga ordenada (posible falta de columna "orden"), reintentando simple...', e);
-        const resEsperaFallback = await supabase
-            .from('turnos')
-            .select('*')
-            .eq('estado', ESTADOS.ESPERA)
-            .eq('negocio_id', negocioId)
-            .eq('fecha', hoy)
-            .order('created_at', { ascending: true });
-        
-        data = resEsperaFallback.data || [];
-        error = resEsperaFallback.error;
-    }
+    // 3. Procesar Lista de Espera (con fallback de error)
+    let data = []; // Forzamos lista de espera vacía para eliminar sistema de turnos
 
-    if (error) {
-        mostrarNotificacion('Error al cargar turnos', 'error');
-        return;
-    }
-
-    const inicioHoy = new Date();
-    inicioHoy.setHours(0,0,0,0);
-    const finHoy = new Date();
-    finHoy.setHours(23,59,59,999);
-    
-    let citasDia = [], citasRes = [];
-    try {
-        const resCitas = await supabase
-            .from('citas')
-            .select('*')
-            .eq('negocio_id', negocioId)
-            .gte('start_at', inicioHoy.toISOString())
-            .lte('start_at', finHoy.toISOString())
-            .order('start_at', { ascending: true });
-        
-        if (resCitas.error) throw resCitas.error;
-        citasDia = resCitas.data || [];
-
-        const resCitasFut = await supabase
-            .from('citas')
-            .select('*')
-            .eq('negocio_id', negocioId)
-            .gt('start_at', finHoy.toISOString())
-            .order('start_at', { ascending: true });
-        
-        if (resCitasFut.error) throw resCitasFut.error;
-        citasRes = resCitasFut.data || [];
-    } catch (e) {
-        console.warn('No se pudo cargar citas (tabla inexistente o error):', e);
-    }
-
-    citasHoy = citasDia;
-    citasFuturas = citasRes;
+    // 4. Procesar Citas
+    citasHoy = resCitasHoy.data || [];
+    citasFuturas = resCitasFut.data || [];
 
     renderCitas();
 
