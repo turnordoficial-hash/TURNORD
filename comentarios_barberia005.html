@@ -159,12 +159,6 @@
 
       <main class="flex-1 md:ml-0 p-4 sm:p-6 w-full max-w-full overflow-x-hidden">
         <div class="max-w-[1600px] mx-auto w-full space-y-6">
-          <!-- Icono de Barbería: Gillet -->
-          <div class="flex justify-center py-8 opacity-20 dark:opacity-10">
-            <svg class="w-16 h-16 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19,7H18V6A2,2 0 0,0 16,4H8A2,2 0 0,0 6,6V7H5A2,2 0 0,0 3,9V15A2,2 0 0,0 5,17H6V18A2,2 0 0,0 8,20H16A2,2 0 0,0 18,18V17H19A2,2 0 0,0 21,15V9A2,2 0 0,0 19,7M7,9H17V15H7V9M9,11V13H15V11H9Z"/>
-            </svg>
-          </div>
           <h1 class="text-3xl font-bold mb-8 text-gray-900 dark:text-white tracking-tight">Comentarios de Clientes</h1>
 
           <div class="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 p-8 overflow-hidden">
@@ -214,14 +208,30 @@
       const closeBtn = document.getElementById('closeSidebar');
 
       if (btn && sidebar && overlay) {
-        const toggle = () => {
-          sidebar.classList.toggle('-translate-x-full');
-          overlay.classList.toggle('opacity-0');
-          overlay.classList.toggle('pointer-events-none');
+        const open = () => {
+          sidebar.classList.remove('-translate-x-full');
+          sidebar.classList.add('translate-x-0');
+          overlay.classList.remove('opacity-0');
+          overlay.classList.remove('pointer-events-none');
+          document.body.classList.add('overflow-hidden');
         };
-        btn.onclick = toggle;
-        overlay.onclick = toggle;
-        if (closeBtn) closeBtn.onclick = toggle;
+        const close = () => {
+          sidebar.classList.add('-translate-x-full');
+          sidebar.classList.remove('translate-x-0');
+          overlay.classList.add('opacity-0');
+          overlay.classList.add('pointer-events-none');
+          document.body.classList.remove('overflow-hidden');
+        };
+        const handleToggle = () => {
+          if (sidebar.classList.contains('-translate-x-full')) open();
+          else close();
+        };
+        btn.onclick = handleToggle;
+        overlay.onclick = close;
+        if (closeBtn) closeBtn.onclick = close;
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') close();
+        });
       }
     });
   </script>
