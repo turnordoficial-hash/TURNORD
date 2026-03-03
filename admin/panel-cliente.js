@@ -245,13 +245,13 @@ async function enviarCorreoConfirmacion(startISO, servicio, barberId) {
           <p style="font-size: 14px; color: #555;">Gracias por elegir JBarber.</p>
         </div>
       </div>`;
-    await sb.functions.invoke('send-email', {
-      body: {
-        to: cliente.email,
-        subject: '✅ Cita confirmada',
-        body: html
-      }
+    
+    await sb.rpc('enviar_correo_rpc', {
+        p_to: cliente.email,
+        p_subject: '✅ Cita confirmada',
+        p_body: html
     });
+
   } catch (e) {
     console.warn('No se pudo enviar correo de confirmación:', e.message || e);
   }

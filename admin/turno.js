@@ -1,5 +1,6 @@
 import { supabase, ensureSupabase } from '../database.js';
 import { RECOMPENSAS } from './promociones.js';
+import { OneSignalManager } from './onesignal.js';
 
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
@@ -302,6 +303,15 @@ async function cargarClientesMap() {
 document.addEventListener('DOMContentLoaded', async () => {
     await ensureSupabase();
     if (!negocioId) return;
+
+    // OneSignal Initialization
+    try {
+        await OneSignalManager.init();
+        await OneSignalManager.login('admin_jbarber'); // Hardcoded admin ID
+    } catch (e) {
+        console.error("Error inicializando OneSignal:", e);
+    }
+
     initThemeToggle();
     actualizarFechaHora();
     setInterval(actualizarFechaHora, 60000);
@@ -1338,214 +1348,83 @@ function cerrarModalPago() {
  */
 async function notificarAvanceFila() {
     if (!Array.isArray(dataRender)) return;
-    // Optimización: Solo notificar a los primeros 2 de la fila para evitar spam y costos
     const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 2);
-    
-    if (turnosEnEspera.length === 0) {
-        console.log('No hay turnos en espera para notificar avance de fila');
-        return;
-    }
+    if (turnosEnEspera.length === 0) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || (supabase.supabaseKey || 'ANON_KEY_FALLBACK');
-
-    // Notificar a todos los clientes en espera sobre el avance
     const promesas = turnosEnEspera.map(async (turno, i) => {
         const posicionEnFila = i + 1;
-        const turnosDelante = i;
+        let mensaje = '';
+        if (posicionEnFila === 1) {
+            mensaje = '¡Es tu turno! Dirígete al local ahora.';
+        } else if (posicionEnFila === 2) {
+            mensaje = '¡Prepárate! Queda 1 persona antes que tú. Dirígete al local.';
+        } else {
+            return;
+        }
 
         try {
-            let mensaje = '';
-            if (posicionEnFila === 1) {
-                mensaje = '¡Es tu turno! Dirígete al local ahora.';
-            } else if (posicionEnFila === 2) {
-                mensaje = '¡Prepárate! Queda 1 persona antes que tú. Dirígete al local.';
-            } else {
-                return; // No notificar a posiciones 3+ para evitar spam
-            }
-
-            console.log(`Notificando avance a ${turno.nombre} (${turno.telefono})...`);
-            let data, error;
-            try {
-                ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
-                    body: {
-                        telefono: turno.telefono,
-                        negocio_id: negocioId,
-                        title: `Turno ${turno.turno} - ${turno.nombre}`,
-                        body: mensaje
-                    }
-                }));
-            } catch (eInvoke) {
-                console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
-                try {
-                    const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                            telefono: turno.telefono,
-                            negocio_id: negocioId,
-                            title: `Turno ${turno.turno} - ${turno.nombre}`,
-                            body: mensaje
-                        })
-                    });
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-                    data = await res.json().catch(() => ({ success: true }));
-                    error = null;
-                } catch (eFetch) {
-                    error = eFetch;
-                }
-            }
-
-            if (error) {
-                console.error(`Error notificando a ${turno.nombre}:`, error.message || error);
-            } else if (data && data.success) {
-                console.log(`✅ Notificación enviada a ${turno.nombre} (posición ${posicionEnFila})`);
-            }
+            await supabase.rpc('enviar_notificacion_rpc', {
+                p_user_id: `cliente_${turno.telefono}`,
+                p_headings: { en: `Turno ${turno.turno} - ${turno.nombre}` },
+                p_contents: { en: mensaje },
+                p_data: { url: 'https://jbarber.vip/cliente.html' }
+            });
         } catch (error) {
-            console.error(`❌ Error crítico al notificar a ${turno.nombre}:`, error);
+            console.error(`Error notificando a ${turno.nombre}:`, error.message || error);
         }
     });
 
     await Promise.all(promesas);
-    mostrarNotificacion(`Proceso de notificaciones completado.`, 'info');
 }
 
 async function notificarSiguienteEnCola() {
-    if (!Array.isArray(dataRender)) return;
-    // dataRender es el array de turnos en espera, ya ordenado.
-    // El turno que se acaba de llamar estaba en el índice 0. El siguiente es el del índice 1.
     const siguienteTurno = dataRender.length > 1 ? dataRender[1] : null;
-
-    if (!siguienteTurno || !siguienteTurno.telefono) {
-        console.log('No hay siguiente turno en la cola para notificar.');
-        return;
-    }
+    if (!siguienteTurno || !siguienteTurno.telefono) return;
 
     try {
-        console.log(`Intentando notificar al siguiente en cola: ${siguienteTurno.nombre} (${siguienteTurno.telefono})`);
-
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || supabase.supabaseKey;
-
-        let data, error;
-        try {
-            ({ data, error } = await supabase.functions.invoke('send-push-notification', {
-                body: {
-                    telefono: siguienteTurno.telefono,
-                    negocio_id: negocioId,
-                    title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
-                    body: 'Dirígete al local ahora. Es tu momento.'
-                }
-            }));
-        } catch (eInvoke) {
-            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
-            try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        telefono: siguienteTurno.telefono,
-                        negocio_id: negocioId,
-                        title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
-                        body: 'Dirígete al local ahora. Es tu momento.'
-                    })
-                });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                data = await res.json().catch(() => ({ success: true }));
-                error = null;
-            } catch (eFetch) {
-                error = eFetch;
-            }
-        }
-
-        if (error) {
-            console.error('Error devuelto por la función de notificación:', error.message || error);
-            mostrarNotificacion(`No se pudo notificar a ${siguienteTurno.nombre}.`, 'warning');
-            return;
-        }
-
-        if (data && data.success) {
-            console.log(`✅ Notificación push enviada a ${siguienteTurno.nombre}.`);
-            mostrarNotificacion(`Notificación push enviada a ${siguienteTurno.nombre}.`, 'info');
-        } else {
-             console.error(`Fallo al enviar notificación a ${siguienteTurno.nombre}:`, data?.error || data);
-             mostrarNotificacion(`Fallo al enviar notificación a ${siguienteTurno.nombre}`, 'warning');
-        }
-
+        await supabase.rpc('enviar_notificacion_rpc', {
+            p_user_id: `cliente_${siguienteTurno.telefono}`,
+            p_headings: { en: `¡Es tu turno, ${siguienteTurno.nombre}!` },
+            p_contents: { en: 'Dirígete al local ahora. Es tu momento.' },
+            p_data: { url: 'https://jbarber.vip/cliente.html' }
+        });
     } catch (invokeError) {
         console.error('Error al invocar la función de notificación push:', invokeError);
-        mostrarNotificacion('Error de red al intentar enviar la notificación push.', 'error');
     }
 }
 
-/**
- * Notifica a un cliente específico cuando se toma un turno
- * @param {string} telefono - Teléfono del cliente
- * @param {string} nombre - Nombre del cliente
- * @param {string} turno - Número de turno
- */
-async function notificarTurnoTomado(telefono, nombre, turno) {
-    if (!telefono) {
-        console.log('No se puede notificar: teléfono no disponible');
-        return;
-    }
+async function notificarTurnoTomado(telefono, nombreCliente, turno) {
+    if (!telefono) return;
+
+    const tiempoEstimado = await calcularTiempoEstimadoTotal(turno);
+    const mensaje = `¡Hola ${nombreCliente}! Tu turno ${turno} ha sido registrado. Tiempo estimado de espera: ${tiempoEstimado} minutos.`;
 
     try {
-        console.log(`Notificando turno tomado a: ${nombre} (${telefono})`);
-
-        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: `¡Turno confirmado, ${nombre}!`,
-            p_body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
+        await supabase.rpc('enviar_notificacion_rpc', {
+            p_user_id: `cliente_${telefono}`,
+            p_headings: { en: "Turno Registrado" },
+            p_contents: { en: mensaje },
+            p_data: { url: 'https://jbarber.vip/cliente.html' }
         });
-
-        if (error) {
-            console.error('Error al notificar turno tomado:', error.message || error);
-            return;
-        }
-
-        if (data && data.success) {
-            console.log(`✅ Notificación de turno tomado enviada a ${nombre}`);
-        } else {
-            console.error(`Error al enviar notificación de turno tomado:`, data?.error || data);
-        }
-
-    } catch (invokeError) {
-        console.error('Error al invocar notificación de turno tomado:', invokeError);
+    } catch (e) {
+        console.error('Error al enviar notificación de turno tomado:', e);
+        mostrarNotificacion('No se pudo notificar al cliente.', 'warning');
     }
 }
 
 async function notificarRecordatorioCita(cita) {
     if (!cita || !cita.cliente_telefono) return;
-
     const telefono = cita.cliente_telefono;
     const nombre = clientesMap[telefono] || 'Cliente';
     const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     try {
-        console.log(`Enviando recordatorio de cita a ${nombre} (${telefono})...`);
-        
-        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: `⏰ Recordatorio de cita`,
-            p_body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
+        await supabase.rpc('enviar_notificacion_rpc', {
+            p_user_id: `cliente_${telefono}`,
+            p_headings: { en: `⏰ Recordatorio de cita` },
+            p_contents: { en: `Tu cita de hoy es a las ${hora}. Te esperamos.` },
+            p_data: { url: 'https://jbarber.vip/cliente.html' }
         });
-
-        if (error) {
-            console.error('Error al enviar recordatorio de cita:', error.message || error);
-        } else if (data && data.success) {
-            console.log(`✅ Recordatorio de cita enviado a ${nombre} (${telefono})`);
-        }
     } catch (invokeError) {
         console.error('Error al invocar recordatorio de cita:', invokeError);
     }
@@ -1553,24 +1432,15 @@ async function notificarRecordatorioCita(cita) {
 
 async function notificarCitaAceptada(telefono, nombre, startAt) {
     if (!telefono) return;
-
     const hora = startAt ? new Date(startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
     try {
-        console.log(`Notificando cita aceptada a ${nombre} (${telefono})...`);
-        
-        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: `✅ Cita aceptada`,
-            p_body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
+        await supabase.rpc('enviar_notificacion_rpc', {
+            p_user_id: `cliente_${telefono}`,
+            p_headings: { en: `✅ Cita aceptada` },
+            p_contents: { en: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.' },
+            p_data: { url: 'https://jbarber.vip/cliente.html' }
         });
-
-        if (error) {
-            console.error('Error al enviar notificación de cita aceptada:', error.message || error);
-        } else if (data && data.success) {
-            console.log(`✅ Notificación de cita aceptada enviada a ${nombre || 'cliente'} (${telefono})`);
-        }
     } catch (invokeError) {
         console.error('Error al invocar notificación de cita aceptada:', invokeError);
     }

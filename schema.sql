@@ -1112,4 +1112,59 @@ EXCEPTION
 END;
 $$;
 
+-- ==============================================================================
+-- 16) Función RPC Segura para Envío de Correos
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.enviar_correo_rpc(p_to text, p_subject text, p_body text)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_resend_api_key TEXT;
+    v_response JSON;
+BEGIN
+    -- 1. Obtener la API Key de Resend desde Vault de forma segura
+    SELECT decrypted_secret INTO v_resend_api_key FROM vault.decrypted_secrets WHERE name = 'RESEND_API_KEY' LIMIT 1;
+
+    -- Si no se encuentra la clave, devolver un error claro
+    IF v_resend_api_key IS NULL THEN
+        RETURN json_build_object('success', false, 'error', 'Resend API Key no configurada en Vault.');
+    END IF;
+
+    -- 2. Enviar la solicitud a la API de Resend
+    SELECT content::json INTO v_response FROM net.http_post(
+        url := 'https://api.resend.com/emails',
+        headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || v_resend_api_key
+        ),
+        body := jsonb_build_object(
+            'from', 'JBarber <onboarding@resend.dev>',
+            'to', p_to,
+            'subject', p_subject,
+            'html', p_body
+        )
+    );
+
+    -- 3. Manejar la respuesta
+    IF v_response->>'id' IS NOT NULL THEN
+        RETURN json_build_object('success', true, 'id', v_response->>'id');
+    ELSE
+        RETURN json_build_object('success', false, 'error', 'Respuesta inválida de Resend', 'details', v_response);
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
+-- Permisos para las funciones RPC
+GRANT EXECUTE ON FUNCTION public.enviar_notificacion_rpc(text, text, text, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.enviar_notificacion_rpc(text, text, text, text, text) TO authenticated;
+
+GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO authenticated;
+
 COMMIT;
