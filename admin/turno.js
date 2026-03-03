@@ -1501,43 +1501,12 @@ async function notificarTurnoTomado(telefono, nombre, turno) {
     try {
         console.log(`Notificando turno tomado a: ${nombre} (${telefono})`);
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || supabase.supabaseKey;
-
-        let data, error;
-        try {
-            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
-                body: {
-                    telefono: telefono,
-                    negocio_id: negocioId,
-                    title: `¡Turno confirmado, ${nombre}!`,
-                    body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
-                }
-            }));
-        } catch (eInvoke) {
-            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
-            try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        telefono: telefono,
-                        negocio_id: negocioId,
-                        title: `¡Turno confirmado, ${nombre}!`,
-                        body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
-                    })
-                });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                data = await res.json().catch(() => ({ success: true }));
-                error = null;
-            } catch (eFetch) {
-                error = eFetch;
-            }
-        }
+        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: `¡Turno confirmado, ${nombre}!`,
+            p_body: `Tu turno ${turno} ha sido registrado exitosamente. Te notificaremos cuando sea tu momento.`
+        });
 
         if (error) {
             console.error('Error al notificar turno tomado:', error.message || error);
@@ -1564,43 +1533,13 @@ async function notificarRecordatorioCita(cita) {
 
     try {
         console.log(`Enviando recordatorio de cita a ${nombre} (${telefono})...`);
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || supabase.supabaseKey;
-
-        let data, error;
-        try {
-            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
-                body: {
-                    telefono,
-                    negocio_id: negocioId,
-                    title: `⏰ Recordatorio de cita`,
-                    body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
-                }
-            }));
-        } catch (eInvoke) {
-            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
-            try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        telefono,
-                        negocio_id: negocioId,
-                        title: `⏰ Recordatorio de cita`,
-                        body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
-                    })
-                });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                data = await res.json().catch(() => ({ success: true }));
-                error = null;
-            } catch (eFetch) {
-                error = eFetch;
-            }
-        }
+        
+        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: `⏰ Recordatorio de cita`,
+            p_body: `Tu cita de hoy es a las ${hora}. Te esperamos.`
+        });
 
         if (error) {
             console.error('Error al enviar recordatorio de cita:', error.message || error);
@@ -1619,43 +1558,13 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
 
     try {
         console.log(`Notificando cita aceptada a ${nombre} (${telefono})...`);
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token || supabase.supabaseKey;
-
-        let data, error;
-        try {
-            ({ data, error } = await supabase.functions.invoke('send-onesignal-notification', {
-                body: {
-                    telefono,
-                    negocio_id: negocioId,
-                    title: `✅ Cita aceptada`,
-                    body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
-                }
-            }));
-        } catch (eInvoke) {
-            console.warn('Fallo invoke, intentando fetch manual:', eInvoke);
-            try {
-                const url = 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification';
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        telefono,
-                        negocio_id: negocioId,
-                        title: `✅ Cita aceptada`,
-                        body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
-                    })
-                });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                data = await res.json().catch(() => ({ success: true }));
-                error = null;
-            } catch (eFetch) {
-                error = eFetch;
-            }
-        }
+        
+        const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: `✅ Cita aceptada`,
+            p_body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.'
+        });
 
         if (error) {
             console.error('Error al enviar notificación de cita aceptada:', error.message || error);

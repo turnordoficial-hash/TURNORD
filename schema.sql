@@ -412,6 +412,27 @@ CREATE TABLE IF NOT EXISTS public.roles_negocio (
   UNIQUE (negocio_id, user_id)
 );
 
+-- FIX: Ensure ON DELETE CASCADE is correctly applied to roles_negocio.
+-- This is a non-destructive and idempotent way to fix the foreign key.
+DO $$
+DECLARE
+  v_constraint_name text;
+  v_delete_rule char;
+BEGIN
+  SELECT con.conname, con.confdeltype INTO v_constraint_name, v_delete_rule
+  FROM pg_catalog.pg_constraint AS con JOIN pg_catalog.pg_class AS rel ON rel.oid = con.conrelid
+  WHERE rel.relname = 'roles_negocio' AND con.contype = 'f' AND con.confrelid = 'auth.users'::regclass LIMIT 1;
+
+  -- confdeltype: a = no action, r = restrict, c = cascade
+  IF v_constraint_name IS NOT NULL AND v_delete_rule <> 'c' THEN
+    EXECUTE 'ALTER TABLE public.roles_negocio DROP CONSTRAINT ' || quote_ident(v_constraint_name);
+    ALTER TABLE public.roles_negocio ADD CONSTRAINT roles_negocio_user_id_fkey_cascade FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  ELSIF v_constraint_name IS NULL THEN
+    ALTER TABLE public.roles_negocio ADD CONSTRAINT roles_negocio_user_id_fkey_cascade FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END;
+$$;
+
 ALTER TABLE public.roles_negocio ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS roles_select ON public.roles_negocio;
@@ -424,9 +445,7 @@ USING (auth.uid() = user_id);
 -- 9) Tabla: Clientes (Perfil y Auth Personalizado)
 -- ==============================================================================
 
--- Eliminar tabla antigua si existe para evitar conflicto de tipos (BigInt vs UUID)
-DROP TABLE IF EXISTS public.clientes CASCADE;
-
+-- The destructive `DROP TABLE` command was removed in favor of a non-destructive fix below.
 CREATE TABLE IF NOT EXISTS public.clientes (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   negocio_id TEXT NOT NULL,
@@ -445,6 +464,27 @@ CREATE TABLE IF NOT EXISTS public.clientes (
   CONSTRAINT ux_clientes_negocio_doc UNIQUE (negocio_id, documento_identidad),
   CONSTRAINT ux_clientes_negocio_email UNIQUE (negocio_id, email)
 );
+
+-- FIX: Ensure ON DELETE CASCADE is correctly applied to clientes.
+-- This is a non-destructive and idempotent way to fix the foreign key.
+DO $$
+DECLARE
+  v_constraint_name text;
+  v_delete_rule char;
+BEGIN
+  SELECT con.conname, con.confdeltype INTO v_constraint_name, v_delete_rule
+  FROM pg_catalog.pg_constraint AS con JOIN pg_catalog.pg_class AS rel ON rel.oid = con.conrelid
+  WHERE rel.relname = 'clientes' AND con.contype = 'f' AND con.confrelid = 'auth.users'::regclass LIMIT 1;
+
+  -- confdeltype: a = no action, r = restrict, c = cascade
+  IF v_constraint_name IS NOT NULL AND v_delete_rule <> 'c' THEN
+    EXECUTE 'ALTER TABLE public.clientes DROP CONSTRAINT ' || quote_ident(v_constraint_name);
+    ALTER TABLE public.clientes ADD CONSTRAINT clientes_id_fkey_cascade FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  ELSIF v_constraint_name IS NULL THEN
+    ALTER TABLE public.clientes ADD CONSTRAINT clientes_id_fkey_cascade FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END;
+$$;
 
 -- RLS para Clientes
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
@@ -977,7 +1017,8 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Función para invocar la Edge Function
--- ⚠️ IMPORTANTE: Reemplaza TU_PROJECT_REF y TU_SERVICE_ROLE_KEY con tus valores reales antes de ejecutar
+-- ⚠️ IMPORTANTE: Reemplaza el texto de abajo con tu SERVICE_ROLE_KEY real de Supabase
+-- Puedes encontrarla en: Dashboard -> Project Settings -> API -> Project API keys -> service_role
 CREATE OR REPLACE FUNCTION public.run_sistema_notificaciones()
 RETURNS void
 LANGUAGE plpgsql
@@ -989,7 +1030,7 @@ BEGIN
       url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer TU_SERVICE_ROLE_KEY'
+        'Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdndqaXJoeGVub3R2ZGV3Ym1tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTkzNzUxMSwiZXhwIjoyMDg1NTEzNTExfQ.bObcSn2JJKaNN6wTp1AMY0Wr8eo5tOa3q3kxnw4n8WI' -- <-- REEMPLAZA ESTO
       ),
       body := '{}'::jsonb
     );
@@ -1004,9 +1045,71 @@ SELECT cron.schedule(
 );
 
 -- Eliminar la tarea de cron directa si existe
-SELECT cron.unschedule('enviar-notificaciones-cada-minuto');
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'enviar-notificaciones-cada-minuto') THEN
+    PERFORM cron.unschedule('enviar-notificaciones-cada-minuto');
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.enviar_notificaciones_onesignal();
 
+-- ==============================================================================
+-- 15) Función RPC Segura para Notificaciones desde el Frontend
+-- ==============================================================================
 
+CREATE OR REPLACE FUNCTION public.enviar_notificacion_rpc(
+    p_telefono TEXT,
+    p_negocio_id TEXT,
+    p_title TEXT,
+    p_body TEXT,
+    p_url TEXT DEFAULT '/panel_cliente.html'
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_onesignal_app_id TEXT := '85f98db3-968a-4580-bb02-8821411a6bee';
+  v_onesignal_api_key TEXT;
+  v_payload JSONB;
+  v_request_id BIGINT;
+  v_response JSON;
+BEGIN
+  -- IMPORTANTE: Configura ONE_SIGNAL_REST_API_KEY en Supabase Vault
+  SELECT decrypted_secret INTO v_onesignal_api_key FROM vault.decrypted_secrets WHERE name = 'ONE_SIGNAL_REST_API_KEY' LIMIT 1;
+
+  IF v_onesignal_api_key IS NULL THEN
+      RETURN json_build_object('success', false, 'error', 'OneSignal API Key no configurada en Vault.');
+  END IF;
+
+  v_payload := jsonb_build_object(
+    'app_id', v_onesignal_app_id,
+    'headings', jsonb_build_object('en', p_title),
+    'contents', jsonb_build_object('en', p_body),
+    'url', p_url,
+    'include_aliases', jsonb_build_object('external_id', jsonb_build_array(p_telefono)),
+    'target_channel', 'push'
+  );
+
+  SELECT content::json INTO v_response FROM net.http_post(
+    url := 'https://api.onesignal.com/notifications',
+    headers := jsonb_build_object(
+      'Authorization', 'Basic ' || v_onesignal_api_key,
+      'Content-Type', 'application/json'
+    ),
+    body := v_payload
+  );
+
+  IF v_response->>'id' IS NOT NULL THEN
+    RETURN json_build_object('success', true, 'id', v_response->>'id');
+  ELSE
+    RETURN json_build_object('success', false, 'error', 'Respuesta inválida de OneSignal', 'details', v_response);
+  END IF;
+
+EXCEPTION
+  WHEN others THEN
+    RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
 
 COMMIT;

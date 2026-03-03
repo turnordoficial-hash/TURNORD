@@ -1365,15 +1365,24 @@ async function sendPushNotification(title, body, url) {
     return;
   }
   
-  console.log(`Intentando enviar notificación push a ${telefono}...`);
+  console.log(`Intentando enviar notificación push via RPC a ${telefono}...`);
   try {
-    const { data, error } = await supabase.functions.invoke('send-onesignal-notification', {
-      body: { telefono, negocio_id: negocioId, title, body, url }
+    const { data, error } = await supabase.rpc('enviar_notificacion_rpc', {
+      p_telefono: telefono,
+      p_negocio_id: negocioId,
+      p_title: title,
+      p_body: body,
+      p_url: url || '/panel_cliente.html'
     });
+    
     if (error) throw error;
-    console.log('✅ Notificación push enviada con éxito:', data);
+    if (data && data.success) {
+      console.log('✅ Notificación push enviada con éxito via RPC:', data.id);
+    } else {
+      console.error('❌ Error en respuesta RPC:', data?.error);
+    }
   } catch (e) {
-    console.error('❌ Error enviando push:', e.message || e);
+    console.error('❌ Error invocando enviar_notificacion_rpc:', e.message || e);
   }
 }
 
@@ -1585,7 +1594,8 @@ function slotDisponible(slotStart, duracion, citas = [], breaks = []) {
 }
 
 function updateBarberInfo() {
-  const barberSel = document.getElementById('select-barbero-cita')?.value;  const barbers = appState.barbers || [];
+  const barberSel = document.getElementById('select-barbero-cita')?.value;
+  const barbers = appState.barbers || [];
   const infoCard = document.getElementById('barber-info-card');
   
   if (infoCard && barbers.length > 0) {
@@ -1596,7 +1606,12 @@ function updateBarberInfo() {
       const nameDisplay = document.getElementById('barber-name-display');
       if (nameDisplay) nameDisplay.textContent = barber.nombre || barber.usuario || 'Barbero';
       const avatarDisplay = document.getElementById('barber-avatar-display');
-      if (avatarDisplay) avatarDisplay.src = barber.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario || 'B')}&background=C1121F&color=fff&bold=true`;
+      if (avatarDisplay) {
+        const avatarUrl = (barber.avatar_url && !barber.avatar_url.startsWith('blob:')) 
+          ? barber.avatar_url 
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario || 'B')}&background=C1121F&color=fff&bold=true`;
+        avatarDisplay.src = avatarUrl;
+      }
     } else {
       infoCard.classList.add('hidden');
       infoCard.classList.remove('flex');
@@ -1938,17 +1953,21 @@ async function confirmarReservaManual() {
 
         Object.keys(slotsCache).forEach(k => delete slotsCache[k]); 
 
-        // 1. Notificación Push OneSignal
-        sendPushNotification(
+        // 1. Notificación Push via RPC (Esperamos a que se envíe antes de recargar)
+        await sendPushNotification(
           '💈 JBarber - Cita confirmada',
           `Tu cita para las ${timeStr} ha sido agendada.`,
           '/panel_cliente.html#cita'
         );
 
         // 2. Correo de Confirmación
-        enviarCorreoConfirmacion(date.toISOString(), servicioSel, Number(barberSel));
+        await enviarCorreoConfirmacion(date.toISOString(), servicioSel, Number(barberSel));
 
-        window.location.reload();
+        // 🔥 OPTIMIZACIÓN: Solo recargar si es necesario
+        showToast('Cita agendada con éxito. Actualizando...', 'success');
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
       } catch (e) {
         console.error(e);
         const msg = (e.message && e.message.length < 150) ? e.message : 'Ese horario acaba de ocuparse o hubo un error. Por favor selecciona otro.';
