@@ -1364,10 +1364,11 @@ async function notificarAvanceFila() {
 
         try {
             await supabase.rpc('enviar_notificacion_rpc', {
-                p_user_id: `cliente_${turno.telefono}`,
-                p_headings: { en: `Turno ${turno.turno} - ${turno.nombre}` },
-                p_contents: { en: mensaje },
-                p_data: { url: 'https://jbarber.vip/cliente.html' }
+                p_telefono: turno.telefono,
+                p_negocio_id: negocioId,
+                p_title: `Turno ${turno.turno} - ${turno.nombre}`,
+                p_body: mensaje,
+                p_url: 'https://jbarber.vip/cliente.html'
             });
         } catch (error) {
             console.error(`Error notificando a ${turno.nombre}:`, error.message || error);
@@ -1383,10 +1384,11 @@ async function notificarSiguienteEnCola() {
 
     try {
         await supabase.rpc('enviar_notificacion_rpc', {
-            p_user_id: `cliente_${siguienteTurno.telefono}`,
-            p_headings: { en: `¡Es tu turno, ${siguienteTurno.nombre}!` },
-            p_contents: { en: 'Dirígete al local ahora. Es tu momento.' },
-            p_data: { url: 'https://jbarber.vip/cliente.html' }
+            p_telefono: siguienteTurno.telefono,
+            p_negocio_id: negocioId,
+            p_title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
+            p_body: 'Dirígete al local ahora. Es tu momento.',
+            p_url: 'https://jbarber.vip/cliente.html'
         });
     } catch (invokeError) {
         console.error('Error al invocar la función de notificación push:', invokeError);
@@ -1401,10 +1403,11 @@ async function notificarTurnoTomado(telefono, nombreCliente, turno) {
 
     try {
         await supabase.rpc('enviar_notificacion_rpc', {
-            p_user_id: `cliente_${telefono}`,
-            p_headings: { en: "Turno Registrado" },
-            p_contents: { en: mensaje },
-            p_data: { url: 'https://jbarber.vip/cliente.html' }
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: "Turno Registrado",
+            p_body: mensaje,
+            p_url: 'https://jbarber.vip/cliente.html'
         });
     } catch (e) {
         console.error('Error al enviar notificación de turno tomado:', e);
@@ -1420,10 +1423,11 @@ async function notificarRecordatorioCita(cita) {
 
     try {
         await supabase.rpc('enviar_notificacion_rpc', {
-            p_user_id: `cliente_${telefono}`,
-            p_headings: { en: `⏰ Recordatorio de cita` },
-            p_contents: { en: `Tu cita de hoy es a las ${hora}. Te esperamos.` },
-            p_data: { url: 'https://jbarber.vip/cliente.html' }
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: `⏰ Recordatorio de cita`,
+            p_body: `Tu cita de hoy es a las ${hora}. Te esperamos.`,
+            p_url: 'https://jbarber.vip/cliente.html'
         });
     } catch (invokeError) {
         console.error('Error al invocar recordatorio de cita:', invokeError);
@@ -1436,10 +1440,11 @@ async function notificarCitaAceptada(telefono, nombre, startAt) {
 
     try {
         await supabase.rpc('enviar_notificacion_rpc', {
-            p_user_id: `cliente_${telefono}`,
-            p_headings: { en: `✅ Cita aceptada` },
-            p_contents: { en: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.' },
-            p_data: { url: 'https://jbarber.vip/cliente.html' }
+            p_telefono: telefono,
+            p_negocio_id: negocioId,
+            p_title: `✅ Cita aceptada`,
+            p_body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.',
+            p_url: 'https://jbarber.vip/cliente.html'
         });
     } catch (invokeError) {
         console.error('Error al invocar notificación de cita aceptada:', invokeError);
