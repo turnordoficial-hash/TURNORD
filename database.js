@@ -111,4 +111,22 @@ function injectFavicon() {
 if (document.readyState !== 'loading') injectFavicon();
 else document.addEventListener('DOMContentLoaded', injectFavicon);
 
-export { supabase, ensureSupabase };
+/**
+ * Obtiene el ID del negocio de forma dinámica.
+ * Intenta obtenerlo de:
+ * 1. Parámetro 'negocio' en la URL.
+ * 2. Atributo 'data-negocio-id' en el body.
+ * 3. Valor por defecto 'barberia005'.
+ */
+function getDynamicNegocioId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromUrl = urlParams.get('negocio');
+  if (fromUrl) return fromUrl;
+
+  const fromBody = document.body.dataset.negocioId;
+  if (fromBody) return fromBody;
+
+  return 'barberia005';
+}
+
+export { supabase, ensureSupabase, getDynamicNegocioId };

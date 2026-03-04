@@ -265,45 +265,53 @@ ALTER TABLE public.turnos ENABLE ROW LEVEL SECURITY;
 
 -- --- Políticas Servicios ---
 DROP POLICY IF EXISTS servicios_select ON public.servicios;
-CREATE POLICY servicios_select ON public.servicios FOR SELECT USING (true);
+CREATE POLICY servicios_select ON public.servicios FOR SELECT
+  USING (true); -- Los servicios son públicos para que los clientes puedan verlos al tomar turno.
 
 DROP POLICY IF EXISTS servicios_insert ON public.servicios;
-CREATE POLICY servicios_insert ON public.servicios FOR INSERT WITH CHECK (true);
+CREATE POLICY servicios_insert ON public.servicios FOR INSERT
+  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.servicios.negocio_id AND rol = 'admin'));
 
 DROP POLICY IF EXISTS servicios_update ON public.servicios;
-CREATE POLICY servicios_update ON public.servicios FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY servicios_update ON public.servicios FOR UPDATE
+  USING (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.servicios.negocio_id AND rol = 'admin'));
 
 -- --- Políticas Cierres Caja ---
 DROP POLICY IF EXISTS cierres_select ON public.cierres_caja;
-CREATE POLICY cierres_select ON public.cierres_caja FOR SELECT USING (true);
+CREATE POLICY cierres_select ON public.cierres_caja FOR SELECT
+  USING (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.cierres_caja.negocio_id AND rol = 'admin'));
 
 DROP POLICY IF EXISTS cierres_insert ON public.cierres_caja;
-CREATE POLICY cierres_insert ON public.cierres_caja FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS cierres_update ON public.cierres_caja;
-CREATE POLICY cierres_update ON public.cierres_caja FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY cierres_insert ON public.cierres_caja FOR INSERT
+  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.cierres_caja.negocio_id AND rol = 'admin'));
 
 -- --- Políticas Configuracion Negocio ---
-DROP POLICY IF EXISTS "Enable all operations for configuracion_negocio" ON public.configuracion_negocio;
-CREATE POLICY "Enable all operations for configuracion_negocio" ON public.configuracion_negocio
-    FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Configuracion select" ON public.configuracion_negocio;
+CREATE POLICY "Configuracion select" ON public.configuracion_negocio FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Configuracion manage" ON public.configuracion_negocio;
+CREATE POLICY "Configuracion manage" ON public.configuracion_negocio
+    FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.configuracion_negocio.negocio_id AND rol = 'admin'));
 
 -- --- Políticas Estado Negocio ---
-DROP POLICY IF EXISTS "Enable all operations for estado_negocio" ON public.estado_negocio;
-CREATE POLICY "Enable all operations for estado_negocio" ON public.estado_negocio
-    FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Estado select" ON public.estado_negocio;
+CREATE POLICY "Estado select" ON public.estado_negocio FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Estado manage" ON public.estado_negocio;
+CREATE POLICY "Estado manage" ON public.estado_negocio
+    FOR ALL USING (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.estado_negocio.negocio_id));
 
 -- --- Políticas Comentarios ---
-DROP POLICY IF EXISTS "Permitir acceso de lectura a todos" ON public.comentarios;
-CREATE POLICY "Permitir acceso de lectura a todos" ON public.comentarios FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Comentarios select" ON public.comentarios;
+CREATE POLICY "Comentarios select" ON public.comentarios FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Permitir inserción a todos" ON public.comentarios;
-CREATE POLICY "Permitir inserción a todos" ON public.comentarios FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Comentarios insert" ON public.comentarios;
+CREATE POLICY "Comentarios insert" ON public.comentarios FOR INSERT WITH CHECK (true);
 
 -- --- Políticas Turnos ---
 DROP POLICY IF EXISTS turnos_select ON public.turnos;
 CREATE POLICY turnos_select ON public.turnos 
-  FOR SELECT USING (true); -- Permitimos ver la cola general, pero limitaremos campos en la vista si es necesario
+  FOR SELECT USING (true); -- Permite ver la cola pública. La privacidad se maneja ocultando datos sensibles en la app.
 
 DROP POLICY IF EXISTS turnos_insert ON public.turnos;
 CREATE POLICY turnos_insert ON public.turnos 
@@ -311,20 +319,18 @@ CREATE POLICY turnos_insert ON public.turnos
 
 DROP POLICY IF EXISTS turnos_update ON public.turnos;
 CREATE POLICY turnos_update ON public.turnos 
-  FOR UPDATE USING (true) WITH CHECK (true);
+  FOR UPDATE USING (
+    (auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.turnos.negocio_id))
+    OR
+    (id IN (SELECT id FROM public.clientes WHERE id = auth.uid()))
+  ) WITH CHECK (true);
 
--- --- Políticas Push Subscriptions (Corregidas para push_subscriptions) ---
-DROP POLICY IF EXISTS "Public-insert" ON public.push_subscriptions;
-CREATE POLICY "Public-insert" ON public.push_subscriptions 
-  FOR INSERT WITH CHECK (true);
+-- --- Políticas Push Subscriptions ---
+DROP POLICY IF EXISTS "Push select self" ON public.push_subscriptions;
+CREATE POLICY "Push select self" ON public.push_subscriptions FOR SELECT USING (auth.uid()::text = user_id OR auth.uid() IN (SELECT user_id FROM public.roles_negocio WHERE negocio_id = public.push_subscriptions.negocio_id));
 
-DROP POLICY IF EXISTS "Public-update" ON public.push_subscriptions;
-CREATE POLICY "Public-update" ON public.push_subscriptions 
-  FOR UPDATE USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public-select" ON public.push_subscriptions;
-CREATE POLICY "Public-select" ON public.push_subscriptions 
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Push insert self" ON public.push_subscriptions;
+CREATE POLICY "Push insert self" ON public.push_subscriptions FOR INSERT WITH CHECK (true);
 
 
 -- ==============================================================================

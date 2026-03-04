@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase, getDynamicNegocioId } from '../database.js';
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
@@ -13,7 +13,7 @@ window.addEventListener('unhandledrejection', (e) => {
   }
 });
 
-const negocioId = 'barberia005';
+const negocioId = getDynamicNegocioId();
 
 // Estado centralizado para la aplicación, eliminando variables globales.
 const appState = {
@@ -1112,7 +1112,8 @@ async function cargarPerfil() {
   }
 
   // 2. Obtener datos frescos
-  const { data, error } = await supabase.from('clientes').select('*, puntos_actuales, puntos_totales_historicos, ultima_visita').eq('id', clienteId).single();
+  const sb = await ensureSupabase();
+  const { data, error } = await sb.from('clientes').select('*, puntos_actuales, puntos_totales_historicos, ultima_visita').eq('id', clienteId).single();
   
   if (error) {
     if (error.message && (error.message.includes('AbortError') || error.message.includes('signal is aborted'))) return;

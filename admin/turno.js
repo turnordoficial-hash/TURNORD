@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase, getDynamicNegocioId } from '../database.js';
 import { RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
@@ -29,16 +29,7 @@ let basePricePago = 0;
 
 
 
-function getNegocioId() {
-    const id = document.body.dataset.negocioId;
-    if (!id) {
-        console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
-        alert('Error de configuración: No se pudo identificar el negocio.');
-    }
-    return id;
-}
-
-const negocioId = getNegocioId();
+const negocioId = getDynamicNegocioId();
 
 // CONSTANTES DE ESTADO CENTRALIZADAS
 const ESTADOS = {
@@ -1345,6 +1336,7 @@ function cerrarModalPago() {
 /**
  * Verifica si un barbero tiene tiempo suficiente para atender un servicio antes de su próxima cita.
  */
+function barberoDisponible(barberId) {
     // 1. Verificar si tiene turno en atención (usando cache actualizado en cargarTurnos)
     const tieneTurnoActivo = enAtencionCache.some(t => t.barber_id === barberId);
     if (tieneTurnoActivo) return false;

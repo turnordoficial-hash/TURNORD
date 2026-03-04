@@ -1,19 +1,6 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase, getDynamicNegocioId } from '../database.js';
 
-/**
- * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
- * @returns {string|null} El ID del negocio o null si no está presente.
- */
-function getNegocioId() {
-    const id = document.body.dataset.negocioId;
-    if (!id) {
-        console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
-        alert('Error de configuración: No se pudo identificar la página del negocio.');
-    }
-    return id;
-}
-
-const negocioId = getNegocioId();
+const negocioId = getDynamicNegocioId();
 
 // Estado en memoria/localStorage
 let turnoAsignado = null;
@@ -672,7 +659,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     ['telefono', 'nombre'].forEach(id => {
         const input = document.getElementById(id);
         if (input) input.addEventListener('input', () => {
-            input.value = id === 'telefono' ? input.value.replace(/[^0-9]/g, '')
+            input.value = id === 'telefono' ? input.value.replace(/[^0-9]/g, '') : input.value;
+        });
     });
     if (await verificarTurnoActivo()) {
         if (btnTomarTurno) btnTomarTurno.disabled = true;
