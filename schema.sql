@@ -1024,13 +1024,16 @@ RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_service_role text;
 BEGIN
+  SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
   PERFORM
     net.http_post(
       url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdndqaXJoeGVub3R2ZGV3Ym1tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTkzNzUxMSwiZXhwIjoyMDg1NTEzNTExfQ.bObcSn2JJKaNN6wTp1AMY0Wr8eo5tOa3q3kxnw4n8WI' -- <-- REEMPLAZA ESTO
+        'Authorization', 'Bearer ' || v_service_role
       ),
       body := '{}'::jsonb
     );
@@ -1052,6 +1055,54 @@ BEGIN
   END IF;
 END $$;
 DROP FUNCTION IF EXISTS public.enviar_notificaciones_onesignal();
+
+-- ==============================================================================
+-- 14.5) Triggers para Notificaciones en Tiempo Real (Event-Driven)
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION public.trg_notificar_evento()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_payload JSONB;
+  v_service_role text;
+BEGIN
+  v_payload := jsonb_build_object(
+    'event', TG_OP,
+    'record', row_to_json(NEW)::jsonb,
+    'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD)::jsonb ELSE NULL END
+  );
+
+  SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+
+  PERFORM
+    net.http_post(
+      url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || v_service_role
+      ),
+      body := v_payload
+    );
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger para Citas (Nuevas y Cancelaciones)
+DROP TRIGGER IF EXISTS trg_citas_notificacion ON public.citas;
+CREATE TRIGGER trg_citas_notificacion
+AFTER INSERT OR UPDATE ON public.citas
+FOR EACH ROW
+WHEN (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.estado IS DISTINCT FROM NEW.estado))
+EXECUTE FUNCTION public.trg_notificar_evento();
+
+-- Trigger para Turnos (Llamados y Posición)
+DROP TRIGGER IF EXISTS trg_turnos_notificacion ON public.turnos;
+CREATE TRIGGER trg_turnos_notificacion
+AFTER UPDATE ON public.turnos
+FOR EACH ROW
+WHEN (OLD.estado IS DISTINCT FROM NEW.estado OR OLD.orden IS DISTINCT FROM NEW.orden)
+EXECUTE FUNCTION public.trg_notificar_evento();
 
 -- ==============================================================================
 -- 15) Función RPC Segura para Notificaciones desde el Frontend

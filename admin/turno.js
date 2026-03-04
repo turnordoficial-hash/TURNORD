@@ -815,8 +815,7 @@ async function tomarTurno(event) {
     cerrarModal();
     mostrarNotificacion(`Turno ${nuevoTurno} registrado para ${nombre}`, 'success');
     
-    // Notificar al cliente que su turno fue tomado
-    await notificarTurnoTomado(telefono, nombre, nuevoTurno);
+    // El trigger de base de datos se encargará de las notificaciones
     
     isSubmittingTurn = false;
     refrescarUI();
@@ -1115,7 +1114,7 @@ async function cargarTurnos() {
             const key = `cita_recordatorio_${negocioId}_${proximaCitaInminente.id}`;
             if (typeof localStorage !== 'undefined' && !localStorage.getItem(key)) {
                 localStorage.setItem(key, '1');
-                notificarRecordatorioCita(proximaCitaInminente);
+                // La notificación de recordatorio ahora la maneja el sistema centralizado de cron/edge functions
             }
         } catch (e) {
             console.error('Error gestionando recordatorio de cita:', e);
@@ -1344,114 +1343,8 @@ function cerrarModalPago() {
 }
 
 /**
- * Notifica a todos los clientes en espera cuando avanza la fila
+ * Verifica si un barbero tiene tiempo suficiente para atender un servicio antes de su próxima cita.
  */
-async function notificarAvanceFila() {
-    if (!Array.isArray(dataRender)) return;
-    const turnosEnEspera = dataRender.filter(turno => turno.estado === ESTADOS.ESPERA).slice(0, 2);
-    if (turnosEnEspera.length === 0) return;
-
-    const promesas = turnosEnEspera.map(async (turno, i) => {
-        const posicionEnFila = i + 1;
-        let mensaje = '';
-        if (posicionEnFila === 1) {
-            mensaje = '¡Es tu turno! Dirígete al local ahora.';
-        } else if (posicionEnFila === 2) {
-            mensaje = '¡Prepárate! Queda 1 persona antes que tú. Dirígete al local.';
-        } else {
-            return;
-        }
-
-        try {
-            await supabase.rpc('enviar_notificacion_rpc', {
-                p_telefono: turno.telefono,
-                p_negocio_id: negocioId,
-                p_title: `Turno ${turno.turno} - ${turno.nombre}`,
-                p_body: mensaje,
-                p_url: 'https://jbarber.vip/cliente.html'
-            });
-        } catch (error) {
-            console.error(`Error notificando a ${turno.nombre}:`, error.message || error);
-        }
-    });
-
-    await Promise.all(promesas);
-}
-
-async function notificarSiguienteEnCola() {
-    const siguienteTurno = dataRender.length > 1 ? dataRender[1] : null;
-    if (!siguienteTurno || !siguienteTurno.telefono) return;
-
-    try {
-        await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: siguienteTurno.telefono,
-            p_negocio_id: negocioId,
-            p_title: `¡Es tu turno, ${siguienteTurno.nombre}!`,
-            p_body: 'Dirígete al local ahora. Es tu momento.',
-            p_url: 'https://jbarber.vip/cliente.html'
-        });
-    } catch (invokeError) {
-        console.error('Error al invocar la función de notificación push:', invokeError);
-    }
-}
-
-async function notificarTurnoTomado(telefono, nombreCliente, turno) {
-    if (!telefono) return;
-
-    const tiempoEstimado = await calcularTiempoEstimadoTotal(turno);
-    const mensaje = `¡Hola ${nombreCliente}! Tu turno ${turno} ha sido registrado. Tiempo estimado de espera: ${tiempoEstimado} minutos.`;
-
-    try {
-        await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: "Turno Registrado",
-            p_body: mensaje,
-            p_url: 'https://jbarber.vip/cliente.html'
-        });
-    } catch (e) {
-        console.error('Error al enviar notificación de turno tomado:', e);
-        mostrarNotificacion('No se pudo notificar al cliente.', 'warning');
-    }
-}
-
-async function notificarRecordatorioCita(cita) {
-    if (!cita || !cita.cliente_telefono) return;
-    const telefono = cita.cliente_telefono;
-    const nombre = clientesMap[telefono] || 'Cliente';
-    const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    try {
-        await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: `⏰ Recordatorio de cita`,
-            p_body: `Tu cita de hoy es a las ${hora}. Te esperamos.`,
-            p_url: 'https://jbarber.vip/cliente.html'
-        });
-    } catch (invokeError) {
-        console.error('Error al invocar recordatorio de cita:', invokeError);
-    }
-}
-
-async function notificarCitaAceptada(telefono, nombre, startAt) {
-    if (!telefono) return;
-    const hora = startAt ? new Date(startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-
-    try {
-        await supabase.rpc('enviar_notificacion_rpc', {
-            p_telefono: telefono,
-            p_negocio_id: negocioId,
-            p_title: `✅ Cita aceptada`,
-            p_body: hora ? `Tu cita con el barbero ha sido aceptada para las ${hora}.` : 'Tu cita con el barbero ha sido aceptada.',
-            p_url: 'https://jbarber.vip/cliente.html'
-        });
-    } catch (invokeError) {
-        console.error('Error al invocar notificación de cita aceptada:', invokeError);
-    }
-}
-
-function barberoDisponible(barberId) {
     // 1. Verificar si tiene turno en atención (usando cache actualizado en cargarTurnos)
     const tieneTurnoActivo = enAtencionCache.some(t => t.barber_id === barberId);
     if (tieneTurnoActivo) return false;
@@ -1629,9 +1522,6 @@ async function atenderAhora() {
             mostrarNotificacion('Error al atender cita: ' + e.message, 'error');
         }
         
-        // Notificar avance de fila (ahora sí detectará el nuevo turno en atención)
-        await notificarAvanceFila();
-        
         refrescarUI();
         window.__atendiendo = false;
         return;
@@ -1648,9 +1538,6 @@ async function atenderAhora() {
         return;
     }
     mostrarNotificacion(`Atendiendo turno ${turnoParaAtender.turno}`, 'success');
-
-    // Notificar avance de fila a todos los clientes en espera
-    await notificarAvanceFila();
 
     window.__atendiendo = false;
 }
@@ -1762,9 +1649,6 @@ async function guardarPago(event) {
 
     cerrarModalPago();
     mostrarNotificacion(`Turno finalizado con cobro de RD$${monto}`, 'success');
-    
-    // Notificar avance de fila después de completar un turno
-    await notificarAvanceFila();
 }
 
  
@@ -1835,9 +1719,6 @@ async function procesarAtencionCita(citaId, negocioId) {
         const nombreCliente = resultado.nombre_cliente || 'Cliente';
         mostrarNotificacion(`Turno generado para ${nombreCliente}`, 'success');
         
-        // 4. Notificaciones Push (Efecto secundario no crítico para la transacción)
-        await notificarCitaAceptada(cita.cliente_telefono || '', nombreCliente, cita.start_at);
-
     } catch (error) {
         console.error('Error procesando cita:', error);
         mostrarNotificacion(error.message || 'Error al procesar la cita', 'error');

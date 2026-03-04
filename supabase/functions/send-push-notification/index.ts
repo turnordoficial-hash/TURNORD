@@ -69,6 +69,7 @@ serve(async (req) => {
     const telefono = parsed?.telefono?.toString()?.trim();
     const nombre = parsed?.nombre?.toString()?.trim() || "";
     const clickUrl = parsed?.url || "/panel_cliente.html";
+    const negocioId = parsed?.negocio_id?.toString()?.trim() || "";
     const rol = (parsed?.rol || "cliente").toString().toLowerCase();
     const baseTitle = parsed?.title 
       || (rol === "barbero" ? "Nueva cita asignada 💈" : "Tu cita está confirmada ✂️");
@@ -85,23 +86,35 @@ serve(async (req) => {
 
     const reqBody: Record<string, unknown> = {
       app_id: ONESIGNAL_APP_ID,
-      headings: { en: title },
-      contents: { en: body },
+      headings: { en: title, es: title },
+      contents: { en: body, es: body },
       url: clickUrl,
+      web_push_topic: `${telefono}-default`,
+      data: negocioId ? { negocio_id: negocioId } : undefined,
       include_aliases: {
         external_id: [telefono]
       },
       target_channel: "push"
     };
 
-    const osResponse = await fetch("https://api.onesignal.com/notifications", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${ONE_SIGNAL_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(reqBody),
-    });
+    async function postWithRetry(attempt = 1): Promise<Response> {
+      const res = await fetch("https://api.onesignal.com/notifications", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${ONE_SIGNAL_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reqBody),
+      });
+      if (!res.ok && attempt < 3 && (res.status >= 500 || res.status === 429)) {
+        const backoff = 300 * attempt;
+        await new Promise(r => setTimeout(r, backoff));
+        return postWithRetry(attempt + 1);
+      }
+      return res;
+    }
+
+    const osResponse = await postWithRetry();
 
     const osData = await osResponse.json().catch(() => ({}));
     

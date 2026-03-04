@@ -58,6 +58,29 @@ serve(async (req) => {
                 </div>
             </div>
         `;
+    } else if (template === 'cita_confirmacion') {
+        htmlContent = `
+            <div style="font-family: sans-serif; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+                <div style="background-color: #C1121F; padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 24px;">✅ Cita Confirmada</h1>
+                </div>
+                <div style="padding: 20px;">
+                    <p style="font-size: 16px;">Hola <strong>${data.nombre_cliente}</strong>,</p>
+                    <p style="font-size: 16px;">Tu cita ha sido confirmada con éxito.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 5px 0;"><strong>Barbero:</strong> ${data.barbero}</p>
+                        <p style="margin: 5px 0;"><strong>Hora:</strong> ${data.hora_cita}</p>
+                        <p style="margin: 5px 0;"><strong>Servicio:</strong> ${data.servicio}</p>
+                    </div>
+
+                    <p style="font-size: 14px; color: #555;">Gracias por elegir JBarber.</p>
+                </div>
+                <div style="background-color: #f1f1f1; padding: 10px; text-align: center; font-size: 12px; color: #888;">
+                    <p>JBarber - Estilo & Precisión</p>
+                </div>
+            </div>
+        `;
     } else if (template === 'marketing_inactividad') {
         htmlContent = `
             <div style="font-family: sans-serif; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">

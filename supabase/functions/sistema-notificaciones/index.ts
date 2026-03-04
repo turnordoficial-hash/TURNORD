@@ -45,7 +45,7 @@ async function enviarPush(telefono: string, title: string, body: string, url = "
     return { ok: false, reason: "missing_service_role" };
   }
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-onesignal-notification`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -61,6 +61,28 @@ async function enviarPush(telefono: string, title: string, body: string, url = "
   } catch (e) {
     console.error("Network error invoking sender function:", e);
     return { ok: false, data: { error: e.message } };
+  }
+}
+
+// ✅ 1.5. Envío de correos via Edge Function
+async function enviarEmail(to: string, subject: string, template: string, data: any) {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return { ok: false };
+  
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ to, subject, template, data }),
+    });
+    return { ok: res.ok };
+  } catch (e) {
+    console.error("Error enviando email:", e);
+    return { ok: false };
   }
 }
 
@@ -158,7 +180,19 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
 
       if (diffMin <= 60 && diffMin > 15 && !cita.recordatorio_1h && cita.cliente_telefono) {
         const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 1 hora 📅", `Hola ${nombreCliente}, te esperamos en JBarber.`);
-        if (ok) await supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id);
+        if (ok) {
+          await supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id);
+          // También enviar email de recordatorio
+          const { data: cliente } = await supabase.from('clientes').select('email').eq('telefono', cita.cliente_telefono).maybeSingle();
+          if (cliente?.email) {
+            await enviarEmail(cliente.email, "⏰ Recordatorio: Cita en 1 hora", "cita_recordatorio", {
+              nombre_cliente: nombreCliente,
+              barbero: "Tu Barbero", // Podríamos traer el nombre real con un join
+              hora_cita: new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              tiempo_restante: "1 hora"
+            });
+          }
+        }
       } else if (diffMin <= 15 && diffMin > 0 && !cita.recordatorio_15m && cita.cliente_telefono) {
         const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", `Ya casi es tu momento, ${nombreCliente}.`);
         if (ok) await supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id);
@@ -172,50 +206,14 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
     }
   }
 
-  // Notificar al barbero/administración por nuevas citas (creadas recientemente)
-  const cincoMinAgo = new Date(Date.now() - 5 * 60000).toISOString();
-  const { data: nuevas, error: nuevasError } = await supabase
-    .from("citas")
-    .select<"*, clientes(nombre)", Cita>("id, barber_id, cliente_telefono, start_at, created_at, clientes(nombre)")
-    .eq("negocio_id", negocioId)
-    .eq("notificado_barbero", false)
-    .gte("created_at", cincoMinAgo);
-
-  if (nuevasError) {
-    console.error(`[${negocioId}] Error fetching new appointments:`, nuevasError);
-    return;
-  }
-
-  if (nuevas && nuevas.length > 0) {
-    for (const c of nuevas) {
-      const hora = c.start_at ? new Date(c.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-      const nombreCliente = c.clientes?.nombre || "un cliente";
-      
-      // ✅ 4. Control de rate limit: Usar Promise.all para enviar en paralelo pero esperar a que terminen
-      const notificaciones = [];
-      
-      // Notificación a admin
-      notificaciones.push(enviarPush(String(`admin_${negocioId}`), "Nueva cita programada 📅", `Cita para ${nombreCliente} a las ${hora}.`));
-      
-      // Notificación a barbero
-      if (c.barber_id) {
-        notificaciones.push(enviarPush(String(`barber_${c.barber_id}`), "Nueva cita asignada 📅", `Cita con ${nombreCliente} a las ${hora}.`));
-      }
-
-      const resultados = await Promise.all(notificaciones);
-      
-      // Si todas las notificaciones fueron exitosas, actualiza la base de datos
-      if (resultados.every(r => r.ok)) {
-        await supabase.from("citas").update({ notificado_barbero: true }).eq("id", c.id);
-      }
-    }
-  }
+  // Se elimina el envío de nuevas citas por cron para operar solo por eventos INSERT
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -227,6 +225,81 @@ serve(async (req) => {
     }
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // --- MANEJO DE EVENTOS (LLAMADO DESDE TRIGGERS) ---
+    if (req.method === "POST") {
+      const payload = await req.json().catch(() => ({}));
+      const { event, record, old_record } = payload;
+
+      if (event === "INSERT" && record && record.start_at) {
+        // Nueva Cita
+        const { data: b } = await supabase.from('barberos').select('nombre').eq('id', record.barber_id).maybeSingle();
+        const { data: c } = await supabase.from('clientes').select('nombre, email').eq('telefono', record.cliente_telefono).maybeSingle();
+
+        const nombreCliente = c?.nombre || "Un cliente";
+        const hora = new Date(record.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const notificaciones = [];
+
+        if (record.barber_id) {
+          notificaciones.push(enviarPush(String(`barber_${record.barber_id}`), "Nueva cita asignada 💈", `Cita con ${nombreCliente} a las ${hora}.`));
+        }
+        if (record.cliente_telefono) {
+          notificaciones.push(enviarPush(record.cliente_telefono, "Cita Confirmada ✅", `Tu cita ha sido agendada para las ${hora}.`));
+        }
+
+        const resultados = await Promise.all(notificaciones);
+
+        if (c?.email) {
+          await enviarEmail(c.email, "✅ Cita Confirmada", "cita_confirmacion", {
+            nombre_cliente: nombreCliente,
+            barbero: b?.nombre || "Tu Barbero",
+            hora_cita: hora,
+            servicio: record.servicio
+          });
+        }
+
+        if (resultados.length > 0 && resultados.every(r => r.ok)) {
+          await supabase.from("citas").update({ notificado_barbero: true }).eq("id", record.id);
+        }
+
+        return new Response(JSON.stringify({ success: true, message: "Evento procesado (cita creada)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (event === "UPDATE" && record && old_record) {
+        // Si el orden cambió, simplemente ejecutamos la verificación global de ese negocio
+        if (record.orden !== old_record.orden) {
+            await verificarTurnos(supabase, record.negocio_id);
+            return new Response(JSON.stringify({ success: true, message: "Posición actualizada" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        
+        // Cambio de Estado o Posición en Turnos
+        if (record.turno && record.estado !== old_record.estado) {
+            const nombre = record.nombre || "Cliente";
+            if (record.estado === "En atención") {
+                await enviarPush(record.telefono, "Es tu turno ahora 💈", `¡Pasa ${nombre}! Te estamos llamando.`);
+            } else if (record.estado === "Cancelado") {
+                await enviarPush(record.telefono, "Turno Cancelado", `Tu turno ${record.turno} ha sido cancelado.`);
+            }
+            return new Response(JSON.stringify({ success: true, message: "Estado de turno procesado" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Cambio de Estado (Cancelación de Cita)
+        if (record.start_at && record.estado === "Cancelada" && old_record.estado !== "Cancelada") {
+          const { data: c } = await supabase.from('clientes').select('nombre').eq('telefono', record.cliente_telefono).maybeSingle();
+          const nombreCliente = c?.nombre || "Un cliente";
+          const hora = new Date(record.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          // Notificar al Barbero
+          await enviarPush(String(`barber_${record.barber_id}`), "Cita Cancelada ❌", `${nombreCliente} ha cancelado su cita de las ${hora}.`);
+          // Notificar al Cliente
+          await enviarPush(record.cliente_telefono, "Cita Cancelada", `Has cancelado tu cita de las ${hora}.`);
+          
+          return new Response(JSON.stringify({ success: true, message: "Cancelación de cita procesada" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
+
+    // --- POLLING DE CRON (LLAMADO SIN BODY O SIN EVENTO) ---
     // Obtener todos los negocios configurados
     const { data: negocios, error: negociosError } = await supabase
       .from("configuracion_negocio")
