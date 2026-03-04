@@ -1673,8 +1673,6 @@ async function guardarPago(event) {
     mostrarNotificacion(`Turno finalizado con cobro de RD$${monto}`, 'success');
 }
 
- 
-
 // --- Lógica Modal Acciones Cita ---
 let selectedCitaId = null;
 
