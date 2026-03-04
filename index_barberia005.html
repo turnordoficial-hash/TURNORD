@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bienvenido a TurnoRD</title>
+
+<!-- Base dinámico -->
+<script>
+  const isGitHub = location.hostname.includes('github.io');
+  let baseHref;
+  if (isGitHub) {
+    const pathParts = location.pathname.split('/');
+    if (pathParts.length > 1 && pathParts[1]) {
+      baseHref = `/${pathParts[1]}/`;
+    } else {
+      baseHref = '/';
+    }
+  } else {
+    baseHref = location.pathname.replace(/[^/]*$/, '');
+  }
+  const base = document.createElement('base');
+  base.href = baseHref;
+  document.head.appendChild(base);
+</script>
+
+<!-- Favicons -->
+<link rel="icon" type="image/png" href="jbarber/jjj.png" />
+<link rel="apple-touch-icon" href="jbarber/jjj.png" />
+<link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+<link rel="manifest" href="imegenlogin/site.webmanifest">
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class', theme: { extend: {} } };
+</script>
+<style>
+  /* Animaciones y Efectos 3D */
+  .perspective-1000 { perspective: 1000px; }
+  .card-3d {
+    transition: transform 0.5s ease, box-shadow 0.5s ease;
+    transform-style: preserve-3d;
+  }
+  .card-3d:hover {
+    transform: translateY(-10px) rotateX(5deg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  .text-shadow { text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+  .gold-gradient { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+  
+  /* Scroll suave */
+  html { scroll-behavior: smooth; }
+  
+  /* Fade In Animations */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up { animation: fadeInUp 0.8s ease-out forwards; }
+</style>
+
+<!-- Inicializar modo oscuro -->
+<script>
+function inicializarModoOscuro() {
+  // Forzar modo oscuro por defecto para estilo premium, o respetar preferencia
+  document.documentElement.classList.add('dark');
+}
+inicializarModoOscuro();
+</script>
+
+</head>
+
+<body class="bg-blue-600 dark:bg-gray-900 text-white min-h-screen flex items-center justify-center px-4" data-negocio-id="barberia005">
+
+  <!-- Botón modo oscuro -->
+  <button id="toggleDarkMode" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  </button>
+
+  <section class="text-center w-full max-w-md p-6 bg-blue-700 dark:bg-blue-800 rounded-xl shadow-xl">
+    <h1 class="text-3xl sm:text-4xl font-bold mb-4">¡Bienvenido a TurnoRD!</h1>
+    <p class="text-base sm:text-lg mb-2"><strong>Nombre de tu negocio</strong></p>
+    <p class="text-base sm:text-lg mb-6">Gestiona tus turnos de manera fácil y rápida.</p>
+
+    <a href="usuario_barberia005.html" class="bg-white dark:bg-gray-200 text-blue-900 dark:text-blue-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:bg-gray-100 dark:hover:bg-gray-300 transition block w-full sm:w-auto mx-auto">
+      Ver turnos
+    </a>
+  </section>
+
+  <!-- Script modo oscuro -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleButton = document.getElementById('toggleDarkMode');
+      toggleButton.addEventListener('click', () => {
+        const isDarkMode = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('modoOscuro', isDarkMode);
+      });
+    });
+  </script>
+
+</body>
+</html>

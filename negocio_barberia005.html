@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Negocio - TurnoRD</title>
+
+<!-- Base dinámico -->
+<script>
+  const isGitHub = location.hostname.includes('github.io');
+  let baseHref;
+  if (isGitHub) {
+    const pathParts = location.pathname.split('/');
+    if (pathParts.length > 1 && pathParts[1]) {
+      baseHref = `/${pathParts[1]}/`;
+    } else {
+      baseHref = '/';
+    }
+  } else {
+    baseHref = location.pathname.replace(/[^/]*$/, '');
+  }
+  const base = document.createElement('base');
+  base.href = baseHref;
+  document.head.appendChild(base);
+</script>
+
+
+<link rel="icon" type="image/png" href="jbarber/jjj.png" />
+<link rel="apple-touch-icon" href="jbarber/jjj.png" />
+<link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
+<link rel="manifest" href="imegenlogin/site.webmanifest">
+
+
+
+
+
+
+
+  <script type="module" src="auth-guard.js"></script>
+  <script>
+    // Aplica tema desde localStorage lo antes posible
+    (function () {
+      var primary = localStorage.getItem('theme_primary') || 'blue';
+      var mode    = localStorage.getItem('theme_mode')    || 'light';
+      var root = document.documentElement;
+      var themes = ['theme-red','theme-orange','theme-blue','theme-black','theme-green','theme-pink','theme-purple'];
+      themes.forEach(function(c){ root.classList.remove(c); });
+      root.classList.add('theme-' + primary);
+      if (mode === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+    })();
+  </script>
+  <script src="assets/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              300: '#fca5a5',
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+              800: '#991b1b',
+              900: '#7f1d1d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Safe area para dispositivos con notch */
+    body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+    /* Evitar overflow en contenedores flex y grids */
+    * { min-width: 0; }
+    /* Medios escalables */
+    img, canvas, svg, video { max-width: 100%; height: auto; }
+    /* Contenedor responsive utilitario */
+    .responsive-container { width: 100%; max-width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+    
+    .dark body { background-color: #000000; background-image: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000000 70%); background-attachment: fixed; }
+
+    /* Sidebar hover effects */
+    @media (min-width: 768px) {
+      #sidebar {
+        width: 4.5rem;
+        overflow: hidden;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #sidebar:hover {
+        width: 18rem;
+      }
+      #sidebar .tracking-wide,
+      #sidebar .tracking-tighter,
+      #sidebar span {
+        opacity: 0;
+        transition: opacity 0.2s;
+        white-space: nowrap;
+      }
+      #sidebar:hover .tracking-wide,
+      #sidebar:hover .tracking-tighter,
+      #sidebar:hover span {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-200" data-negocio-id="barberia005">
+  <div class="flex flex-col min-h-screen">
+    <div class="flex flex-1 relative">
+    <!-- Mobile menu button -->
+    <button id="mobile-menu-button" class="md:hidden fixed top-4 left-4 z-50 bg-gray-900 text-white p-2 rounded-lg shadow-lg hover:bg-gray-800 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+    <!-- Overlay for mobile menu -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-in-out md:hidden z-40"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-18 bg-zinc-950 text-gray-400 flex flex-col fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out z-50 shadow-2xl border-r border-white/5 group/sidebar hover:w-72 will-change-transform">
+      <div class="p-6 flex items-center justify-between border-b border-white/5">
+        <div class="flex items-center gap-3">
+          <img src="jbarber/jjj.png" alt="Logo" class="w-8 h-8 rounded-lg shadow-lg shadow-red-500/20 object-cover">
+          <h2 class="text-xl font-black text-white tracking-tighter opacity-0 group-hover/sidebar:opacity-100 transition-opacity">JBarber<span class="text-red-500">.</span></h2>
+        </div>
+        <button id="closeSidebar" class="md:hidden text-gray-400 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      
+      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+        <a href="panel_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Inicio</span>
+        </a>
+
+        <a href="turno_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Turnos</span>
+        </a>
+
+        <a href="negocio_barberia005.html" class="flex items-center px-4 py-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-600/20 transition-all">
+          <div class="p-2 rounded-lg bg-white/20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Mi Negocio</span>
+        </a>
+
+        <a href="comentarios_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Comentarios</span>
+        </a>
+
+        <a href="configuracion_barberia005.html" class="flex items-center px-4 py-3 hover:bg-white/5 hover:text-white rounded-2xl transition-all group">
+          <div class="p-2 rounded-lg group-hover:bg-red-500/10 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </div>
+          <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Configuración</span>
+        </a>
+
+        <div class="pt-4 mt-4 border-t border-white/5">
+          <a href="cierre_barberia005.html" id="cerrarSesion" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-2xl transition-all group">
+            <div class="p-2 rounded-lg bg-red-500/5 group-hover:bg-red-500/20 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </div>
+            <span class="font-bold text-sm tracking-wide ml-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity whitespace-nowrap">Cerrar sesión</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="flex-1 md:ml-0 p-4 sm:p-6 space-y-8 responsive-container w-full">
+        <!-- Resumen de ingresos -->
+        <section class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-colors relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-blue-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M16,11.78L20.24,4.45L21.97,5.45L19.23,10.22L21.23,13.68L19.5,14.68L17.5,11.22L15.5,14.68L13.77,13.68L15.77,10.22L13.03,5.45L14.76,4.45L19,11.78M12,5V19H10V5H12M16,19H14V11H16V19M8,19H6V11H8V19M4,19H2V11H4V19M16,7H14V5H16V7M8,7H6V5H8V7M4,7H2V5H4V7Z"/></svg>
+          </div>
+          <div class="flex justify-between items-center mb-8 relative z-10">
+            <h2 class="text-2xl font-bold flex items-center text-gray-900 dark:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Resumen de Ingresos
+            </h2>
+            <button id="exportExcel" class="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-xl font-bold shadow-lg hover:scale-105 transition-all flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Exportar Excel
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+            <div class="bg-zinc-50 dark:bg-black/40 p-6 rounded-2xl border border-gray-100 dark:border-white/5 transition-all hover:shadow-lg group/card">
+              <div class="flex justify-between items-start mb-4">
+                <div class="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md">Hoy</span>
+              </div>
+              <p class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ganancia del Día</p>
+              <p class="text-3xl font-black text-gray-900 dark:text-white mt-1">$<span id="ganancia-dia">0</span></p>
+              <div class="mt-4 h-1.5 w-full bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div id="barra-dia" class="h-full bg-red-600 rounded-full transition-all duration-1000" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div class="bg-zinc-50 dark:bg-black/40 p-6 rounded-2xl border border-gray-100 dark:border-white/5 transition-all hover:shadow-lg group/card">
+              <div class="flex justify-between items-start mb-4">
+                <div class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">Semanal</span>
+              </div>
+              <p class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ganancia Semanal</p>
+              <p class="text-3xl font-black text-gray-900 dark:text-white mt-1">$<span id="ganancia-semana">0</span></p>
+              <div class="mt-4 h-1.5 w-full bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div id="barra-semana" class="h-full bg-blue-600 rounded-full transition-all duration-1000" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div class="bg-zinc-50 dark:bg-black/40 p-6 rounded-2xl border border-gray-100 dark:border-white/5 transition-all hover:shadow-lg group/card">
+              <div class="flex justify-between items-start mb-4">
+                <div class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">Mensual</span>
+              </div>
+              <p class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ganancia Mensual</p>
+              <p class="text-3xl font-black text-gray-900 dark:text-white mt-1">$<span id="ganancia-mes">0</span></p>
+              <div class="mt-4 h-1.5 w-full bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div id="barra-mes" class="h-full bg-blue-600 rounded-full transition-all duration-1000" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfico de ingresos -->
+          <div class="bg-zinc-50 dark:bg-black/20 p-6 rounded-2xl border border-gray-100 dark:border-white/5 relative z-10">
+            <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Tendencia de Ingresos</h3>
+            <div class="h-72">
+              <canvas id="ingresos-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Icono de Barbería: Tijeras -->
+        <div class="flex justify-center py-4 opacity-20 dark:opacity-10">
+          <svg class="w-12 h-12 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19,3L13,9L15,11L21,5V3M19,5L15,9L17,11L21,7V5M19,7L17,9L19,11L21,9V7M19,9L18,10L19,11L20,10V9M19,11L19,11L19,11L19,11M12,10.5C12,9.67 11.33,9 10.5,9C9.67,9 9,9.67 9,10.5C9,11.33 9.67,12 10.5,12C11.33,12 12,11.33 12,10.5M10.5,7C10.5,7 10.5,7 10.5,7M10.5,14C10.5,14 10.5,14 10.5,14M7.5,10.5C7.5,9.67 6.83,9 6,9C5.17,9 4.5,9.67 4.5,10.5C4.5,11.33 5.17,12 6,12C6.83,12 7.5,11.33 7.5,10.5M6,7C6,7 6,7 6,7M6,14C6,14 6,14 6,14"/>
+          </svg>
+        </div>
+
+        <!-- Servicios: Uso y Tendencias (MODERNIZADO) -->
+        <section class="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-colors relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-blue-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19,3H5C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3M19,19H5V5H19V19M7,10H9V17H7V10M11,7H13V17H11V7M15,13H17V17H15V13Z"/></svg>
+          </div>
+
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 relative z-10">
+            <h2 class="text-2xl font-bold flex items-center text-gray-900 dark:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              Análisis de Servicios
+            </h2>
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="filtro-periodo-servicio" class="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="hoy">Hoy</option>
+                <option value="semana">Esta Semana</option>
+                <option value="mes">Este Mes</option>
+                <option value="siempre">Todo el tiempo</option>
+              </select>
+              <button id="exportar-servicios-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Exportar Reporte
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
+            <!-- Card: Servicio Top -->
+            <div class="lg:col-span-1 space-y-4">
+              <div class="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden">
+                <div class="absolute right-0 top-0 opacity-20 transform translate-x-4 -translate-y-4">
+                  <svg class="w-32 h-32" viewBox="0 0 24 24" fill="currentColor"><path d="M12,15.39L8.24,17.66L9.23,13.38L5.91,10.5L10.29,10.13L12,6.09L13.71,10.13L18.09,10.5L14.77,13.38L15.76,17.66L12,15.39M22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.45,13.97L5.82,21L12,17.27L18.18,21L16.54,13.97L22,9.24Z"/></svg>
+                </div>
+                <p class="text-blue-100 text-sm font-bold uppercase tracking-wider mb-1">Servicio Estrella</p>
+                <h3 id="svc-mas-usado" class="text-2xl font-black mb-4 truncate">--</h3>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-blue-100 text-xs">Uso total</p>
+                    <p id="svc-top-conteo" class="text-xl font-bold">0</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-blue-100 text-xs">Ingresos</p>
+                    <p id="svc-top-ganancia" class="text-xl font-bold">$0.00</p>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Lista de Rendimiento por Servicio -->
+              <div class="bg-gray-50 dark:bg-black/40 p-5 rounded-2xl border border-gray-100 dark:border-white/5 h-64 overflow-y-auto">
+                <h4 class="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-4">Ranking de Servicios</h4>
+                <div id="ranking-servicios-list" class="space-y-4">
+                  <!-- Dinámico -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráfico de Tendencias -->
+            <div class="lg:col-span-2 bg-gray-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-white/5">
+              <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">Distribución y Uso</h3>
+                <div class="flex gap-2">
+                  <button class="chart-type-btn p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" data-type="bar">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M22,21H2V3H4V19H6V10H10V19H12V14H16V19H18V7H22V21Z"/></svg>
+                  </button>
+                  <button class="chart-type-btn p-2 rounded-lg bg-gray-100 text-gray-400 dark:bg-zinc-800" data-type="doughnut">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M11,2V22C5.9,21.5 2,17.2 2,12C2,6.8 5.9,2.5 11,2M13,2.03V11H21.97C21.44,6.12 17.88,2.56 13,2.03M13,13V21.97C17.88,21.44 21.44,17.88 21.97,13H13Z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="h-80 w-full">
+                <canvas id="servicios-uso-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Icono de Barbería: Navaja -->
+        <div class="flex justify-center py-4 opacity-20 dark:opacity-10">
+          <svg class="w-12 h-12 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,6V12L16,15L17,13.5L13,11V6H11Z"/>
+          </svg>
+        </div>
+
+        <!-- Configuración de horario y cierre automático -->
+        <section class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-colors">
+          <div class="flex items-center mb-8">
+            <div class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl mr-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Configuración de Horario</h2>
+          </div>
+
+          <form id="config-form" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="space-y-6">
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Hora de apertura</label>
+                <div class="relative group">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <input type="time" id="hora-apertura" class="w-full pl-12 bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" value="08:00" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Hora de cierre</label>
+                <div class="relative group">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <input type="time" id="hora-cierre" class="w-full pl-12 bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" value="20:00" />
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-6">
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Límite de turnos diario</label>
+                <div class="relative group">
+                  <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <input type="number" id="limite-turnos" class="w-full pl-12 bg-gray-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" value="30" min="1" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Días de operación</label>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="1">L</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="2">M</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="3">X</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="4">J</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="5">V</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all border border-blue-100 dark:border-blue-800" data-day="6">S</button>
+                  <button type="button" class="day-btn w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-zinc-800 text-gray-400 font-bold hover:bg-red-600 hover:text-white transition-all border border-gray-100 dark:border-white/5" data-day="0">D</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="md:col-span-2 flex flex-col sm:flex-row items-center justify-between gap-6 p-6 bg-zinc-50 dark:bg-black/40 rounded-3xl border border-gray-100 dark:border-white/5">
+              <div class="flex items-center gap-4">
+                <label for="mostrar-tiempo-toggle" class="inline-flex items-center cursor-pointer">
+                  <span class="relative">
+                    <input type="checkbox" id="mostrar-tiempo-toggle" class="sr-only peer">
+                    <div class="w-14 h-7 bg-gray-200 rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  </span>
+                  <div class="ml-4">
+                    <p class="text-sm font-bold text-gray-900 dark:text-white">Tiempo Estimado</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Mostrar espera aproximada a clientes</p>
+                  </div>
+                </label>
+              </div>
+              <button id="btnGuardarConfig" type="submit" class="w-full sm:w-auto bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-8 py-3 rounded-2xl font-black shadow-xl hover:scale-105 transition-all flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Guardar Configuración
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Icono de Barbería: Gillet -->
+        <div class="flex justify-center py-4 opacity-20 dark:opacity-10">
+          <svg class="w-12 h-12 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19,7H16V5H19V7M19,11H16V9H19V11M19,15H16V13H19V15M19,19H16V17H19V19M14,5H11V19H14V5M9,5H6V7H9V5M9,9H6V11H9V9M9,13H6V15H9V13M9,19H6V17H9V19"/>
+          </svg>
+        </div>
+
+        <!-- Gestión de Descansos (Breaks) - UNIFICADO Y CORREGIDO -->
+        <section class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-colors relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-red-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,14.5H13V11H15.5L12,7.5L8.5,11H11V14.5Z"/></svg>
+          </div>
+
+          <div class="flex items-center justify-between mb-8 relative z-10">
+            <div class="flex items-center">
+              <div class="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-2xl mr-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Sistema de Descansos</h2>
+            </div>
+            <div id="break-status" class="px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800 text-gray-500">
+              En Servicio
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+            <!-- Control Manual -->
+            <div class="bg-zinc-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-white/5">
+              <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Control Manual</h3>
+              <div class="flex flex-col space-y-4">
+                <div class="flex items-center justify-between p-4 bg-white dark:bg-zinc-900/50 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
+                  <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center text-red-600">
+                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                      <p class="text-sm font-bold text-gray-900 dark:text-white">Pausar Turnos</p>
+                      <p class="text-xs text-gray-500">Estado inmediato</p>
+                    </div>
+                  </div>
+                  <button id="toggle-break" class="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-2.5 rounded-xl font-black text-sm hover:scale-105 transition-all shadow-lg">
+                    Iniciar Break
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Duración (min)</label>
+                    <input type="number" id="break-duration" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-3 py-2 rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-bold text-sm" value="30" min="5" max="180" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Mensaje</label>
+                    <input type="text" id="break-message" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-3 py-2 rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-bold text-sm" value="En break..." />
+                  </div>
+                </div>
+
+                <div id="break-time-remaining" class="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800 hidden text-center">
+                  <p class="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-widest">Regresamos en</p>
+                  <span id="remaining-time" class="text-2xl font-black text-red-600 dark:text-red-400">--:--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Programación Semanal -->
+            <div class="bg-zinc-50 dark:bg-black/40 p-6 rounded-3xl border border-gray-100 dark:border-white/5">
+              <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Programación Semanal</h3>
+              <div class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Lunes</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-1-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-1-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Martes</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-2-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-2-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Miércoles</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-3-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-3-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Jueves</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-4-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-4-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Viernes</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-5-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-5-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-gray-500">Sábado</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-6-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-6-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-white/5">
+                  <span class="w-16 font-bold text-red-500">Domingo</span>
+                  <div class="flex items-center gap-2">
+                    <input type="time" id="brk-0-start" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                    <span class="text-gray-400">-</span>
+                    <input type="time" id="brk-0-end" class="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 rounded-lg px-2 py-1 text-[10px] font-bold">
+                  </div>
+                </div>
+              </div>
+              <button id="btnGuardarBreakSemanal" class="w-full mt-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-md">
+                Guardar Horarios
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Icono de Barbería: Navaja -->
+        <div class="flex justify-center py-4 opacity-20 dark:opacity-10">
+          <svg class="w-12 h-12 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16,14H14V17H12V14H10V12H12V9H14V12H16V14Z"/>
+          </svg>
+        </div>
+
+        <!-- Servicios del negocio -->
+        <section class="bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-white/5 transition-colors relative overflow-hidden group">
+          <div class="absolute -right-4 -top-4 text-gray-100 dark:text-white/5 group-hover:text-blue-500/10 transition-colors">
+            <svg class="w-24 h-24" viewBox="0 0 24 24" fill="currentColor"><path d="M19,21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          </div>
+          <h2 class="text-2xl font-bold mb-8 flex items-center text-gray-900 dark:text-white relative z-10">
+            <div class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl mr-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            Gestión de Servicios
+          </h2>
+
+          <!-- Formulario de nuevo servicio -->
+          <form id="form-servicio" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 p-6 bg-zinc-50 dark:bg-black/40 rounded-3xl border border-gray-100 dark:border-white/5 relative z-10">
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Nombre del Servicio</label>
+              <input id="svc-nombre" type="text" required maxlength="60" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-sm" placeholder="Ej: Corte Degradado" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Duración (min)</label>
+              <input id="svc-duracion" type="number" required min="1" max="240" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-sm" placeholder="30" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Precio (RD$)</label>
+              <input id="svc-precio" type="number" step="0.01" min="0" class="w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-sm" placeholder="500.00" />
+            </div>
+            <div class="flex items-end gap-4">
+              <div class="flex items-center h-12 px-4 bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm">
+                <input id="svc-activo" type="checkbox" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" checked />
+                <label for="svc-activo" class="ml-2 text-xs font-bold text-gray-600 dark:text-gray-400">Activo</label>
+              </div>
+              <button id="btn-agregar-servicio" type="submit" class="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 h-12 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Añadir
+              </button>
+            </div>
+          </form>
+
+          <!-- Tabla de servicios -->
+          <div class="relative z-10">
+            <div class="flex items-center justify-between mb-6">
+              <div class="relative w-full md:w-80">
+                <input id="servicios-filter" type="text" class="w-full bg-zinc-50 dark:bg-black/40 border border-gray-100 dark:border-white/5 text-gray-900 dark:text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm" placeholder="Buscar servicio...">
+                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+            </div>
+            
+            <div class="overflow-x-auto rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm -mx-4 sm:mx-0">
+              <table class="min-w-full divide-y divide-gray-100 dark:divide-white/5">
+                <thead class="bg-zinc-50 dark:bg-black/60">
+                  <tr>
+                    <th class="py-4 px-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Servicio</th>
+                    <th class="py-4 px-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Duración</th>
+                    <th class="py-4 px-6 text-left text-[10px] font-black uppercase tracking-widest text-gray-400">Precio</th>
+                    <th class="py-4 px-6 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">Estado</th>
+                    <th class="py-4 px-6 text-right text-[10px] font-black uppercase tracking-widest text-gray-400">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tabla-servicios" class="divide-y divide-gray-100 dark:divide-white/5 bg-white dark:bg-zinc-900/50">
+                  <!-- Los servicios se cargan dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <footer class="bg-zinc-950 text-gray-400 text-center text-sm py-8 px-6 border-t border-white/5 mt-auto">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <p>© 2026 <span class="text-white font-bold">JBarber<span class="text-red-500">.</span></span> Todos los derechos reservados</p>
+        <p class="text-xs">Hecho por <strong class="text-white">LUIS ALFREDO CABRERA REYES</strong></p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script type="module" src="./admin/negocio.js"></script>
+  <script type="module">
+    import { supabase } from './database.js';
+    const negocioId = 'barberia005';
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('configuracion_negocio')
+          .select('theme_primary, theme_mode')
+          .eq('negocio_id', negocioId)
+          .maybeSingle();
+        if (data) {
+          if (data.theme_primary) localStorage.setItem('theme_primary', data.theme_primary);
+          if (data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
+          if (window.theme && window.theme.apply) {
+            window.theme.apply(
+              data.theme_primary || localStorage.getItem('theme_primary') || 'blue',
+              data.theme_mode || localStorage.getItem('theme_mode') || 'light'
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo sincronizar tema desde DB', e);
+      }
+    })();
+
+    async function cargarServicios() {
+      const { data, error } = await supabase
+        .from('servicios')
+        .select('id,nombre,duracion_min,precio,activo')
+        .eq('negocio_id', negocioId)
+        .order('activo', { ascending: false })
+        .order('nombre', { ascending: true });
+      if (error) {
+        console.error('Error cargando servicios:', error.message);
+        return;
+      }
+      const tbody = document.getElementById('tabla-servicios');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const esc = (v) => String(v == null ? '' : v).replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+      (data || []).forEach(s => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors group/row';
+        tr.innerHTML = `
+          <td class="py-4 px-6">
+            <input class="svc-nombre w-full bg-transparent border-none text-sm font-bold text-gray-900 dark:text-white focus:ring-0 p-0" value="${esc(s.nombre)}">
+          </td>
+          <td class="py-4 px-6">
+            <div class="flex items-center gap-2">
+              <input type="number" min="1" max="240" class="svc-duracion w-16 bg-transparent border-none text-sm font-bold text-gray-500 dark:text-gray-400 focus:ring-0 p-0" value="${s.duracion_min != null ? s.duracion_min : 25}">
+              <span class="text-[10px] font-black text-gray-300 uppercase">min</span>
+            </div>
+          </td>
+          <td class="py-4 px-6">
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] font-black text-gray-300 uppercase">RD$</span>
+              <input type="number" step="0.01" min="0" class="svc-precio w-24 bg-transparent border-none text-sm font-bold text-gray-900 dark:text-white focus:ring-0 p-0" value="${Number(s.precio || 0).toFixed(2)}">
+            </div>
+          </td>
+          <td class="py-4 px-6 text-center">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" class="svc-activo sr-only peer" ${s.activo ? 'checked' : ''}>
+              <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </td>
+          <td class="py-4 px-6 text-right">
+            <div class="flex justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
+              <button class="btn-guardar p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg hover:scale-110 transition-transform shadow-sm" title="Guardar cambios">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              </button>
+              <button class="btn-eliminar p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:scale-110 transition-transform shadow-sm" title="Eliminar servicio">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
+          </td>
+        `;
+        tr.dataset.id = s.id;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function agregarServicio(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('svc-nombre').value.trim();
+      const dur = parseInt(document.getElementById('svc-duracion').value, 10);
+      const precio = parseFloat(document.getElementById('svc-precio').value || '0');
+      const activo = document.getElementById('svc-activo').checked;
+      if (!nombre || !dur || dur < 1) return;
+      const { error } = await supabase
+        .from('servicios')
+        .insert([{ negocio_id: negocioId, nombre, duracion_min: dur, precio, activo }]);
+      if (error) {
+        alert('Error al agregar servicio: ' + error.message);
+        return;
+      }
+      e.target.reset();
+      document.getElementById('svc-activo').checked = true;
+      await cargarServicios();
+    }
+
+    async function actualizarServicio(id, payload) {
+      const { error } = await supabase
+        .from('servicios')
+        .update(payload)
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    }
+
+    async function eliminarServicio(id) {
+      const { error } = await supabase
+        .from('servicios')
+        .delete()
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    }
+
+    // Delegación de eventos para la tabla
+    document.getElementById('tabla-servicios').addEventListener('click', async (e) => {
+      const row = e.target.closest('tr');
+      if (!row) return;
+      const id = row.dataset.id;
+      if (e.target.classList.contains('btn-guardar')) {
+        const nombre = row.querySelector('.svc-nombre').value.trim();
+        const dur = parseInt(row.querySelector('.svc-duracion').value, 10);
+        const precio = parseFloat(row.querySelector('.svc-precio').value || '0');
+        const activo = row.querySelector('.svc-activo').checked;
+        try {
+          await actualizarServicio(id, { nombre, duracion_min: dur, precio, activo });
+          alert('Servicio actualizado');
+        } catch (err) {
+          alert('Error al actualizar: ' + err.message);
+        }
+      }
+      if (e.target.classList.contains('btn-eliminar')) {
+        if (!confirm('¿Eliminar este servicio?')) return;
+        try {
+          await eliminarServicio(id);
+          row.remove();
+        } catch (err) {
+          alert('Error al eliminar: ' + err.message);
+        }
+      }
+    });
+
+    document.getElementById('form-servicio').addEventListener('submit', agregarServicio);
+
+    document.addEventListener('DOMContentLoaded', cargarServicios);
+
+    // Refresco automático: cambios en tiempo real desde Supabase
+    supabase
+      .channel('servicios-negocio')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'servicios', filter: `negocio_id=eq.${negocioId}` },
+        () => cargarServicios()
+      )
+      .subscribe();
+
+    // Refresco automático: señal via localStorage (desde otras pestañas)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'servicios_updated') {
+        cargarServicios();
+      }
+    });
+  </script>
+  <script>
+    // Lógica para el menú móvil (Script robusto)
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('mobile-menu-button');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      const closeBtn = document.getElementById('closeSidebar');
+
+      if (btn && sidebar && overlay) {
+        const open = () => {
+          sidebar.classList.remove('-translate-x-full');
+          sidebar.classList.add('translate-x-0');
+          overlay.classList.remove('opacity-0');
+          overlay.classList.remove('pointer-events-none');
+          sidebar.setAttribute('data-open', 'true');
+        };
+        const close = () => {
+          sidebar.classList.remove('translate-x-0');
+          sidebar.classList.add('-translate-x-full');
+          overlay.classList.add('opacity-0');
+          overlay.classList.add('pointer-events-none');
+          sidebar.removeAttribute('data-open');
+        };
+        btn.addEventListener('click', (e) => { e.stopPropagation(); open(); });
+        overlay.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+        if (closeBtn) closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        // Estado inicial según breakpoint
+        const mql = window.matchMedia('(min-width: 768px)');
+        const handle = (e) => { if (e.matches) { open(); } else { close(); } };
+        handle(mql);
+        mql.addEventListener ? mql.addEventListener('change', handle) : mql.addListener(handle);
+      }
+    });
+  </script>
+</body>
+</html>

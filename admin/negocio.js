@@ -1,0 +1,732 @@
+import { supabase, ensureSupabase } from '../database.js';
+
+/**
+ * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
+ * @returns {string|null} El ID del negocio o null si no está presente.
+ */
+function getNegocioId() {
+    const id = document.body.dataset.negocioId;
+    if (!id) {
+        console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
+        alert('Error de configuración: No se pudo identificar el negocio.');
+    }
+    return id;
+}
+
+const negocioId = getNegocioId();
+
+// Variables para el control de break
+let breakActivo = false;
+let breakEndTime = null;
+let breakInterval = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await ensureSupabase();
+    if (!negocioId) return;
+
+    initThemeToggle();
+    actualizarFechaHora();
+    setInterval(actualizarFechaHora, 60000);
+    setupMobileMenu();
+    initDayButtons();
+    mostrarTotales();
+    cargarConfiguracion();
+    inicializarGrafico();
+    initBreakControl();
+    verificarEstadoBreak();
+    initServiciosExtras();
+
+    const btnExport = document.getElementById('exportExcel');
+    if (btnExport) btnExport.addEventListener('click', exportarAExcel);
+    const formConfig = document.getElementById('config-form');
+    if (formConfig) formConfig.addEventListener('submit', guardarConfiguracion);
+});
+
+function initThemeToggle() {
+    const themeToggle = document.getElementById('theme-toggle');
+    const htmlElement = document.documentElement;
+    if (!themeToggle) return;
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        htmlElement.classList.add('dark');
+    } else {
+        htmlElement.classList.remove('dark');
+    }
+    themeToggle.addEventListener('click', () => {
+        htmlElement.classList.toggle('dark');
+        const isDark = htmlElement.classList.contains('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+}
+
+function actualizarFechaHora() {
+    const ahora = new Date();
+    const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const fechaFormateada = ahora.toLocaleDateString('es-ES', opciones);
+    const horaFormateada = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const fechaEl = document.getElementById('fecha-actual');
+    const horaEl = document.getElementById('hora-actual');
+    if (fechaEl) fechaEl.textContent = fechaFormateada.charAt(0).toUpperCase() + fechaFormateada.slice(1);
+    if (horaEl) horaEl.textContent = horaFormateada;
+}
+
+function setupMobileMenu() {
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar && overlay) {
+        if (mobileMenuButton) mobileMenuButton.addEventListener('click', () => toggleMobileMenu(sidebar, overlay));
+        if (overlay) overlay.addEventListener('click', () => toggleMobileMenu(sidebar, overlay));
+        if (toggleBtn) toggleBtn.addEventListener('click', () => toggleDesktopMenu(sidebar));
+    }
+}
+
+function toggleMobileMenu(sidebar, overlay) {
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('opacity-0');
+    overlay.classList.toggle('pointer-events-none');
+}
+
+function toggleDesktopMenu(sidebar) {
+    sidebar.classList.toggle('w-64');
+    sidebar.classList.toggle('w-20');
+    sidebar.querySelectorAll('.sidebar-text').forEach(el => el.classList.toggle('hidden'));
+}
+
+function initDayButtons() {
+    const dayButtons = document.querySelectorAll('.day-btn');
+    dayButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const willSelect = !button.classList.contains('bg-blue-500');
+            button.classList.toggle('bg-blue-500', willSelect);
+            button.classList.toggle('text-white', willSelect);
+            button.classList.toggle('bg-blue-100', !willSelect);
+            button.classList.toggle('dark:bg-blue-900', !willSelect);
+            button.classList.toggle('text-blue-800', !willSelect);
+            button.classList.toggle('dark:text-blue-200', !willSelect);
+        });
+    });
+}
+
+async function obtenerGanancias() {
+    if (!negocioId) return [];
+    try {
+        const { data, error } = await supabase
+            .from('turnos')
+            .select('fecha, monto_cobrado')
+            .eq('negocio_id', negocioId);
+        if (error) throw error;
+        const resumen = {};
+        (data || []).forEach(({ fecha, monto_cobrado }) => {
+            const monto = Number(monto_cobrado);
+            if (!resumen[fecha]) resumen[fecha] = 0;
+            resumen[fecha] += isNaN(monto) ? 0 : monto;
+        });
+        return Object.entries(resumen).map(([fecha, ganancia]) => ({
+            Fecha: fecha,
+            Ganancia: Number(ganancia).toFixed(2),
+        }));
+    } catch (error) {
+        mostrarNotificacion('Error', `No se pudieron obtener los datos de ganancias: ${error.message}`, 'error');
+        return [];
+    }
+}
+
+async function exportarAExcel() {
+    try {
+        let ingresos = await obtenerGanancias();
+        if (ingresos.length === 0) {
+            mostrarNotificacion('Sin datos', 'No hay datos para exportar', 'info');
+            return;
+        }
+        ingresos = ingresos.sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
+        const total = ingresos.reduce((sum, fila) => sum + Number(fila.Ganancia), 0);
+        ingresos.push({ Fecha: 'TOTAL', Ganancia: total.toFixed(2) });
+        const ws = XLSX.utils.json_to_sheet(ingresos);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Ingresos');
+        XLSX.writeFile(wb, 'historial_ingresos.xlsx');
+        mostrarNotificacion('Éxito', 'El archivo Excel ha sido generado correctamente', 'success');
+    } catch (error) {
+        mostrarNotificacion('Error', `No se pudo exportar a Excel: ${error.message}`, 'error');
+    }
+}
+
+async function mostrarTotales() {
+    try {
+        const ingresos = await obtenerGanancias();
+        const hoy = new Date();
+        const diaActual = hoy.toISOString().slice(0, 10);
+        const primerDiaSemana = new Date(hoy);
+        primerDiaSemana.setDate(hoy.getDate() - hoy.getDay() + (hoy.getDay() === 0 ? -6 : 1));
+        const inicioSemana = primerDiaSemana.toISOString().slice(0, 10);
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+        let totalDia = 0, totalSemana = 0, totalMes = 0;
+        ingresos.forEach(({ Fecha, Ganancia }) => {
+            if (Fecha === 'TOTAL') return;
+            const g = Number(Ganancia);
+            if (Fecha === diaActual) totalDia += g;
+            if (Fecha >= inicioSemana) totalSemana += g;
+            if (Fecha >= inicioMes) totalMes += g;
+        });
+        document.getElementById('ganancia-dia').textContent = totalDia.toFixed(2);
+        document.getElementById('ganancia-semana').textContent = totalSemana.toFixed(2);
+        document.getElementById('ganancia-mes').textContent = totalMes.toFixed(2);
+        const maxGanancia = Math.max(totalDia, totalSemana, totalMes, 1);
+        document.getElementById('barra-dia').style.width = `${(totalDia / maxGanancia) * 100}%`;
+        document.getElementById('barra-semana').style.width = `${(totalSemana / maxGanancia) * 100}%`;
+        document.getElementById('barra-mes').style.width = `${(totalMes / maxGanancia) * 100}%`;
+        actualizarGraficoIngresos(ingresos);
+    } catch (error) {
+        console.error('Error al mostrar totales:', error);
+    }
+}
+
+let ingresosChart;
+function inicializarGrafico() {
+    const canvas = document.getElementById('ingresos-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ingresosChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Ingresos diarios',
+                data: [],
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--color-primary-500') || '#0ea5e9',
+                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b' } },
+                tooltip: { mode: 'index', intersect: false, callbacks: { label: (context) => `Ingresos: $${context.raw}` } }
+            },
+            scales: {
+                x: { grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }, ticks: { color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b' } },
+                y: { beginAtZero: true, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' }, ticks: { color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b', callback: (value) => '$' + value } }
+            }
+        }
+    });
+}
+
+function actualizarGraficoIngresos(ingresos) {
+    if (!ingresosChart) return;
+    const hoy = new Date();
+    const hace14Dias = new Date();
+    hace14Dias.setDate(hoy.getDate() - 14);
+    const datosRecientes = (ingresos || [])
+        .filter(item => item.Fecha !== 'TOTAL' && new Date(item.Fecha) >= hace14Dias)
+        .sort((a, b) => new Date(a.Fecha) - new Date(b.Fecha));
+    const labels = datosRecientes.map(item => new Date(item.Fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }));
+    const datos = datosRecientes.map(item => Number(item.Ganancia));
+    ingresosChart.data.labels = labels;
+    ingresosChart.data.datasets[0].data = datos;
+    ingresosChart.update();
+}
+
+async function cargarConfiguracion() {
+    if (!negocioId) return;
+    try {
+        const { data, error } = await supabase
+            .from('configuracion_negocio')
+            .select('*')
+            .eq('negocio_id', negocioId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (error) throw error;
+        if (data) {
+            document.getElementById('hora-apertura').value = data.hora_apertura || '';
+            document.getElementById('hora-cierre').value = data.hora_cierre || '';
+            document.getElementById('limite-turnos').value = data.limite_turnos || '';
+            document.getElementById('mostrar-tiempo-toggle').checked = data.mostrar_tiempo_estimado !== undefined ? data.mostrar_tiempo_estimado : false;
+            if (data.dias_operacion && Array.isArray(data.dias_operacion)) {
+                const dayNumToName = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
+                const selectedDays = data.dias_operacion.map(name => dayNumToName[name]).filter(n => typeof n === 'number');
+                document.querySelectorAll('.day-btn').forEach(button => {
+                    const day = parseInt(button.getAttribute('data-day'));
+                    const isSelected = selectedDays.includes(day);
+                    button.classList.toggle('bg-blue-500', isSelected);
+                    button.classList.toggle('text-white', isSelected);
+                    button.classList.toggle('bg-blue-100', !isSelected);
+                    button.classList.toggle('dark:bg-blue-900', !isSelected);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error al cargar configuración:', error);
+    }
+}
+
+async function guardarConfiguracion(event) {
+    event.preventDefault();
+    if (!negocioId) return;
+    try {
+        const horaApertura = document.getElementById('hora-apertura').value || null;
+        const horaCierre = document.getElementById('hora-cierre').value || null;
+        const limiteTurnosRaw = parseInt(document.getElementById('limite-turnos').value);
+        const limiteTurnos = isNaN(limiteTurnosRaw) ? null : limiteTurnosRaw;
+        const mostrarTiempo = document.getElementById('mostrar-tiempo-toggle').checked;
+        const dayNumToName = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
+        const diasOperacion = [];
+        document.querySelectorAll('.day-btn.bg-blue-500').forEach(button => {
+            const dayNum = parseInt(button.getAttribute('data-day'));
+            if (dayNumToName[dayNum]) diasOperacion.push(dayNumToName[dayNum]);
+        });
+        if (!diasOperacion.length) {
+            mostrarNotificacion('Error de Configuración', 'Debe seleccionar al menos un día de operación.', 'warning');
+            return;
+        }
+        const { error } = await supabase
+            .from('configuracion_negocio')
+            .upsert({
+                negocio_id: negocioId,
+                hora_apertura: horaApertura,
+                hora_cierre: horaCierre,
+                limite_turnos: limiteTurnos,
+                dias_operacion: diasOperacion,
+                mostrar_tiempo_estimado: mostrarTiempo
+            }, { onConflict: 'negocio_id' });
+        if (error) throw error;
+        mostrarNotificacion('Éxito', 'Configuración guardada correctamente', 'success');
+    } catch (error) {
+        mostrarNotificacion('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
+    }
+}
+
+function mostrarNotificacion(titulo, mensaje, tipo) {
+    Swal.fire({
+        title: titulo,
+        text: mensaje,
+        icon: tipo,
+        confirmButtonColor: '#0ea5e9',
+        confirmButtonText: 'Aceptar',
+        background: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'
+    });
+}
+
+function initBreakControl() {
+    document.getElementById('toggle-break')?.addEventListener('click', toggleBreak);
+}
+
+async function verificarEstadoBreak() {
+    if (!negocioId) return;
+    try {
+        const { data, error } = await supabase
+            .from('estado_negocio')
+            .select('*')
+            .eq('negocio_id', negocioId)
+            .limit(1)
+            .maybeSingle();
+        if (error) throw error;
+        if (data && data.en_break) {
+            const endTime = new Date(data.break_end_time);
+            if (endTime > new Date()) {
+                breakActivo = true;
+                breakEndTime = endTime;
+                actualizarUIBreak(true);
+                iniciarTemporizador();
+            } else {
+                await finalizarBreak();
+            }
+        } else {
+            actualizarUIBreak(false);
+        }
+    } catch (error) {
+        console.error('Error al verificar estado del break:', error);
+    }
+}
+
+async function toggleBreak() {
+    if (breakActivo) await finalizarBreak(); else await iniciarBreak();
+}
+
+async function iniciarBreak() {
+    if (!negocioId) return;
+    try {
+        const duracion = parseInt(document.getElementById('break-duration').value) || 30;
+        const mensaje = document.getElementById('break-message').value || 'Estamos en break, regresamos pronto...';
+        const now = new Date();
+        const endTime = new Date(now.getTime() + duracion * 60000);
+        const { error } = await supabase
+            .from('estado_negocio')
+            .upsert({
+                negocio_id: negocioId,
+                en_break: true,
+                break_start_time: now.toISOString(),
+                break_end_time: endTime.toISOString(),
+                break_message: mensaje,
+                updated_at: now.toISOString()
+            }, { onConflict: 'negocio_id' });
+        if (error) throw error;
+        breakActivo = true;
+        breakEndTime = endTime;
+        actualizarUIBreak(true);
+        iniciarTemporizador();
+        mostrarNotificacion('Break Iniciado', `Break activo por ${duracion} minutos`, 'success');
+    } catch (error) {
+        console.error('Error al iniciar break:', error);
+        mostrarNotificacion('Error', 'No se pudo iniciar el break', 'error');
+    }
+}
+
+async function finalizarBreak() {
+    if (!negocioId) return;
+    try {
+        const { error } = await supabase
+            .from('estado_negocio')
+            .upsert({
+                negocio_id: negocioId,
+                en_break: false,
+                break_start_time: null,
+                break_end_time: null,
+                break_message: null,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'negocio_id' });
+        if (error) throw error;
+        breakActivo = false;
+        breakEndTime = null;
+        if (breakInterval) clearInterval(breakInterval);
+        breakInterval = null;
+        actualizarUIBreak(false);
+        mostrarNotificacion('Break Finalizado', 'El negocio está nuevamente abierto', 'success');
+    } catch (error) {
+        console.error('Error al finalizar break:', error);
+        mostrarNotificacion('Error', 'No se pudo finalizar el break', 'error');
+    }
+}
+
+function actualizarUIBreak(enBreak) {
+    const indicator = document.getElementById('break-indicator');
+    const text = document.getElementById('break-text');
+    const button = document.getElementById('toggle-break');
+    const buttonText = document.getElementById('break-button-text');
+    const timeRemaining = document.getElementById('break-time-remaining');
+    if (!indicator || !text || !button || !buttonText || !timeRemaining) return;
+    if (enBreak) {
+        indicator.className = 'w-3 h-3 rounded-full bg-orange-500';
+        text.textContent = 'En Break';
+        text.className = 'font-medium text-orange-600 dark:text-orange-400';
+        button.className = 'w-full bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center font-semibold';
+        buttonText.textContent = 'Finalizar Break';
+        timeRemaining.classList.remove('hidden');
+    } else {
+        indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+        text.textContent = 'Negocio Abierto';
+        text.className = 'font-medium text-green-600 dark:text-green-400';
+        button.className = 'w-full bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center font-semibold';
+        buttonText.textContent = 'Iniciar Break';
+        timeRemaining.classList.add('hidden');
+    }
+}
+
+function iniciarTemporizador() {
+    if (breakInterval) clearInterval(breakInterval);
+    breakInterval = setInterval(() => {
+        const now = new Date();
+        const timeLeft = breakEndTime - now;
+        if (timeLeft <= 0) {
+            finalizarBreak();
+        } else {
+            const minutes = Math.floor(timeLeft / 60000);
+            const seconds = Math.floor((timeLeft % 60000) / 1000);
+            document.getElementById('remaining-time').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+}
+
+function initServiciosExtras() {
+    const filter = document.getElementById('servicios-filter');
+    if (filter) {
+        filter.addEventListener('input', () => {
+            const term = filter.value.toLowerCase();
+            const rows = document.querySelectorAll('#tabla-servicios tr');
+            rows.forEach(r => {
+                const nameInput = r.querySelector('.svc-nombre');
+                const name = nameInput ? nameInput.value.toLowerCase() : '';
+                r.style.display = name.includes(term) ? '' : 'none';
+            });
+        });
+    }
+
+    const periodFilter = document.getElementById('filtro-periodo-servicio');
+    if (periodFilter) {
+        periodFilter.addEventListener('change', () => calcularUsoServicios(periodFilter.value));
+    }
+
+    const exportBtn = document.getElementById('exportar-servicios-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportarReporteServicios);
+    }
+
+    const chartTypeBtns = document.querySelectorAll('.chart-type-btn');
+    chartTypeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.getAttribute('data-type');
+            chartTypeBtns.forEach(b => {
+                b.classList.remove('bg-emerald-100', 'text-emerald-600', 'dark:bg-emerald-900/30', 'dark:text-emerald-400');
+                b.classList.add('bg-gray-100', 'text-gray-400', 'dark:bg-zinc-800');
+            });
+            btn.classList.remove('bg-gray-100', 'text-gray-400', 'dark:bg-zinc-800');
+            btn.classList.add('bg-emerald-100', 'text-emerald-600', 'dark:bg-emerald-900/30', 'dark:text-emerald-400');
+            renderServiciosChart(currentServiciosData, type);
+        });
+    });
+
+    calcularUsoServicios();
+    setInterval(() => calcularUsoServicios(periodFilter?.value || 'hoy'), 60000);
+}
+
+let currentServiciosData = {};
+
+async function calcularUsoServicios(periodo = 'hoy') {
+    if (!negocioId) return;
+    try {
+        let query = supabase.from('turnos').select('servicio, monto_cobrado, fecha').eq('negocio_id', negocioId);
+        
+        const hoy = new Date();
+        if (periodo === 'hoy') {
+            query = query.eq('fecha', hoy.toISOString().slice(0, 10));
+        } else if (periodo === 'semana') {
+            const startOfWeek = new Date(hoy);
+            startOfWeek.setDate(hoy.getDate() - hoy.getDay() + (hoy.getDay() === 0 ? -6 : 1));
+            query = query.gte('fecha', startOfWeek.toISOString().slice(0, 10));
+        } else if (periodo === 'mes') {
+            const startOfMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            query = query.gte('fecha', startOfMonth.toISOString().slice(0, 10));
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const analysis = {};
+        (data || []).forEach(t => {
+            const s = t.servicio || 'N/A';
+            if (!analysis[s]) analysis[s] = { count: 0, revenue: 0 };
+            analysis[s].count++;
+            analysis[s].revenue += Number(t.monto_cobrado) || 0;
+        });
+
+        currentServiciosData = analysis;
+        actualizarUIServicios(analysis);
+    } catch (error) {
+        console.error('Error al analizar servicios:', error);
+    }
+}
+
+function actualizarUIServicios(analysis) {
+    const sorted = Object.entries(analysis).sort((a, b) => b[1].count - a[1].count);
+    const top = sorted[0];
+
+    // Actualizar Card Top
+    const topNameEl = document.getElementById('svc-mas-usado');
+    const topCountEl = document.getElementById('svc-top-conteo');
+    const topRevenueEl = document.getElementById('svc-top-ganancia');
+
+    if (topNameEl) topNameEl.textContent = top ? top[0] : '--';
+    if (topCountEl) topCountEl.textContent = top ? top[1].count : '0';
+    if (topRevenueEl) topRevenueEl.textContent = top ? `$${top[1].revenue.toFixed(2)}` : '$0.00';
+
+    // Actualizar Lista Ranking
+    const listEl = document.getElementById('ranking-servicios-list');
+    if (listEl) {
+        listEl.innerHTML = sorted.map(([name, data], index) => `
+            <div class="flex items-center justify-between p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold">${index + 1}</span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate w-32">${name}</span>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-bold text-gray-900 dark:text-white">${data.count} usos</p>
+                    <p class="text-[10px] text-emerald-600 dark:text-emerald-400">$${data.revenue.toFixed(2)}</p>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center text-gray-500 text-xs py-4">No hay datos para este periodo</p>';
+    }
+
+    renderServiciosChart(analysis);
+}
+
+let serviciosChart;
+function renderServiciosChart(analysis, type = 'bar') {
+    const canvas = document.getElementById('servicios-uso-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const labels = Object.keys(analysis);
+    const counts = labels.map(l => analysis[l].count);
+    const revenues = labels.map(l => analysis[l].revenue);
+
+    if (serviciosChart) serviciosChart.destroy();
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#e2e8f0' : '#1e293b';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+
+    serviciosChart = new Chart(ctx, {
+        type: type,
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Cantidad de Usos',
+                    data: counts,
+                    backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Ganancia (RD$)',
+                    data: revenues,
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    yAxisID: 'y1',
+                    hidden: type === 'doughnut'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: textColor, font: { weight: 'bold', size: 11 } }
+                },
+                tooltip: {
+                    backgroundColor: isDark ? '#18181b' : '#ffffff',
+                    titleColor: isDark ? '#ffffff' : '#18181b',
+                    bodyColor: isDark ? '#a1a1aa' : '#71717a',
+                    borderColor: 'rgba(16, 185, 129, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 12
+                }
+            },
+            scales: type === 'doughnut' ? {} : {
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, precision: 0 },
+                    title: { display: true, text: 'Usos', color: textColor }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: { color: textColor, callback: v => '$' + v },
+                    title: { display: true, text: 'Ganancia', color: textColor }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: textColor }
+                }
+            }
+        }
+    });
+}
+
+async function exportarReporteServicios() {
+    try {
+        const labels = Object.keys(currentServiciosData);
+        if (labels.length === 0) {
+            mostrarNotificacion('Sin datos', 'No hay datos de servicios para exportar', 'info');
+            return;
+        }
+
+        const data = labels.map(l => ({
+            Servicio: l,
+            Usos: currentServiciosData[l].count,
+            'Ganancia Total (RD$)': currentServiciosData[l].revenue.toFixed(2)
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Análisis de Servicios');
+        XLSX.writeFile(wb, `reporte_servicios_${new Date().toISOString().slice(0, 7)}.xlsx`);
+        mostrarNotificacion('Éxito', 'Reporte de servicios exportado correctamente', 'success');
+    } catch (error) {
+        console.error('Error al exportar reporte:', error);
+        mostrarNotificacion('Error', 'No se pudo exportar el reporte', 'error');
+    }
+}
+
+document.getElementById('btnGuardarBreakSemanal')?.addEventListener('click', async () => {
+    const weekly = [];
+    for (const d of [1,2,3,4,5,6,0]) {
+        const s = document.getElementById(`brk-${d}-start`)?.value || null;
+        const e = document.getElementById(`brk-${d}-end`)?.value || null;
+        if (s && e) weekly.push({ day: d, start: s, end: e });
+    }
+    try {
+        const { error } = await supabase
+            .from('estado_negocio')
+            .upsert({ negocio_id: negocioId, weekly_breaks: weekly, updated_at: new Date().toISOString() }, { onConflict: 'negocio_id' });
+        if (error) throw error;
+        mostrarNotificacion('Éxito', 'Break semanal guardado', 'success');
+    } catch (e) {
+        mostrarNotificacion('Error', 'No se pudo guardar break semanal', 'error');
+    }
+});
+
+setInterval(async () => {
+    try {
+        const now = new Date();
+        const day = now.getDay();
+        const { data } = await supabase
+            .from('estado_negocio')
+            .select('weekly_breaks,en_break')
+            .eq('negocio_id', negocioId)
+            .maybeSingle();
+        const wb = data?.weekly_breaks || [];
+        const item = wb.find(x => x.day === day);
+        if (!item) return;
+        const parseTime = (t) => { const [h,m] = t.split(':').map(Number); const d = new Date(); d.setHours(h,m,0,0); return d; };
+        const start = parseTime(item.start);
+        const end = parseTime(item.end);
+        if (now >= start && now <= end && !data.en_break) {
+            await iniciarBreak();
+        }
+        if ((now > end) && data.en_break) {
+            await finalizarBreak();
+        }
+    } catch {}
+}, 60000);
+window.exportarAExcel = exportarAExcel;
+window.mostrarTotales = mostrarTotales;
+window.guardarConfiguracion = guardarConfiguracion;
+window.verificarBreakActivo = async () => {
+    if (!negocioId) return { enBreak: false, mensaje: null };
+    try {
+        const { data, error } = await supabase
+            .from('estado_negocio')
+            .select('en_break, break_end_time, break_message')
+            .eq('negocio_id', negocioId)
+            .single();
+        if (error && error.code !== 'PGRST116') return { enBreak: false, mensaje: null };
+        if (data && data.en_break) {
+            const endTime = new Date(data.break_end_time);
+            if (endTime > new Date()) {
+                return { enBreak: true, mensaje: data.break_message || 'En break.', tiempoRestante: Math.ceil((endTime - new Date()) / 60000) };
+            }
+        }
+        return { enBreak: false, mensaje: null };
+    } catch (error) {
+        console.error('Error al verificar break:', error);
+        return { enBreak: false, mensaje: null };
+    }
+};
