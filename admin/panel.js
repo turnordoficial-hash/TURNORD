@@ -99,7 +99,7 @@ async function cargarDatos() {
     // 1. Cargar Turnos
     const { data: turnosData, error: turnosError } = await supabase
       .from('turnos')
-      .select('id, turno, nombre, estado, hora, servicio, started_at, created_at') // 2. Optimización de consulta
+      .select('id, turno, nombre, telefono, estado, hora, servicio, started_at, created_at') // 2. Optimización de consulta
       .eq('negocio_id', negocioId)
       .eq('fecha', hoyLocal)
       .order('created_at', { ascending: false });
@@ -120,32 +120,38 @@ async function cargarDatos() {
 
     if (citasError) throw citasError;
 
-    // 3. Obtener nombres de clientes para las citas
+    // 3. Obtener nombres de clientes para las citas y turnos
     let citasConNombre = [];
-    if (citasData && citasData.length > 0) {
-        const telefonos = [...new Set(citasData.map(c => c.cliente_telefono).filter(Boolean))];
-        const barberIds = [...new Set(citasData.map(c => c.barber_id).filter(Boolean))];
-        let clientesMap = {};
-        let barberosMap = {};
+    let turnosConNombre = [];
+    
+    const telefonosCitas = (citasData || []).map(c => c.cliente_telefono).filter(Boolean);
+    const telefonosTurnos = (turnosData || []).map(t => t.telefono).filter(Boolean);
+    const telefonos = [...new Set([...telefonosCitas, ...telefonosTurnos])];
+    
+    const barberIds = [...new Set((citasData || []).map(c => c.barber_id).filter(Boolean))];
+    let clientesMap = {};
+    let barberosMap = {};
+    
+    if (telefonos.length > 0) {
+        const { data: clientes } = await supabase
+            .from('clientes')
+            .select('telefono, nombre')
+            .eq('negocio_id', negocioId)
+            .in('telefono', telefonos);
         
-        if (telefonos.length > 0) {
-            const { data: clientes } = await supabase
-                .from('clientes')
-                .select('telefono, nombre')
-                .eq('negocio_id', negocioId)
-                .in('telefono', telefonos);
-            
-            (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
-        }
-        if (barberIds.length > 0) {
-            const { data: barberos } = await supabase
-                .from('barberos')
-                .select('id, nombre')
-                .eq('negocio_id', negocioId)
-                .in('id', barberIds);
-            (barberos || []).forEach(b => barberosMap[b.id] = b.nombre);
-        }
+        (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
+    }
+    if (barberIds.length > 0) {
+        const { data: barberos } = await supabase
+            .from('barberos')
+            .select('id, nombre')
+            .eq('negocio_id', negocioId)
+            .in('id', barberIds);
+        (barberos || []).forEach(b => barberosMap[b.id] = b.nombre);
+    }
 
+    // Procesar Citas
+    if (citasData && citasData.length > 0) {
         // Asignar código letra+número por día para citas
         const baseDate = new Date('2024-08-23T00:00:00Z');
         const getLetterForDate = (d) => {
@@ -162,7 +168,7 @@ async function cargarDatos() {
             return {
                 id: `cita-${c.id}`,
                 turno: codeMap.get(c.id),
-                nombre: clientesMap[c.cliente_telefono] || (c.cliente_telefono || 'Cliente'),
+                nombre: clientesMap[c.cliente_telefono] || c.nombre || (c.cliente_telefono || 'Cliente'),
                 estado: c.estado || 'Cita Programada',
                 hora: hora,
                 servicio: c.servicio || 'Cita',
@@ -172,17 +178,21 @@ async function cargarDatos() {
         });
     }
 
-    const turnosHoy = turnosData || [];
-    
+    // Procesar Turnos
+    turnosConNombre = (turnosData || []).map(t => ({
+        ...t,
+        nombre: clientesMap[t.telefono] || t.nombre || 'Cliente'
+    }));
+
     // Combinar y ordenar por fecha de creación/inicio
-    const historialCombinado = [...turnosHoy, ...citasConNombre].sort((a, b) => {
+    const historialCombinado = [...turnosConNombre, ...citasConNombre].sort((a, b) => {
         return new Date(b.created_at) - new Date(a.created_at);
     });
 
     historialGlobal = historialCombinado;
-    actualizarContadores(turnosHoy);
+    actualizarContadores(turnosConNombre);
     renderPaginationHistorial();
-    actualizarTurnoEnAtencion(turnosHoy);
+    actualizarTurnoEnAtencion(turnosConNombre);
 
   } catch (err) {
     console.error('Error al cargar datos del panel:', err);

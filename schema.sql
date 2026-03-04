@@ -1123,12 +1123,28 @@ BEGIN
 
   SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
 
-  -- Se cambia a insertar en una tabla de eventos para procesamiento asíncrono
-  -- Esto evita que el trigger bloquee la operación de INSERT/UPDATE
+  -- 1. Intentar llamar a la función directamente (Sincrónico para eventos críticos)
+  -- Si falla (por timeout o error), al menos queda registrado en notification_events
+  BEGIN
+    PERFORM net.http_post(
+      url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || v_service_role
+      ),
+      body := v_payload,
+      timeout_milliseconds := 1000 -- Timeout corto para no bloquear el trigger
+    );
+  EXCEPTION WHEN OTHERS THEN
+    -- Ignorar error de red para no bloquear la transacción principal
+    NULL;
+  END;
+
+  -- 2. Siempre insertar en la tabla de eventos para respaldo/auditoría/reintento
   INSERT INTO public.notification_events (negocio_id, event_type, payload)
   VALUES (
-    COALESCE(NEW.negocio_id, OLD.negocio_id), -- Obtener negocio_id de NEW o OLD
-    TG_TABLE_NAME || '_' || TG_OP, -- e.g., 'citas_INSERT', 'turnos_UPDATE'
+    COALESCE(NEW.negocio_id, OLD.negocio_id),
+    TG_TABLE_NAME || '_' || TG_OP,
     v_payload
   );
 
@@ -1136,13 +1152,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger para Citas (Nuevas y Cancelaciones)
-DROP TRIGGER IF EXISTS trg_citas_notificacion ON public.citas;
-CREATE TRIGGER trg_citas_notificacion
-AFTER INSERT OR UPDATE ON public.citas
+-- Trigger para Citas (Nuevas)
+DROP TRIGGER IF EXISTS trg_citas_insert_notificacion ON public.citas;
+CREATE TRIGGER trg_citas_insert_notificacion
+AFTER INSERT ON public.citas
 FOR EACH ROW
-WHEN (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.estado IS DISTINCT FROM NEW.estado))
 EXECUTE FUNCTION public.trg_notificar_evento();
+
+-- Trigger para Citas (Cambios de Estado)
+DROP TRIGGER IF EXISTS trg_citas_update_notificacion ON public.citas;
+CREATE TRIGGER trg_citas_update_notificacion
+AFTER UPDATE ON public.citas
+FOR EACH ROW
+WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
+EXECUTE FUNCTION public.trg_notificar_evento();
+
+-- Limpieza del trigger antiguo que causaba error
+DROP TRIGGER IF EXISTS trg_citas_notificacion ON public.citas;
 
 -- Trigger para Turnos (Llamados y Posición)
 DROP TRIGGER IF EXISTS trg_turnos_notificacion ON public.turnos;
@@ -1171,35 +1197,51 @@ DECLARE
   v_onesignal_app_id TEXT := '85f98db3-968a-4580-bb02-8821411a6bee';
   v_onesignal_api_key TEXT;
   v_payload JSONB;
-  v_request_id BIGINT;
-  v_response JSON;
 BEGIN
   -- IMPORTANTE: Configura ONE_SIGNAL_REST_API_KEY en Supabase Vault
   SELECT decrypted_secret INTO v_onesignal_api_key FROM vault.decrypted_secrets WHERE name = 'ONE_SIGNAL_REST_API_KEY' LIMIT 1;
 
   IF v_onesignal_api_key IS NULL THEN
-      RETURN json_build_object('success', false, 'error', 'OneSignal API Key no configurada en Vault.');
+      -- Fallback a SERVICE_ROLE para llamar a la Edge Function si no hay OneSignal Key en Vault
+      -- Esto es más seguro y centralizado
+      DECLARE
+        v_service_role text;
+      BEGIN
+        SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+        PERFORM net.http_post(
+          url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification',
+          headers := jsonb_build_object('Authorization', 'Bearer ' || v_service_role, 'Content-Type', 'application/json'),
+          body := jsonb_build_object(
+            'telefono', p_telefono,
+            'negocio_id', p_negocio_id,
+            'title', p_title,
+            'body', p_body,
+            'url', p_url
+          )
+        );
+        RETURN json_build_object('success', true, 'message', 'Llamada delegada a Edge Function');
+      EXCEPTION WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'error', 'Error delegando a Edge Function: ' || SQLERRM);
+      END;
   END IF;
 
-  v_payload := jsonb_build_object('app_id', v_onesignal_app_id, 'headings', jsonb_build_object('en', p_title), 'contents', jsonb_build_object('en', p_body), 'url', p_url, 'include_aliases', jsonb_build_object('external_id', jsonb_build_array(p_telefono)), 'target_channel', 'push');
+  v_payload := jsonb_build_object(
+    'app_id', v_onesignal_app_id, 
+    'headings', jsonb_build_object('en', p_title, 'es', p_title), 
+    'contents', jsonb_build_object('en', p_body, 'es', p_body), 
+    'url', p_url, 
+    'include_aliases', jsonb_build_object('external_id', jsonb_build_array(p_telefono)), 
+    'target_channel', 'push'
+  );
 
-  -- Se cambia a PERFORM sin collect_response para evitar bloqueos.
-  -- La función RPC retornará inmediatamente después de enviar la solicitud.
   PERFORM net.http_post(
     url := 'https://api.onesignal.com/notifications',
     headers := jsonb_build_object('Authorization', 'Basic ' || v_onesignal_api_key, 'Content-Type', 'application/json'),
     body := v_payload,
-    timeout_milliseconds := 3000 -- Añadir un timeout para evitar esperas indefinidas
+    timeout_milliseconds := 3000
   );
 
-  -- Retornar un éxito inmediato ya que la llamada es asíncrona
-  RETURN json_build_object('success', true, 'message', 'Notificación enviada asíncronamente');
-
-  IF v_response->>'id' IS NOT NULL THEN
-    RETURN json_build_object('success', true, 'id', v_response->>'id');
-  ELSE
-    RETURN json_build_object('success', false, 'error', 'Respuesta inválida de OneSignal', 'details', v_response);
-  END IF;
+  RETURN json_build_object('success', true, 'message', 'Notificación enviada vía OneSignal API');
 
 EXCEPTION
   WHEN others THEN

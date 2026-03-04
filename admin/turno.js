@@ -935,6 +935,27 @@ async function cargarTurnos() {
     citasHoy = resCitasHoy.data || [];
     citasFuturas = resCitasFut.data || [];
 
+    // --- MEJORA: Asegurar nombres de clientes para citas y turnos en atención ---
+    const allPhones = [
+        ...citasHoy.map(c => c.cliente_telefono),
+        ...citasFuturas.map(c => c.cliente_telefono),
+        ...enAtencionCache.map(t => t.telefono)
+    ].filter(tel => tel && !clientesMap[tel]);
+    
+    const uniquePhones = [...new Set(allPhones)];
+
+    if (uniquePhones.length > 0) {
+        const { data: newClients } = await supabase
+            .from('clientes')
+            .select('telefono, nombre')
+            .eq('negocio_id', negocioId)
+            .in('telefono', uniquePhones);
+        
+        (newClients || []).forEach(c => {
+            if (c.telefono) clientesMap[c.telefono] = c.nombre;
+        });
+    }
+
     renderCitas();
 
     // Limpiar intervalos SOLO cuando tenemos los datos nuevos listos para evitar parpadeos vacíos
@@ -1343,8 +1364,9 @@ function cerrarModalPago() {
 }
 
 /**
- * Verifica si un barbero tiene tiempo suficiente para atender un servicio antes de su próxima cita.
+ * Verifica si un barbero está libre actualmente (no tiene turno en atención ni cita ahora).
  */
+function barberoDisponible(barberId) {
     // 1. Verificar si tiene turno en atención (usando cache actualizado en cargarTurnos)
     const tieneTurnoActivo = enAtencionCache.some(t => t.barber_id === barberId);
     if (tieneTurnoActivo) return false;

@@ -981,14 +981,13 @@ function renderProfile(data) {
     if (saludoEl) {
        saludoEl.textContent = `${getSaludo()}, ${data.nombre.split(' ')[0]}`;
     }
-
-    const nivelInfo = calcularNivelInfo(data.puntos_totales_historicos || 0);
-    const badge = document.getElementById('profile-level-badge');
-    if (badge) badge.textContent = `${nivelInfo.icon} ${nivelInfo.nombre}`;
-
-    // Validación de URL de avatar para evitar errores de blob revocados
-    const avatarUrl = (data.avatar_url && !data.avatar_url.startsWith('blob:')) 
-        ? data.avatar_url 
+ 
+    // 🔥 OPTIMIZACIÓN: Usar Supabase Image Transformations para avatares.
+    // Esto solicita una versión pequeña y optimizada de la imagen desde el CDN de Supabase.
+    const avatarUrl = (data.avatar_url && data.avatar_url.includes('supabase.co'))
+        ? `${data.avatar_url}?width=256&height=256&resize=cover&quality=80`
+        : (data.avatar_url && !data.avatar_url.startsWith('blob:'))
+            ? data.avatar_url
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
 
     const navAvatar = document.getElementById('nav-avatar');
@@ -996,6 +995,9 @@ function renderProfile(data) {
     const profileAvatar = document.getElementById('profile-avatar');
     if (profileAvatar) profileAvatar.src = avatarUrl;
 
+    const nivelInfo = calcularNivelInfo(data.puntos_totales_historicos || 0);
+    const badge = document.getElementById('profile-level-badge');
+    if (badge) badge.textContent = `${nivelInfo.icon} ${nivelInfo.nombre}`;
     const recompensas = obtenerRecompensasDisponibles(data.puntos_actuales || 0);
     const badge2 = document.getElementById('profile-level-badge');
     if (badge2) badge2.innerHTML = `${nivelInfo.icon} ${nivelInfo.nombre}`;
@@ -1999,9 +2001,62 @@ window.cancelarCita = async (idCita = null) => {
   );
 };
 
+/**
+ * Resizes an image file to a maximum width/height using a canvas.
+ * @param {File} file The image file to resize.
+ * @param {number} maxSize The maximum width or height of the resized image.
+ * @returns {Promise<File>} A promise that resolves with the resized image as a File object.
+ */
+function resizeImage(file, maxSize = 512) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round(height * (maxSize / width));
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round(width * (maxSize / height));
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(new File([blob], file.name, { type: file.type, lastModified: Date.now() }));
+          else reject(new Error('Canvas to Blob conversion failed'));
+        }, file.type, 0.9); // 0.9 quality
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 window.subirAvatar = async (input) => {
-  const file = input.files[0];
+  let file = input.files[0];
   if (!file) return;
+
+  // 🔥 OPTIMIZACIÓN: Redimensionar imagen antes de subir
+  try {
+    showToast('Optimizando imagen...', 'info');
+    file = await resizeImage(file, 512); // Redimensionar a 512px max
+  } catch (e) {
+    console.warn('No se pudo redimensionar la imagen, subiendo original.', e);
+  }
 
   const bucketName = 'avatars';
   const fileName = `public/${clienteId}-${Date.now()}`;
@@ -2019,50 +2074,19 @@ window.subirAvatar = async (input) => {
 
     if (uploadError) throw uploadError;
 
-    const { data: publicData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(fileName);
+    const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(fileName);
 
-    const publicUrl = publicData?.publicUrl;
     if (!publicUrl) throw new Error('No se pudo obtener la URL pública.');
 
-    const { error: dbError } = await supabase.from('clientes')
-      .update({ avatar_url: publicUrl })
-      .eq('id', clienteId);
+    const { error: dbError } = await supabase.from('clientes').update({ avatar_url: publicUrl }).eq('id', clienteId);
 
     if (dbError) throw dbError;
 
     showToast('Avatar actualizado con éxito.', 'success');
     await cargarPerfil();
-    } catch (error) {
-      console.warn('Fallo subida a Storage, intentando fallback Data URL:', error);
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const dataUrl = e.target.result;
-
-        const { error: dbError } = await supabase.from('clientes')
-          .update({ avatar_url: dataUrl })
-          .eq('id', clienteId);
-
-        if (dbError) {
-          console.error('Error guardando Data URL:', dbError);
-          showToast('No se pudo guardar la imagen. Contacta al administrador.', 'error');
-          return;
-        }
-
-        const navAvatar = document.getElementById('nav-avatar');
-        if (navAvatar) navAvatar.src = dataUrl;
-        const profileAvatar = document.getElementById('profile-avatar');
-        if (profileAvatar) profileAvatar.src = dataUrl;
-        showToast('Avatar guardado correctamente (modo local).', 'success');
-      };
-      reader.readAsDataURL(file);
-    } catch (e2) {
-      console.error('Error fatal al procesar imagen:', e2);
-      showToast('No se pudo procesar la imagen.', 'error');
-    }
+  } catch (error) {
+    console.error('Error al subir avatar:', error);
+    showToast('No se pudo subir la imagen. Intenta de nuevo.', 'error');
   }
 };
 

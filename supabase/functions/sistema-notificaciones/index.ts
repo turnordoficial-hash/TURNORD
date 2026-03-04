@@ -232,7 +232,12 @@ serve(async (req) => {
       const payload = await req.json().catch(() => ({}));
       const { event, record, old_record } = payload;
 
-    // Manejo de eventos INSERT/UPDATE/DELETE provenientes de triggers SQL
+      console.info(`Evento recibido: ${event || 'POLLING'}`, { id: record?.id });
+
+      if (event) {
+        // Marcar evento como procesado si viene de la tabla notification_events
+        // (Esto es opcional si el trigger llama directamente, pero útil para cron de reintentos)
+      }
       if (event === "INSERT" && record && record.start_at) {
         // Nueva Cita
         const { data: b } = await supabase.from('barberos').select('nombre').eq('id', record.barber_id).maybeSingle();

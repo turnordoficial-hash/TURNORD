@@ -25,8 +25,13 @@ function bindEvents() {
     fileInput.addEventListener('change', () => {
       const f = fileInput.files?.[0];
       if (f) {
-        const url = URL.createObjectURL(f);
-        preview.src = url;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (preview && e.target) {
+            preview.src = e.target.result;
+          }
+        };
+        reader.readAsDataURL(f);
       }
     });
   }
@@ -113,33 +118,36 @@ async function subirAvatar(usuario) {
   const f = fileInput?.files?.[0];
   if (!f) return null;
 
-  // Verificar sesión: usar token de usuario o anónimo para permisos públicos
-  const { data: sess } = await supabase.auth.getSession();
-  if (!sess?.session) {
-    await supabase.auth.signInAnonymously?.().catch(()=>{});
-  } else {
-    // Refrescar sesión para evitar error "exp claim timestamp check failed"
-    await supabase.auth.refreshSession();
-  }
-
   const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${negocioId}/${usuario}-${Date.now()}-${safeName}`;
 
-  const { data, error } = await supabase
-    .storage
-    .from('avatars') // CORRECCIÓN: Usar bucket 'avatars' existente
-    .upload(path, f, {
-      cacheControl: '3600',
-      upsert: true,
-      contentType: f.type || 'application/octet-stream'
-    });
+  try {
+    // Refrescar sesión para evitar error "exp claim timestamp check failed"
+    await supabase.auth.refreshSession();
 
-  if (error) {
-    console.error('Error subiendo avatar:', error);
-    return null;
+    const { data, error } = await supabase
+      .storage
+      .from('avatars')
+      .upload(path, f, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: f.type || 'application/octet-stream'
+      });
+
+    if (error) throw error;
+
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.path);
+    return pub?.publicUrl || null;
+  } catch (error) {
+    console.error('Error subiendo avatar a Storage, usando fallback a Data URL:', error);
+    // Fallback a Data URL si la subida a Storage falla (ej. bucket no existe)
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(f);
+    });
   }
-  const { data: pub } = await supabase.storage.from('avatars').getPublicUrl(data.path);
-  return pub?.publicUrl || null;
 }
 
 async function guardarBarbero() {
@@ -148,22 +156,37 @@ async function guardarBarbero() {
   const usuario = document.getElementById('barber-usuario').value.trim();
   const password = document.getElementById('barber-password').value.trim();
   const activo = document.getElementById('barber-activo').checked;
+  
   let avatar_url = document.getElementById('barber-avatar-preview').src || '';
-  const uploaded = await subirAvatar(usuario);
-  if (uploaded) avatar_url = uploaded;
-  const payload = { negocio_id: negocioId, nombre, usuario, password, avatar_url, activo };
+  if (document.getElementById('barber-avatar').files.length > 0) {
+    const uploaded = await subirAvatar(usuario);
+    if (uploaded) avatar_url = uploaded;
+  }
+
+  const payload = { negocio_id: negocioId, nombre, usuario, avatar_url, activo };
+  if (password) {
+    payload.password = password;
+  }
   
   try {
     if (id) {
       const { error } = await supabase.from('barberos').update(payload).eq('id', Number(id));
       if (error) throw error;
     } else {
+      if (!password) {
+        alert('La contraseña es obligatoria para nuevos barberos.');
+        return;
+      }
       const { error } = await supabase.from('barberos').insert([payload]);
       if (error) throw error;
     }
   } catch (error) {
     console.error('Error guardando barbero:', error);
-    alert(error.code === '23505' ? 'Error: El usuario ya existe.' : 'Error al guardar: ' + error.message);
+    if (error.code === '23505' && error.message.includes('ux_barberos_neg_usuario')) {
+        alert('Error: El nombre de usuario ya existe. Por favor, elige otro.');
+    } else {
+        alert('Error al guardar: ' + error.message);
+    }
     return;
   }
   limpiarFormulario();
