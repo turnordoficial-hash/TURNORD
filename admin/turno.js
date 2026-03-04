@@ -2,6 +2,17 @@ import { supabase, ensureSupabase } from '../database.js';
 import { RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
+// Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
+window.addEventListener('unhandledrejection', (e) => {
+    if (e.reason && (
+        e.reason.name === 'UnknownError' || 
+        (e.reason.message && e.reason.message.includes('indexedDB'))
+    )) {
+        console.warn('Supressed OneSignal IndexedDB error to prevent crash.');
+        e.preventDefault();
+    }
+});
+
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
 let turnoEnAtencionActual = null; // Variable Global de Estado Maestro
@@ -1959,7 +1970,7 @@ async function handleDoubleClickDelete(event) {
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'No, cancelar'
     }).then(async (result) => {
-        if (result.isConfirmed) {
+        if (result && result.isConfirmed) {
             try {
                 const { error } = await supabase
                     .from('turnos')
