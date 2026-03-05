@@ -33,6 +33,35 @@ let isSubmittingTurn = false; // Flag para evitar doble submit
 let agendaInterval = null; // Intervalo para actualizar línea de tiempo y estados
 let basePricePago = 0;
 
+// ===============================
+// Resolver nombre cliente (GLOBAL)
+// ===============================
+function obtenerNombreCliente(obj) {
+    if (!obj) return 'Cliente';
+
+    if (obj.nombre && obj.nombre.trim() !== '') {
+        return obj.nombre.trim();
+    }
+
+    if (obj.telefono && clientesMap[obj.telefono]) {
+        return clientesMap[obj.telefono];
+    }
+
+    if (obj.cliente_telefono && clientesMap[obj.cliente_telefono]) {
+        return clientesMap[obj.cliente_telefono];
+    }
+
+    return 'Cliente';
+}
+
+function formatearHora(fecha) {
+    const d = new Date(fecha);
+    return d.toLocaleTimeString('es-DO', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
  * @returns {string|null} El ID del negocio o null si no está presente.
@@ -317,8 +346,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // OneSignal Initialization
     try {
+        const adminId = `admin_${negocioId}`;
         await OneSignalManager.init();
-        await OneSignalManager.login('admin_jbarber'); // Hardcoded admin ID
+        await OneSignalManager.login(adminId, {
+            negocio_id: negocioId,
+            role: 'admin'
+        });
     } catch (e) {
         console.error("Error inicializando OneSignal:", e);
     }
@@ -507,6 +540,7 @@ async function enviarCorreoMarketingCliente(clienteId, flow) {
 let draggedItem = null;
 
 function handleDragStart(event) {
+    return; // Desactivado
     const target = event.target.closest('.turn-card-espera');
     if (!target) {
         event.preventDefault();
@@ -521,6 +555,7 @@ function handleDragStart(event) {
 }
 
 function handleDragOver(event) {
+    return; // Desactivado
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     const target = event.target.closest('.turn-card-espera');
@@ -537,6 +572,7 @@ function handleDragOver(event) {
 }
 
 async function handleDrop(event) {
+    return; // Desactivado
     event.preventDefault();
     if (!draggedItem) return;
 
@@ -596,6 +632,7 @@ async function handleDrop(event) {
 }
 
 function handleDragEnd(event) {
+    return; // Desactivado
     if (draggedItem) {
         draggedItem.classList.remove('opacity-50');
         draggedItem = null;
@@ -671,6 +708,8 @@ function esDiaOperativo(date = new Date()) {
 }
 
 async function tomarTurno(event) {
+    event.preventDefault();
+    return; // Sistema de turnos inactivo
     event.preventDefault();
     if (isSubmittingTurn) return; // Evitar doble clic
     
@@ -940,7 +979,7 @@ async function cargarTurnos() {
     if (indicadorIngresos) indicadorIngresos.textContent = `RD$ ${totalIngresos.toLocaleString('es-DO', {minimumFractionDigits: 2})}`;
 
     // 3. Procesar Lista de Espera (con fallback de error)
-    let data = []; // Forzamos lista de espera vacía para eliminar sistema de turnos
+    let data = []; // SISTEMA DE TURNOS INACTIVO: Siempre vacío
 
     // 4. Procesar Citas
     citasHoy = resCitasHoy.data || [];
@@ -1059,7 +1098,7 @@ async function cargarTurnos() {
         <span class="text-2xl font-bold text-blue-700 dark:text-blue-400">${t.turno}</span>
         <span class="text-xs bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full">${t.hora.slice(0, 5)}</span>
       </div>
-      <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${t.nombre || 'Cliente'}</p>
+      <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${obtenerNombreCliente(t)}</p>
       <div class="flex justify-between items-center mt-3">
         <span class="text-xs text-gray-500 dark:text-gray-400">${t.servicio || 'Servicio'}</span>
         <div class="text-right">
@@ -1083,7 +1122,7 @@ async function cargarTurnos() {
           <span class="text-2xl font-bold text-green-700 dark:text-green-400">${t.turno}</span>
           <div id="timer-${t.id}" class="text-lg font-bold text-red-500 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded-lg">--:--</div>
         </div>
-        <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${t.nombre || 'Cliente'}</p>
+        <p class="text-gray-700 dark:text-gray-300 font-medium mt-2 truncate">${obtenerNombreCliente(t)}</p>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${t.servicio || 'Servicio'}</p>`;
             listaAtencion.appendChild(div);
             iniciarTimerParaTurno(t);
@@ -1096,7 +1135,7 @@ async function cargarTurnos() {
     document.getElementById('turnoActual').textContent = displayTurno ? displayTurno.turno : '--';
     const clienteActual = document.getElementById('cliente-actual');
     if (clienteActual) {
-        clienteActual.textContent = displayTurno ? displayTurno.nombre : '-';
+        clienteActual.textContent = displayTurno ? obtenerNombreCliente(displayTurno) : '-';
     }
     const tiempoEstimado = document.getElementById('tiempo-estimado');
     if (tiempoEstimado) {
@@ -1154,7 +1193,7 @@ async function cargarTurnos() {
         const alertaDiv = document.getElementById('alerta-cita-proxima') || document.createElement('div');
         alertaDiv.id = 'alerta-cita-proxima';
         alertaDiv.className = 'fixed bottom-4 right-4 bg-yellow-500 text-white px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce cursor-pointer';
-        alertaDiv.innerHTML = `<strong>⚠️ Cita Inminente</strong><br>${clientesMap[proximaCitaInminente.cliente_telefono] || 'Cliente'} - ${new Date(proximaCitaInminente.start_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        alertaDiv.innerHTML = `<strong>⚠️ Cita Inminente</strong><br>${obtenerNombreCliente(proximaCitaInminente)} - ${formatearHora(proximaCitaInminente.start_at)}`;
         alertaDiv.onclick = () => atenderAhora(); // Clic para ir directo a atender
         if (!document.getElementById('alerta-cita-proxima')) document.body.appendChild(alertaDiv);
     } else {
@@ -1216,8 +1255,8 @@ function renderPorBarbero(enAtencionList, enEsperaList, citasHoyList) {
                     const end = new Date(c.end_at);
                     return `
                       <div class="text-sm bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg border border-emerald-100 dark:border-emerald-800">
-                        <span class="font-bold text-emerald-700 dark:text-emerald-300">${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
-                        <span class="ml-2 text-gray-600 dark:text-gray-300">hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                        <span class="font-bold text-emerald-700 dark:text-emerald-300">${formatearHora(c.start_at)}</span>
+                        <span class="ml-2 text-gray-700 dark:text-gray-300">${obtenerNombreCliente(c)}</span>
                       </div>`;
                 }).join('')}
                 ${misCitasHoy.length === 0 ? '<div class="text-xs text-gray-500">Sin citas</div>' : ''}
@@ -1426,6 +1465,8 @@ function obtenerBarberoSugerido(duracionTurno = 30) {
 }
 
 async function atenderAhora() {
+    // SISTEMA DE TURNOS INACTIVO
+    return;
     // 5. Seguridad: Evitar doble clic en "Atender"
     if (window.__atendiendo) return;
     window.__atendiendo = true;
@@ -1596,16 +1637,16 @@ function renderCitas() {
             const clientName = clientesMap[c.cliente_telefono] || 'Cliente';
             const card = document.createElement('div');
             card.className = 'bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800 transition-all cursor-pointer hover:shadow-md hover:scale-[1.02]';
-            card.ondblclick = () => abrirModalAccionesCita(c.id, `Cita: ${clientName} - ${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}`);
+            card.ondblclick = () => abrirModalAccionesCita(c.id, `Cita: ${clientName} - ${formatearHora(start)}`);
             card.innerHTML = `
               <div class="flex justify-between items-start">
-                <span class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">${formatearHora(start)}</span>
                 <span class="text-xs bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full">${bName}</span>
               </div>
               <p class="text-gray-900 dark:text-white font-bold mt-2 truncate">${clientName}</p>
               <p class="text-gray-500 dark:text-gray-400 text-xs truncate">${c.cliente_telefono || ''}</p>
               <div class="flex justify-between items-center mt-3">
-                <span class="text-xs text-gray-500 dark:text-gray-400">Hasta ${end.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">Hasta ${formatearHora(end)}</span>
                 <span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     ${dur} min
@@ -1625,7 +1666,7 @@ function renderCitas() {
             card.className = 'bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg shadow-sm border border-violet-100 dark:border-violet-800 transition-all';
             card.innerHTML = `
               <div class="flex justify-between items-start">
-                <span class="text-2xl font-bold text-violet-700 dark:text-violet-400">${start.toLocaleDateString('es-ES')} ${start.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</span>
+                <span class="text-2xl font-bold text-violet-700 dark:text-violet-400">${start.toLocaleDateString('es-ES')} ${formatearHora(start)}</span>
                 <span class="text-xs bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200 px-2 py-0.5 rounded-full">${bName}</span>
               </div>
               <p class="text-gray-900 dark:text-white font-bold mt-2 truncate">${clientName}</p>
@@ -1656,11 +1697,7 @@ async function guardarPago(event) {
        return;
     }
 
-    const turnoId = parseInt(activeTurnIdForPayment);
-    if (isNaN(turnoId)) {
-        mostrarNotificacion('ID de turno inválido.', 'error');
-        return;
-    }
+    const turnoId = activeTurnIdForPayment;
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('finalizar_turno_con_pago', {
         p_turno_id: turnoId,
@@ -1828,7 +1865,7 @@ function iniciarReconocimientoVoz() {
     }
 
     recognition = new SpeechRecognition();
-    recognition.lang = 'es-DO';
+    recognition.lang = 'es-ES';
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -1918,36 +1955,13 @@ function procesarComandoVoz(transcript) {
     const comandosSiguiente = ['siguiente turno', 'cuál turno sigue', 'quién sigue', 'próximo turno'];
     const comandosAtender = ['pasar turno', 'atender turno', 'pase el turno', 'siguiente', 'atender', 'pasar'];
 
-    if (comandosSiguiente.some(cmd => transcript.includes(cmd))) {
-        const siguiente = getSiguienteTurno();
-        if (siguiente && siguiente.nombre) {
-            const texto = `El siguiente turno es de ${siguiente.nombre}.`;
-            hablar(texto);
-            mostrarNotificacion(texto, 'success');
-        } else {
-            const texto = 'No hay más turnos en espera.';
-            hablar(texto);
-            mostrarNotificacion(texto, 'warning');
-        }
-    } else if (comandosAtender.some(cmd => transcript.includes(cmd))) {
-        const siguiente = getSiguienteTurno();
-        if (siguiente) {
-            hablar(`Atendiendo a ${siguiente.nombre}.`);
-            if (!window.__atendiendo) atenderAhora();
-        } else {
-            const texto = 'No hay turnos para atender.';
-            hablar(texto);
-            mostrarNotificacion(texto, 'warning');
-        }
-    } else {
-        const texto = 'No se reconoció un comando válido.';
-        hablar(texto);
-        mostrarNotificacion(texto, 'error');
-    }
+    // Comandos de voz desactivados para turnos
+    return;
 }
 
 
 async function handleDoubleClickDelete(event) {
+    return; // Desactivado
     if (!event) return;
     event.preventDefault();
     const card = event.target.closest('.turn-card-espera');

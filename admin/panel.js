@@ -11,6 +11,27 @@ let historialGlobal = [];
 let currentPage = 1;
 const itemsPerPage = 10;
 
+// ===============================
+// Resolver nombre cliente (GLOBAL)
+// ===============================
+function obtenerNombreCliente(obj, clientesMap = {}) {
+  if (!obj) return 'Cliente';
+
+  if (obj.nombre && obj.nombre.trim() !== '') {
+    return obj.nombre.trim();
+  }
+
+  if (obj.telefono && clientesMap[obj.telefono]) {
+    return clientesMap[obj.telefono];
+  }
+
+  if (obj.cliente_telefono && clientesMap[obj.cliente_telefono]) {
+    return clientesMap[obj.cliente_telefono];
+  }
+
+  return 'Cliente';
+}
+
 function handleAuthError(err) {
   if (err && err.code === 'PGRST303') {
     supabase.auth.signOut().finally(() => {
@@ -168,7 +189,7 @@ async function cargarDatos() {
             return {
                 id: `cita-${c.id}`,
                 turno: codeMap.get(c.id),
-                nombre: clientesMap[c.cliente_telefono] || c.nombre || (c.cliente_telefono || 'Cliente'),
+                nombre: obtenerNombreCliente(c, clientesMap),
                 estado: c.estado || 'Cita Programada',
                 hora: hora,
                 servicio: c.servicio || 'Cita',
@@ -181,7 +202,7 @@ async function cargarDatos() {
     // Procesar Turnos
     turnosConNombre = (turnosData || []).map(t => ({
         ...t,
-        nombre: clientesMap[t.telefono] || t.nombre || 'Cliente'
+        nombre: obtenerNombreCliente(t, clientesMap)
     }));
 
     // Combinar y ordenar por fecha de creación/inicio
@@ -308,7 +329,8 @@ function suscribirseTurnos() {
         console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
         
         if (payload.eventType === 'INSERT') {
-            mostrarNotificacion(`Nuevo turno: ${payload.new.turno} - ${payload.new.nombre}`, 'info');
+            const nombre = payload.new.nombre || 'Cliente';
+            mostrarNotificacion(`Nuevo turno: ${payload.new.turno} - ${nombre}`, 'info');
         }
         
         solicitarActualizacion();
@@ -372,7 +394,7 @@ function actualizarTurnoEnAtencion(turnosHoy) {
 
     card.classList.remove('hidden');
     document.getElementById('atencion-turno').textContent = enAtencion.turno;
-    document.getElementById('atencion-cliente').textContent = enAtencion.nombre;
+    document.getElementById('atencion-cliente').textContent = obtenerNombreCliente(enAtencion);
     document.getElementById('atencion-servicio').textContent = enAtencion.servicio;
 
     const duracionMin = serviciosCache[enAtencion.servicio];

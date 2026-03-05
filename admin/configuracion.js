@@ -50,17 +50,27 @@ function limpiarFormulario() {
 }
 
 async function cargarBarberos() {
-  // Asegurar sesión anónima para evitar 401
-  const { data: sess } = await supabase.auth.getSession();
-  if (!sess?.session) {
-    await supabase.auth.signInAnonymously?.().catch(()=>{});
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+
+    if (!sess?.session) {
+      await supabase.auth.signInAnonymously?.().catch(() => {});
+    }
+
+    const { data, error } = await supabase
+      .from('barberos')
+      .select('id,nombre,usuario,avatar_url,activo')
+      .eq('negocio_id', negocioId)
+      .order('nombre', { ascending: true });
+
+    if (error) throw error;
+
+    renderBarberos(data || []);
+
+  } catch (error) {
+    console.error('Error cargando barberos:', error);
+    alert('Error cargando barberos');
   }
-  const { data } = await supabase
-    .from('barberos')
-    .select('id,nombre,usuario,avatar_url,activo')
-    .eq('negocio_id', negocioId)
-    .order('nombre', { ascending: true });
-  renderBarberos(data || []);
 }
 
 function renderBarberos(items) {
@@ -116,14 +126,18 @@ async function eliminarBarbero(id) {
 async function subirAvatar(usuario) {
   const fileInput = document.getElementById('barber-avatar');
   const f = fileInput?.files?.[0];
-  if (!f) return null;
+
+  if (!f || !usuario) return null;
 
   const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `${negocioId}/${usuario}-${Date.now()}-${safeName}`;
 
   try {
-    // Refrescar sesión para evitar error "exp claim timestamp check failed"
-    await supabase.auth.refreshSession();
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (sessionData?.session) {
+      await supabase.auth.refreshSession();
+    }
 
     const { data, error } = await supabase
       .storage
@@ -136,17 +150,18 @@ async function subirAvatar(usuario) {
 
     if (error) throw error;
 
-    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.path);
+    const { data: pub } = supabase
+      .storage
+      .from('avatars')
+      .getPublicUrl(data.path);
+
     return pub?.publicUrl || null;
+
   } catch (error) {
-    console.error('Error subiendo avatar a Storage, usando fallback a Data URL:', error);
-    // Fallback a Data URL si la subida a Storage falla (ej. bucket no existe)
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(f);
-    });
+    // No usar fallback a DataURL, ya que causa problemas de almacenamiento y carga.
+    console.error('Error subiendo avatar:', error);
+    alert(`Error al subir el avatar: ${error.message}`);
+    return null;
   }
 }
 
@@ -156,41 +171,74 @@ async function guardarBarbero() {
   const usuario = document.getElementById('barber-usuario').value.trim();
   const password = document.getElementById('barber-password').value.trim();
   const activo = document.getElementById('barber-activo').checked;
-  
-  let avatar_url = document.getElementById('barber-avatar-preview').src || '';
-  if (document.getElementById('barber-avatar').files.length > 0) {
-    const uploaded = await subirAvatar(usuario);
-    if (uploaded) avatar_url = uploaded;
-  }
 
-  const payload = { negocio_id: negocioId, nombre, usuario, avatar_url, activo };
-  if (password) {
-    payload.password = password;
-  }
-  
-  try {
-    if (id) {
-      const { error } = await supabase.from('barberos').update(payload).eq('id', Number(id));
-      if (error) throw error;
-    } else {
-      if (!password) {
-        alert('La contraseña es obligatoria para nuevos barberos.');
-        return;
-      }
-      const { error } = await supabase.from('barberos').insert([payload]);
-      if (error) throw error;
-    }
-  } catch (error) {
-    console.error('Error guardando barbero:', error);
-    if (error.code === '23505' && error.message.includes('ux_barberos_neg_usuario')) {
-        alert('Error: El nombre de usuario ya existe. Por favor, elige otro.');
-    } else {
-        alert('Error al guardar: ' + error.message);
-    }
+  // 🔐 VALIDACIONES
+  if (!nombre) {
+    alert('El nombre es obligatorio.');
     return;
   }
-  limpiarFormulario();
-  await cargarBarberos();
+
+  if (!usuario) {
+    alert('El usuario es obligatorio.');
+    return;
+  }
+
+  if (!id && !password) {
+    alert('La contraseña es obligatoria para nuevos barberos.');
+    return;
+  }
+
+  const payload = {
+    negocio_id: negocioId,
+    nombre,
+    usuario,
+    activo
+  };
+
+  if (password) {
+    payload.password = password; // ⚠️ Idealmente esto debería ir hasheado desde backend
+  }
+
+  if (document.getElementById('barber-avatar').files.length > 0) {
+    const newAvatarUrl = await subirAvatar(usuario);
+    if (newAvatarUrl) {
+      payload.avatar_url = newAvatarUrl;
+    } else {
+      alert('El guardado fue cancelado porque la subida del avatar falló.');
+      return;
+    }
+  }
+
+  try {
+    if (id) {
+      const { error } = await supabase
+        .from('barberos')
+        .update(payload)
+        .eq('id', Number(id))
+        .eq('negocio_id', negocioId);
+
+      if (error) throw error;
+
+    } else {
+      const { error } = await supabase
+        .from('barberos')
+        .insert([payload]);
+
+      if (error) throw error;
+    }
+
+    limpiarFormulario();
+    await cargarBarberos();
+
+  } catch (error) {
+    console.error('Error guardando barbero:', error);
+
+    if (error.code === '23505') {
+      alert('Ese usuario ya existe.');
+    } else {
+      alert('Error al guardar: ' + error.message);
+    }
+  }
 }
 
 function setupSidebar() {
