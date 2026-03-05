@@ -53,6 +53,12 @@ async function login(externalId, tags = {}) {
         console.log(`OneSignal: Usuario identificado como ${externalId}.`);
     } catch (error) {
         console.error('Error en OneSignal login:', error);
+        // 409 Conflict: El usuario ya existe o tiene alias conflictivos. No es crítico.
+        if (error && (error.status === 409 || (error.message && error.message.includes('409')))) {
+            console.warn('OneSignal: Usuario ya registrado (409).');
+        } else {
+            console.error('Error en OneSignal login:', error);
+        }
     }
 }
 
