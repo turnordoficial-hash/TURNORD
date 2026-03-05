@@ -1073,9 +1073,15 @@ async function cargarPerfil() {
     renderProfile(cached);
   }
 
-  const { data, error } = await sb.from('clientes').select('*, puntos_actuales, puntos_totales_historicos, ultima_visita').eq('id', appState.user.id).single();
+  const { data, error } = await sb.from('clientes')
+    .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
+    .eq('id', appState.user.id)
+    .maybeSingle();
   
-  if (error) return;
+  if (error) {
+    console.error('Error cargando perfil:', error);
+    return;
+  }
   
   if (data) {
     const oldPoints = appState.profile?.puntos_actuales || 0;
