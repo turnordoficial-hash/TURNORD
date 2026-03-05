@@ -607,18 +607,6 @@ async function init() {
 
 function renderStructure() {
   const statusContainer = document.getElementById('inicio-status-container');
-    checkPendingRatings();
-    setupPosterTilt();
-}
-
-function renderStructure() {
-  const statusContainer = document.getElementById('inicio-status-container');
-    checkPendingRatings();
-    setupPosterTilt();
-}
-
-function renderStructure() {
-  const statusContainer = document.getElementById('inicio-status-container');
   if (statusContainer) {
     statusContainer.innerHTML = `
       <div class="grid grid-cols-1 gap-4">
@@ -815,9 +803,7 @@ function renderStructure() {
               <div class="text-center sm:text-left">
                 <h3 id="profile-name" class="text-4xl font-display font-bold title-text tracking-wide text-gray-900 dark:text-white">Cargando...</h3>
                 <p id="profile-phone" class="subtitle-text text-lg mt-1 text-gray-600 dark:text-gray-400">...</p>
-<!-- panel_cliente.html -->
-<script type="module" src="admin/panel-cliente.js?v=1.2"></script><!-- panel_cliente.html -->
-<script type="module" src="admin/panel-cliente.js?v=1.2"></script>                <div class="mt-3 flex items-center gap-2">
+                <div class="mt-3 flex items-center gap-2">
                     <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 ${nivelInfo.color} text-xs font-bold border border-black/10 dark:border-white/10">
                       ${nivelInfo.icon} ${nivelInfo.nombre}
                     </span>
