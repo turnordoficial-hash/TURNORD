@@ -1305,3 +1305,6 @@ GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO authenticated;
 
 COMMIT;
+
+CREATE POLICY "Permitir inserción a dueños" ON public.clientes 
+FOR INSERT WITH CHECK (auth.uid() = id);

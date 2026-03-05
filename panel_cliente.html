@@ -43,43 +43,61 @@
       const negocioId = 'barberia005';
 
       try {
-        // Intentar obtener el perfil. Si falla con error de RLS o no existe, intentamos crear/completar.
-        const { data: profile, error } = await supabase
+        // 1. Verificar si el perfil existe
+        const { data: profile, error: selectError } = await supabase
           .from('clientes')
-          .select('id, negocio_id')
+          .select('id, email, negocio_id')
           .eq('id', user.id)
           .maybeSingle();
 
+        if (selectError) {
+          console.error('Error al verificar perfil (SELECT):', selectError);
+          // Si es error de RLS, tal vez el registro existe pero no podemos verlo (id diferente)
+        }
+
         if (profile) {
-          console.log('Perfil verificado correctamente.');
+          console.log('Perfil verificado:', profile.id);
+          // Si el negocio_id no coincide, lo actualizamos
+          if (profile.negocio_id !== negocioId) {
+            console.warn('Actualizando negocio_id del perfil...');
+            await supabase.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
+          }
           return;
         }
 
-        if (error) {
-          console.error('Error al verificar perfil:', error);
-        }
-
-        // El perfil no existe, vamos a crearlo. 
-        // Usamos upsert para evitar errores si ya existe por email/negocio_id pero con otro ID (aunque id es PK)
-        console.warn(`Creando perfil para el usuario: ${user.id}`);
+        // 2. Si no existe, intentamos insertarlo
+        console.warn(`Creando perfil nuevo para: ${user.id}`);
         
-        const { error: insertError } = await supabase.from('clientes').upsert({
+        // Usamos insert simple primero. Si falla por duplicado de ID, upsert.
+        const newProfile = {
           id: user.id,
           email: user.email,
           nombre: user.user_metadata?.nombre || 'Cliente',
           telefono: user.user_metadata?.telefono || '',
           negocio_id: negocioId,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
+        };
+
+        console.log('Intentando insertar perfil:', newProfile);
+        const currentSession = await supabase.auth.getSession();
+        console.log('Sesión activa:', currentSession.data.session ? 'SÍ' : 'NO');
+        console.log('Auth UID (desde session):', currentSession.data.session?.user?.id);
+        console.log('Auth UID (desde getUser):', user.id);
+
+        const { error: insertError } = await supabase.from('clientes').insert(newProfile);
 
         if (insertError) {
-          console.error('Error al crear perfil fallback:', insertError);
-          // Si el error es de RLS (42501), es probable que las políticas no permitan INSERT directo
+          console.error('Error al crear perfil (INSERT):', insertError);
+          
+          // Si falló por RLS, probamos con una función RPC si existiera, 
+          // o revisamos los campos. Algunos campos NOT NULL podrían faltar? No.
           if (insertError.code === '42501') {
-            console.warn('Nota: Revisa las políticas RLS de la tabla "clientes". El usuario debe poder insertar su propio registro (auth.uid() = id).');
+            console.error('RLS BLOCK: El usuario no tiene permiso para insertar en "clientes".');
+            console.log('Datos intentados:', newProfile);
+            console.log('Auth UID actual:', (await supabase.auth.getUser()).data.user?.id);
           }
         } else {
-          console.log('Perfil creado/actualizado con éxito.');
+          console.log('Perfil creado con éxito.');
         }
       } catch (err) {
         console.error('Error inesperado en ensureProfileExists:', err);
@@ -695,7 +713,7 @@
   </div>
 
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script type="module" src="admin/panel-cliente.js"></script>
+  <script type="module" src="admin/panel-cliente.js?v=1.1"></script>
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(function(OneSignal) {

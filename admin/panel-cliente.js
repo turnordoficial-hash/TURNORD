@@ -1073,17 +1073,33 @@ async function cargarPerfil() {
     renderProfile(cached);
   }
 
-  const { data, error } = await sb.from('clientes')
-    .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
-    .eq('id', appState.user.id)
-    .maybeSingle();
-  
-  if (error) {
-    console.error('Error cargando perfil:', error);
-    return;
+  try {
+    const { data, error } = await sb.from('clientes')
+      .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
+      .eq('id', appState.user.id)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error cargando perfil:', error);
+      // Si el error es PGRST116 aquí, es un comportamiento inesperado de maybeSingle()
+      if (error.code === 'PGRST116') {
+        console.warn('Detectado PGRST116 a pesar de usar maybeSingle().');
+      }
+      return;
+    }
+    
+    if (data) {
+      processProfileData(data);
+    } else {
+      console.warn('No se encontró el perfil del cliente en la base de datos.');
+      // El perfil debería ser creado por ensureProfileExists en panel_cliente.html
+    }
+  } catch (err) {
+    console.error('Excepción en cargarPerfil:', err);
   }
-  
-  if (data) {
+}
+
+function processProfileData(data) {
     const oldPoints = appState.profile?.puntos_actuales || 0;
     const newPoints = data.puntos_actuales || 0;
     const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
@@ -1094,15 +1110,17 @@ async function cargarPerfil() {
         const levelUp = newLevel.nombre !== oldLevel.nombre;
         if ((unlocked || levelUp) && typeof confetti === 'function') {
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
+            if (levelUp) showToast(`¡Felicidades! Has subido al nivel ${newLevel.icon} ${newLevel.nombre}`, 'success');
         }
     }
+
     setCache('PROFILE', data, 15);
     appState.profile = data;
     renderProfile(data);
     if (data.telefono) OneSignalManager.login(data.telefono, { negocio_id: negocioId, role: 'cliente' });
     iniciarMotorMarketing();
     cargarHistorialPuntos();
-  }
+    setupRealtime();
 }
 
 function renderServices(data) {
