@@ -8,6 +8,7 @@
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0B0B0B">
   
   <!-- Optimización de Carga -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -28,12 +29,12 @@
     import { ensureSupabase } from './database.js';
     async function verificarSesion() {
       const supabase = await ensureSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         window.location.href = 'login_cliente.html';
         return null; // No user, stop here
       }
-      return user;
+      return session.user;
     }
 
     async function ensureProfileExists(user) {
@@ -43,21 +44,21 @@
       const negocioId = 'barberia005';
 
       try {
-        // 1. Verificar si el perfil existe
-        const { data: profile, error: selectError } = await supabase
+        // 1. Verificar si el perfil existe (Usamos SELECT simple con limit(1) para evitar 406/PGRST116)
+        const { data: profiles, error: selectError } = await supabase
           .from('clientes')
           .select('id, email, negocio_id')
           .eq('id', user.id)
-          .maybeSingle();
+          .limit(1);
 
         if (selectError) {
           console.error('Error al verificar perfil (SELECT):', selectError);
-          // Si es error de RLS, tal vez el registro existe pero no podemos verlo (id diferente)
         }
+
+        const profile = profiles && profiles.length > 0 ? profiles[0] : null;
 
         if (profile) {
           console.log('Perfil verificado:', profile.id);
-          // Si el negocio_id no coincide, lo actualizamos
           if (profile.negocio_id !== negocioId) {
             console.warn('Actualizando negocio_id del perfil...');
             await supabase.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
@@ -65,10 +66,9 @@
           return;
         }
 
-        // 2. Si no existe, intentamos insertarlo
-        console.warn(`Creando perfil nuevo para: ${user.id}`);
+        // 2. Si no existe, intentamos crearlo con UPSERT (más robusto)
+        console.warn(`Perfil para usuario ${user.id} no encontrado. Creando...`);
         
-        // Usamos insert simple primero. Si falla por duplicado de ID, upsert.
         const newProfile = {
           id: user.id,
           email: user.email,
@@ -78,26 +78,20 @@
           updated_at: new Date().toISOString()
         };
 
-        console.log('Intentando insertar perfil:', newProfile);
-        const currentSession = await supabase.auth.getSession();
-        console.log('Sesión activa:', currentSession.data.session ? 'SÍ' : 'NO');
-        console.log('Auth UID (desde session):', currentSession.data.session?.user?.id);
-        console.log('Auth UID (desde getUser):', user.id);
-
-        const { error: insertError } = await supabase.from('clientes').insert(newProfile);
+        const { error: insertError } = await supabase
+          .from('clientes')
+          .upsert(newProfile, { onConflict: 'id' });
 
         if (insertError) {
-          console.error('Error al crear perfil (INSERT):', insertError);
-          
-          // Si falló por RLS, probamos con una función RPC si existiera, 
-          // o revisamos los campos. Algunos campos NOT NULL podrían faltar? No.
+          console.error('Error al crear perfil (UPSERT):', insertError);
           if (insertError.code === '42501') {
-            console.error('RLS BLOCK: El usuario no tiene permiso para insertar en "clientes".');
-            console.log('Datos intentados:', newProfile);
-            console.log('Auth UID actual:', (await supabase.auth.getUser()).data.user?.id);
+            console.error('RLS BLOCK: Verifica que auth.uid() coincida con el ID del perfil.');
+            console.log('ID Intentado:', user.id);
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('ID Actual Auth:', session?.user?.id);
           }
         } else {
-          console.log('Perfil creado con éxito.');
+          console.log('Perfil creado/actualizado con éxito.');
         }
       } catch (err) {
         console.error('Error inesperado en ensureProfileExists:', err);
@@ -309,6 +303,10 @@
     }
     .logo-animate {
       animation: logoReveal .8s ease-out forwards;
+    }
+    .logo-animate:hover {
+      transform: scale(1.05);
+      transition: transform .2s ease;
     }
     .promo-shine::after {
       content: "";
@@ -532,7 +530,7 @@
                             
                             <div class="relative h-48 rounded-xl overflow-hidden mb-4 group">
                                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10"></div>
-                                <img src="jbarber/jjj.png" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" alt="Barber">
+                                <img src="jbarber/jjj.png" loading="lazy" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" alt="Barber">
                                 <div class="absolute bottom-3 left-3 z-20">
                                     <p class="text-xs text-yellow-400 font-bold uppercase tracking-wider">Session Ready</p>
                                     <p class="text-white font-bold text-lg">Barbería JBarber</p>
@@ -713,7 +711,55 @@
   </div>
 
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script type="module" src="admin/panel-cliente.js?v=1.1"></script>
+<!-- Corrección para el error 'resetIdleTimer is not defined' -->
+<script>
+  let idleTimer;
+
+  /**
+   * Define la función para reiniciar el temporizador de inactividad.
+   * Esta función es llamada por panel-cliente.js para evitar que la sesión
+   * se cierre mientras el usuario está activo.
+   * @param {number} timeoutMinutes - Minutos de inactividad antes de cerrar sesión.
+   */
+  function resetIdleTimer(timeoutMinutes = 20) {
+    // Si el primer argumento es un evento, ignorarlo y usar el valor predeterminado.
+    if (typeof timeoutMinutes !== 'number') {
+      timeoutMinutes = 20;
+    }
+
+    // Limpia cualquier temporizador existente para empezar de nuevo.
+    clearTimeout(idleTimer);
+
+    const timeoutMilliseconds = timeoutMinutes * 60 * 1000;
+
+    // Configura el temporizador que se ejecutará después del período de inactividad.
+    idleTimer = setTimeout(() => {
+      console.log(`Usuario inactivo por ${timeoutMinutes} minutos. Cerrando sesión.`);
+      
+      // Intenta cerrar la sesión de forma segura haciendo clic en el enlace de logout.
+      const logoutLink = document.getElementById('menu-logout');
+      if (logoutLink) {
+        logoutLink.click();
+      } else {
+        // Si no se encuentra el enlace, redirige a la página de login como medida de seguridad.
+        window.location.href = 'login_cliente.html';
+      }
+    }, timeoutMilliseconds);
+  }
+</script>
+
+<!-- panel_cliente.html -->
+<script type="module" src="admin/panel-cliente.js?v=1.2"></script>
+  <script>
+    window.addEventListener("load", () => {
+      const loading = document.getElementById("loading-screen");
+      if (loading) {
+        loading.style.opacity = "0";
+        setTimeout(()=> loading.remove(), 500);
+      }
+    });
+  </script>
+
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(function(OneSignal) {

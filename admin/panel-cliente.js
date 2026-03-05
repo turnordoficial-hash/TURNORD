@@ -38,6 +38,7 @@ const appState = {
 
 // Instancia única de Supabase para evitar mezclas
 let sbInstance = null;
+let realtimeChannel = null;
 async function getSupabase() {
   if (!sbInstance) {
     await ensureSupabase();
@@ -567,7 +568,7 @@ async function init() {
 
     switchTab('inicio');
 
-    document.getElementById('btn-ver-horarios')?.addEventListener('click', renderSlotsForSelectedDate);
+    document.getElementById('btn-ver-horarios')?.addEventListener('click', cargarSlotsInteligente);
     document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
     document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
@@ -600,12 +601,18 @@ async function init() {
 
     registrarServiceWorker();
 
-    const loader = document.getElementById('loading-screen');
-    if (loader) {
-        loader.classList.add('opacity-0');
-        setTimeout(() => loader.remove(), 500);
-    }
+    checkPendingRatings();
+    setupPosterTilt();
+}
 
+function renderStructure() {
+  const statusContainer = document.getElementById('inicio-status-container');
+    checkPendingRatings();
+    setupPosterTilt();
+}
+
+function renderStructure() {
+  const statusContainer = document.getElementById('inicio-status-container');
     checkPendingRatings();
     setupPosterTilt();
 }
@@ -808,7 +815,9 @@ function renderStructure() {
               <div class="text-center sm:text-left">
                 <h3 id="profile-name" class="text-4xl font-display font-bold title-text tracking-wide text-gray-900 dark:text-white">Cargando...</h3>
                 <p id="profile-phone" class="subtitle-text text-lg mt-1 text-gray-600 dark:text-gray-400">...</p>
-                <div class="mt-3 flex items-center gap-2">
+<!-- panel_cliente.html -->
+<script type="module" src="admin/panel-cliente.js?v=1.2"></script><!-- panel_cliente.html -->
+<script type="module" src="admin/panel-cliente.js?v=1.2"></script>                <div class="mt-3 flex items-center gap-2">
                     <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 ${nivelInfo.color} text-xs font-bold border border-black/10 dark:border-white/10">
                       ${nivelInfo.icon} ${nivelInfo.nombre}
                     </span>
@@ -1074,25 +1083,33 @@ async function cargarPerfil() {
   }
 
   try {
-    const { data, error } = await sb.from('clientes')
+    // Usamos select().limit(1) para ser más robustos que maybeSingle() en entornos con RLS estricto
+    const { data: profiles, error } = await sb.from('clientes')
       .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
       .eq('id', appState.user.id)
-      .maybeSingle();
+      .limit(1);
     
     if (error) {
       console.error('Error cargando perfil:', error);
-      // Si el error es PGRST116 aquí, es un comportamiento inesperado de maybeSingle()
-      if (error.code === 'PGRST116') {
-        console.warn('Detectado PGRST116 a pesar de usar maybeSingle().');
-      }
       return;
     }
     
+    const data = profiles && profiles.length > 0 ? profiles[0] : null;
+
     if (data) {
       processProfileData(data);
     } else {
-      console.warn('No se encontró el perfil del cliente en la base de datos.');
-      // El perfil debería ser creado por ensureProfileExists en panel_cliente.html
+      console.warn('Perfil no encontrado. Es posible que se esté creando...');
+      // Si no existe, esperamos 2 segundos y reintentamos una vez
+      setTimeout(async () => {
+        const { data: retryProfiles } = await sb.from('clientes')
+          .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
+          .eq('id', appState.user.id)
+          .limit(1);
+        if (retryProfiles && retryProfiles.length > 0) {
+          processProfileData(retryProfiles[0]);
+        }
+      }, 2000);
     }
   } catch (err) {
     console.error('Excepción en cargarPerfil:', err);
@@ -1444,6 +1461,10 @@ async function confirmarReservaManual() {
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       await sendPushNotification('Cita Confirmada', `Tu cita para las ${timeStr} ha sido agendada.`);
       await enviarCorreoConfirmacion(date.toISOString(), servicio, barberId);
+
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
       
       setTimeout(() => window.location.reload(), 1500);
     } catch (e) { 

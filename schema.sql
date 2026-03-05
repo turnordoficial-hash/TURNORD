@@ -1302,9 +1302,34 @@ GRANT EXECUTE ON FUNCTION public.enviar_notificacion_rpc(text, text, text, text,
 GRANT EXECUTE ON FUNCTION public.enviar_notificacion_rpc(text, text, text, text, text) TO authenticated;
 
 GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO anon;
-GRANT EXECUTE ON FUNCTION public.enviar_correo_rpc(text, text, text) TO authenticated;
+-- ==============================================================================
+-- 10) Permisos y Políticas de Seguridad (REFORZADO)
+-- ==============================================================================
+
+-- Otorgar permisos básicos en el esquema public
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
+
+-- Asegurar RLS en Clientes
+ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
+
+-- Política integral para Clientes (SELECT, INSERT, UPDATE)
+DROP POLICY IF EXISTS "Los usuarios pueden gestionar su propio perfil." ON public.clientes;
+DROP POLICY IF EXISTS "Permitir inserción a dueños" ON public.clientes;
+
+CREATE POLICY "Clientes: Acceso total a perfil propio"
+ON public.clientes
+FOR ALL
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+-- Política para permitir que otros vean perfiles (opcional, para referidos por ejemplo)
+-- CREATE POLICY "Lectura pública de perfiles básicos" ON public.clientes FOR SELECT USING (true);
+
+-- Otorgar permisos específicos a roles de Supabase (por si acaso)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.clientes TO authenticated;
+GRANT SELECT, INSERT ON public.clientes TO anon;
 
 COMMIT;
-
-CREATE POLICY "Permitir inserción a dueños" ON public.clientes 
-FOR INSERT WITH CHECK (auth.uid() = id);
