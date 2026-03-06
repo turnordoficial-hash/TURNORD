@@ -354,14 +354,18 @@ async function setupRealtime() {
 
   const telefono = appState.profile?.telefono;
   if (!telefono) return;
-  const safeTel = encodeURIComponent(telefono);
+  const safeTel = telefono;
 
+  let refreshTimeout;
   const safeRefresh = () => {
-    verificarCitaActiva();
-    checkPendingRatings();
-    // Invalidar caché de perfil para forzar recarga fresca
-    GlobalCache.remove(`profile_${appState.user.id}`);
-    cargarPerfil();
+    clearTimeout(refreshTimeout);
+    refreshTimeout = setTimeout(() => {
+      verificarCitaActiva();
+      checkPendingRatings();
+      // Invalidar caché de perfil para forzar recarga fresca
+      GlobalCache.remove(`profile_${appState.user.id}`);
+      cargarPerfil();
+    }, 800);
   };
 
   realtimeChannel = sb.channel(`cliente-updates-${negocioId}-${appState.user.id}`)
@@ -592,13 +596,15 @@ async function init() {
         cargarBarberos()
     ]);
     
-    if (appState.profile?.telefono) {
-        await setupRealtime();
-        await OneSignalManager.login(appState.profile.telefono, {
-            negocio_id: negocioId,
-            role: 'cliente'
-        });
-    }
+  if (appState.profile?.telefono) {
+    await setupRealtime();
+    await OneSignalManager.login(appState.profile.telefono, {
+      negocio_id: negocioId,
+      role: 'cliente',
+      cliente_id: appState.user.id,
+      segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
+    });
+  }
 
     const dp = document.getElementById('date-picker');
     if (dp) {
@@ -1231,16 +1237,21 @@ async function verificarCitaActiva() {
   if (!telefono) return;
 
   const nowISO = new Date().toISOString();
-  const { data: cita } = await sb.from('citas').select('*, barberos(nombre)').eq('negocio_id', negocioId).eq('cliente_telefono', telefono).gt('end_at', nowISO).order('start_at', { ascending: true }).limit(1).maybeSingle();
+  const { data: cita } = await sb.from('citas')
+    .select('id,start_at,end_at,estado,servicio,barberos(nombre)')
+    .eq('negocio_id', negocioId)
+    .eq('cliente_telefono', telefono)
+    .gt('end_at', nowISO)
+    .order('start_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
   const estadosNoActivos = ['Cancelada', 'Atendida', 'Cita Atendida', 'Completada', 'Finalizada'];
   const cardCita = document.getElementById('card-cita-activa');
   const inicioCitaContainer = document.getElementById('inicio-cita-card-container');
-  const seccionCita = document.getElementById('seccion-cita-inteligente');
 
-  if (cita && !estadosNoActivos.includes(cita.estado) && cardCita) {
+  if (cita && !estadosNoActivos.includes(cita.estado)) {
     appState.hasActiveAppointment = true;
-    cardCita.classList.remove('hidden');
     const date = new Date(cita.start_at);
     const today = new Date();
     const isToday = date.toDateString() === today.toDateString();
@@ -1251,7 +1262,7 @@ async function verificarCitaActiva() {
     const cardHTML = `
                 <div class="bento-card p-6 relative overflow-hidden mb-6 animate-fade-in bg-white dark:bg-[#111113] border border-gray-100 dark:border-white/5 shadow-sm rounded-2xl" style="border-left: 4px solid #000;">
                     <div class="absolute top-0 right-0 p-4 opacity-5 text-black dark:text-white pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 transform rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 transform rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
@@ -1278,11 +1289,17 @@ async function verificarCitaActiva() {
                     </div>
                 </div>`;
     if (inicioCitaContainer) inicioCitaContainer.innerHTML = cardHTML;
-    cardCita.innerHTML = cardHTML;
+    if (cardCita) {
+      cardCita.classList.remove('hidden');
+      cardCita.innerHTML = cardHTML;
+    }
   } else {
     appState.hasActiveAppointment = false;
     if (inicioCitaContainer) inicioCitaContainer.innerHTML = '';
-    if (cardCita) cardCita.innerHTML = '';
+    if (cardCita) {
+      cardCita.classList.add('hidden');
+      cardCita.innerHTML = '';
+    }
   }
 }
 
@@ -1587,6 +1604,13 @@ window.subirAvatar = async (input) => {
     // Refrescar sesión para evitar errores de timeout en storage
     await sb.auth.refreshSession();
     
+    // Validación de seguridad de archivos
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+        showToast('Formato de imagen no permitido', 'error');
+        return;
+    }
+
     file = await resizeImage(file, 512);
     const fileName = `public/${appState.user.id}-${Date.now()}`;
     
@@ -1597,21 +1621,27 @@ window.subirAvatar = async (input) => {
     if (uploadError) throw uploadError;
 
     const { data: { publicUrl } } = sb.storage.from('avatars').getPublicUrl(fileName);
-    
-    const { error: updateError } = await sb.from('clientes')
+
+    const { error: updateError } = await sb
+      .from('clientes')
       .update({ avatar_url: publicUrl })
       .eq('id', appState.user.id);
       
     if (updateError) throw updateError;
 
-    showToast('Avatar actualizado correctamente');
-    await cargarPerfil();
-  } catch (e) { 
-    console.error(e);
-    showToast('Error al subir imagen', 'error'); 
+    showToast('Foto de perfil actualizada', 'success');
+    
+    const img = document.getElementById('avatar-img');
+    if (img) img.src = publicUrl;
+    
+    cargarPerfil();
+
+  } catch (err) {
+    console.error('Error al subir avatar:', err);
+    showToast('Error al subir la imagen', 'error');
   } finally {
     appState.isUploading = false;
-    input.value = ''; // Reset input
+    input.value = '';
   }
 };
 
