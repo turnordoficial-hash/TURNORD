@@ -606,53 +606,53 @@ async function init() {
     });
   }
 
-    const dp = document.getElementById('date-picker');
-    if (dp) {
-        const today = new Date().toLocaleDateString('en-CA');
-        dp.value = today;
-        dp.min = today;
-    }
+  // --- Final Initialization Steps ---
+  const dp = document.getElementById('date-picker');
+  if (dp) {
+      const today = new Date().toLocaleDateString('en-CA');
+      dp.value = today;
+      dp.min = today;
+  }
 
-    await verificarCitaActiva();
-    iniciarMotorMarketing();
+  await verificarCitaActiva();
+  iniciarMotorMarketing();
 
-    switchTab('inicio');
+  switchTab('inicio');
 
-    document.getElementById('btn-ver-horarios')?.addEventListener('click', cargarSlotsInteligente);
-    document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
+  document.getElementById('btn-ver-horarios')?.addEventListener('click', cargarSlotsInteligente);
+  document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
-    document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
+  document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
 
-    const formPerfil = document.getElementById('form-perfil');
-    if (formPerfil) {
-        const telInput = document.getElementById('edit-telefono');
-        telInput?.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
-        });
+  const formPerfil = document.getElementById('form-perfil');
+  if (formPerfil) {
+      const telInput = document.getElementById('edit-telefono');
+      telInput?.addEventListener('input', function() {
+          this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+      });
 
-        formPerfil.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nombre = document.getElementById('edit-nombre').value.trim();
-            const email = document.getElementById('edit-email').value.trim();
-            const telefono = document.getElementById('edit-telefono').value.trim();
+      formPerfil.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const nombre = document.getElementById('edit-nombre').value.trim();
+          const email = document.getElementById('edit-email').value.trim();
+          const telefono = document.getElementById('edit-telefono').value.trim();
 
-            if (telefono.length !== 10) return showToast('El teléfono debe tener 10 dígitos.', 'error');
-            if (nombre.length < 3) return showToast('El nombre es muy corto.', 'error');
+          if (telefono.length !== 10) return showToast('El teléfono debe tener 10 dígitos.', 'error');
+          if (nombre.length < 3) return showToast('El nombre es muy corto.', 'error');
 
-            const client = await getSupabase();
-            const { error } = await client.from('clientes').update({ nombre, email, telefono }).eq('id', appState.user.id);
-            if (error) showToast('Error al actualizar el perfil', 'error');
-            else {
-                showToast('Perfil actualizado con éxito', 'success');
-                cargarPerfil();
-            }
-        });
-    }
+          const client = await getSupabase();
+          const { error } = await client.from('clientes').update({ nombre, email, telefono }).eq('id', appState.user.id);
+          if (error) showToast('Error al actualizar el perfil', 'error');
+          else {
+              showToast('Perfil actualizado con éxito', 'success');
+              cargarPerfil();
+          }
+      });
+  }
 
-    registrarServiceWorker();
-
-    checkPendingRatings();
-    setupPosterTilt();
+  registrarServiceWorker();
+  checkPendingRatings();
+  setupPosterTilt();
 }
 
 function renderStructure() {
@@ -1504,20 +1504,67 @@ async function cargarSlotsInteligente() {
 function renderSlotsToUI(slots) {
   const container = document.getElementById('slots-container');
   if (!container) return;
-  container.innerHTML = slots.length ? '' : '<div class="col-span-full text-center py-8">No hay horarios.</div>';
+
+  // Mostrar la sección de horarios (quitar 'hidden')
+  const section = document.getElementById('horarios-libres');
+  if (section) section.classList.remove('hidden');
+
+  // Actualizar info del barbero si está disponible
+  const barberId = document.getElementById('select-barbero-cita')?.value;
+  const barber = appState.barbers.find(b => String(b.id) === String(barberId));
+  const infoCard = document.getElementById('barber-info-card');
+  if (infoCard && barber) {
+    infoCard.classList.remove('hidden');
+    const nameDisp = document.getElementById('barber-name-display');
+    const avatarDisp = document.getElementById('barber-avatar-display');
+    if (nameDisp) nameDisp.textContent = barber.nombre;
+    if (avatarDisp) avatarDisp.src = barber.avatar_url || 'jbarber/jjj.png';
+  }
+
+  if (!slots || slots.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full text-center py-8 text-gray-500">
+        <p class="font-bold">No hay horarios disponibles</p>
+        <p class="text-xs">Prueba con otra fecha o barbero</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
   slots.forEach(slot => {
     const btn = document.createElement('button');
-    btn.className = 'slot-btn p-3 border rounded-xl font-bold hover:border-[#C1121F] transition-all';
+    btn.className = 'slot-btn p-3 border dark:border-white/10 rounded-xl font-bold hover:border-[#C1121F] dark:text-white transition-all text-sm';
     btn.textContent = slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     btn.onclick = () => seleccionarHora(slot, btn);
     container.appendChild(btn);
   });
 }
 
-function seleccionarHora(slot, btn) {
+async function seleccionarHora(slot, btn) {
   appState.selectedTimeSlot = slot;
   document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('bg-[#C1121F]', 'text-white'));
   btn.classList.add('bg-[#C1121F]', 'text-white');
+  
+  // Actualizar Resumen de Reserva
+  const servicioName = document.getElementById('select-servicio-cita')?.value;
+  const summaryService = document.getElementById('summary-service');
+  const summaryPrice = document.getElementById('summary-price');
+  
+  if (summaryService) summaryService.textContent = servicioName;
+  
+  if (summaryPrice) {
+    const { data: services } = await GlobalCache.smartQuery('services', async () => {
+         const sb = await getSupabase();
+         const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+         return data;
+    }, 1440);
+    const serv = (services || []).find(s => s.nombre === servicioName);
+    if (serv) {
+      summaryPrice.textContent = `RD$ ${Number(serv.precio).toLocaleString()}`;
+    }
+  }
+
   document.getElementById('action-container')?.classList.remove('hidden');
 }
 
@@ -1708,9 +1755,4 @@ function cerrarModalCalificacion() {
   }
 }
 
-init();
-
-document.addEventListener('DOMContentLoaded', () => {
-    setupThemeToggle();
-    setupStaticEventHandlers();
-});
+document.addEventListener('DOMContentLoaded', init);
