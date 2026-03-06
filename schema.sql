@@ -1332,4 +1332,4 @@ WITH CHECK (auth.uid() = id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.clientes TO authenticated;
 GRANT SELECT, INSERT ON public.clientes TO anon;
 
-COMMIT;
+COMMIT;.
