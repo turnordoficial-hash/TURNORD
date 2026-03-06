@@ -479,6 +479,51 @@ function setupStaticEventHandlers() {
     }
   });
 
+  // --- Lógica de Selección de Barbero y Carga Automática ---
+  const barberSelect = document.getElementById('select-barbero-cita');
+  const serviceSelect = document.getElementById('select-servicio-cita');
+  const datePicker = document.getElementById('date-picker');
+
+  const updateBarberUI = () => {
+      const barberId = barberSelect?.value;
+      const card = document.getElementById('barber-info-card');
+      
+      if (!barberId) {
+          if (card) card.classList.add('hidden');
+          return;
+      }
+      
+      const barber = appState.barbers.find(b => b.id == barberId);
+      const img = document.getElementById('barber-avatar-display');
+      const name = document.getElementById('barber-name-display');
+
+      if (barber && card && img && name) {
+          card.classList.remove('hidden');
+          
+          const avatarUrl = (barber.avatar_url && !barber.avatar_url.startsWith('blob:'))
+              ? barber.avatar_url
+              : `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
+          
+          img.src = avatarUrl;
+          name.textContent = barber.nombre || barber.usuario;
+      }
+  };
+
+  const tryLoadSlots = () => {
+      if (barberSelect?.value && serviceSelect?.value && datePicker?.value) {
+          cargarSlotsInteligente();
+      }
+  };
+
+  if (barberSelect) {
+      barberSelect.addEventListener('change', () => {
+          updateBarberUI();
+          tryLoadSlots();
+      });
+  }
+  if (serviceSelect) serviceSelect.addEventListener('change', tryLoadSlots);
+  if (datePicker) datePicker.addEventListener('change', tryLoadSlots);
+
   // Limpiar la conexión de Realtime al cerrar/recargar la página
   window.addEventListener('beforeunload', () => {
     cleanupRealtime();

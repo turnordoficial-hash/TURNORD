@@ -1179,6 +1179,23 @@ WHEN (OLD.estado IS DISTINCT FROM NEW.estado OR OLD.orden IS DISTINCT FROM NEW.o
 EXECUTE FUNCTION public.trg_notificar_evento();
 
 -- ==============================================================================
+-- 14.6) Historial de Notificaciones (Auditoría)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.notification_history (
+  id BIGSERIAL PRIMARY KEY,
+  negocio_id TEXT,
+  recipient TEXT,
+  channel TEXT DEFAULT 'push',
+  title TEXT,
+  body TEXT,
+  status TEXT, -- 'sent', 'failed'
+  response JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.notification_history ENABLE ROW LEVEL SECURITY;
+
+-- ==============================================================================
 -- 15) Función RPC Segura para Notificaciones desde el Frontend
 -- ==============================================================================
 
@@ -1319,6 +1336,7 @@ ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Los usuarios pueden gestionar su propio perfil." ON public.clientes;
 DROP POLICY IF EXISTS "Permitir inserción a dueños" ON public.clientes;
 
+DROP POLICY IF EXISTS "Clientes: Acceso total a perfil propio" ON public.clientes;
 CREATE POLICY "Clientes: Acceso total a perfil propio"
 ON public.clientes
 FOR ALL
@@ -1332,4 +1350,4 @@ WITH CHECK (auth.uid() = id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.clientes TO authenticated;
 GRANT SELECT, INSERT ON public.clientes TO anon;
 
-COMMIT;.
+COMMIT;
