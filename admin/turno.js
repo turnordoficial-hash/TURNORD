@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase, getNegocioId } from '../database.js?v=2';
 import { RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 

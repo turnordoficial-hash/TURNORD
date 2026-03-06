@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase, GlobalCache } from '../database.js';
+import { supabase, ensureSupabase, GlobalCache, getNegocioId } from '../database.js?v=2';
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
@@ -12,13 +12,6 @@ window.addEventListener('unhandledrejection', (e) => {
       e.preventDefault();
   }
 });
-
-/**
- * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
- */
-function getNegocioId() {
-  return document.body.dataset.negocioId || 'barberia005';
-}
 
 const negocioId = getNegocioId();
 

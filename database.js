@@ -4,9 +4,9 @@
 const SUPABASE_URL = 'https://wjvwjirhxenotvdewbmm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdndqaXJoeGVub3R2ZGV3Ym1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5Mzc1MTEsImV4cCI6MjA4NTUxMzUxMX0.8tze0Dr0Js-aFpOMt7QKa5ImfcDnkZAUKomrjJXjcig';
 
-let supabase;
+export let supabase;
 let supabaseReadyResolve;
-const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
+export const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
 
 async function initializeSupabase() {
   try {
@@ -96,7 +96,7 @@ if (document.readyState !== 'loading') {
   document.addEventListener('DOMContentLoaded', initializeSupabase);
 }
 
-async function ensureSupabase() {
+export async function ensureSupabase() {
   if (supabase) return supabase;
   await supabaseReady;
   return supabase;
@@ -117,7 +117,7 @@ if (document.readyState !== 'loading') injectFavicon();
 else document.addEventListener('DOMContentLoaded', injectFavicon);
 
 // --- SISTEMA DE CACHÉ GLOBAL INTELIGENTE ---
-const GlobalCache = {
+export const GlobalCache = {
   prefix: 'jbarber_cache_v1_',
   
   _key(key) {
@@ -201,4 +201,6 @@ const GlobalCache = {
   }
 };
 
-export { supabase, ensureSupabase, GlobalCache };
+export function getNegocioId() {
+  return document.body.dataset.negocioId || 'barberia005';
+}
