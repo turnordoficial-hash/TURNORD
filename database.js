@@ -116,4 +116,89 @@ function injectFavicon() {
 if (document.readyState !== 'loading') injectFavicon();
 else document.addEventListener('DOMContentLoaded', injectFavicon);
 
-export { supabase, ensureSupabase };
+// --- SISTEMA DE CACHÉ GLOBAL INTELIGENTE ---
+const GlobalCache = {
+  prefix: 'jbarber_cache_v1_',
+  
+  _key(key) {
+    return this.prefix + key;
+  },
+
+  get(key) {
+    try {
+      const record = JSON.parse(localStorage.getItem(this._key(key)));
+      if (!record) return null;
+      if (Date.now() > record.expiry) {
+        localStorage.removeItem(this._key(key));
+        return null;
+      }
+      return record.data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  set(key, data, ttlMinutes = 5) {
+    try {
+      const record = {
+        data,
+        expiry: Date.now() + (ttlMinutes * 60 * 1000),
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this._key(key), JSON.stringify(record));
+    } catch (e) {
+      this.prune();
+    }
+  },
+
+  remove(key) {
+    localStorage.removeItem(this._key(key));
+  },
+
+  clear() {
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith(this.prefix)) localStorage.removeItem(k);
+    });
+  },
+
+  prune() {
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith(this.prefix)) {
+        try {
+          const record = JSON.parse(localStorage.getItem(k));
+          if (Date.now() > record.expiry) {
+            localStorage.removeItem(k);
+          }
+        } catch (e) {
+          localStorage.removeItem(k);
+        }
+      }
+    });
+  },
+
+  async smartQuery(key, fetcher, ttlMinutes = 5) {
+    const cached = this.get(key);
+    if (cached) {
+      return { data: cached, error: null, fromCache: true };
+    }
+
+    try {
+      const result = await fetcher();
+      if (result && result.error) throw result.error;
+      
+      // Soporte para respuestas de Supabase { data, error } o datos directos
+      const dataToCache = result.data !== undefined ? result.data : result;
+      
+      if (dataToCache) {
+        this.set(key, dataToCache, ttlMinutes);
+      }
+      
+      return { data: dataToCache, error: null, fromCache: false };
+    } catch (error) {
+      console.error(`Error en smartQuery (${key}):`, error);
+      return { data: null, error, fromCache: false };
+    }
+  }
+};
+
+export { supabase, ensureSupabase, GlobalCache };

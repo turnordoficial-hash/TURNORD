@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase, GlobalCache } from '../database.js';
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
@@ -21,7 +21,6 @@ function getNegocioId() {
 }
 
 const negocioId = getNegocioId();
-const CACHE_VERSION = 'v2'; // Control de versiones de caché
 
 // Estado centralizado para la aplicación
 const appState = {
@@ -47,46 +46,6 @@ async function getSupabase() {
   }
   return sbInstance;
 }
-
-// --- SISTEMA DE CACHÉ ROBUSTO (VERSIONADO) ---
-const CACHE_TTL = {
-  PROFILE: 60,    // 1 hora
-  SERVICES: 1440, // 24 horas
-  CONFIG: 60,     // 1 hora
-  BARBERS: 60     // 1 hora
-};
-
-function getCache(key) {
-  const item = localStorage.getItem(`cache_${negocioId}_${key}_${CACHE_VERSION}`);
-  if (!item) return null;
-  try {
-    const { data, expiry } = JSON.parse(item);
-    if (Date.now() > expiry) {
-      localStorage.removeItem(`cache_${negocioId}_${key}_${CACHE_VERSION}`);
-      return null;
-    }
-    return data;
-  } catch (e) { return null; }
-}
-
-function setCache(key, data, ttlMinutes) {
-  const expiry = Date.now() + (ttlMinutes * 60 * 1000);
-  const cacheKey = `cache_${negocioId}_${key}_${CACHE_VERSION}`;
-  const payload = JSON.stringify({ data, expiry });
-
-  try {
-    localStorage.setItem(cacheKey, payload);
-  } catch (e) {
-    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-      console.warn('LocalStorage lleno. Limpiando caché antiguo...');
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('cache_')) localStorage.removeItem(k);
-      });
-      try { localStorage.setItem(cacheKey, payload); } catch (e2) {}
-    }
-  }
-}
-// --------------------------------
 
 // --- MOTOR DE MARKETING INTELIGENTE (SINGLETON) ---
 const SmartMarketingEngine = (function() {
@@ -380,7 +339,8 @@ window.logout = async () => {
   const engine = SmartMarketingEngine.getInstance();
   if (engine) engine.reset();
   await cleanupRealtime();
-  Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`)).forEach(k => localStorage.removeItem(k));
+  GlobalCache.clear(); // Limpiar caché inteligente
+  Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`) && !k.includes('jbarber_cache')).forEach(k => localStorage.removeItem(k));
   if (window.OneSignal) await OneSignalManager.logout();
   const sb = await getSupabase();
   await sb.auth.signOut();
@@ -406,6 +366,8 @@ async function setupRealtime() {
   const safeRefresh = () => {
     verificarCitaActiva();
     checkPendingRatings();
+    // Invalidar caché de perfil para forzar recarga fresca
+    GlobalCache.remove(`profile_${appState.user.id}`);
     cargarPerfil();
   };
 
@@ -515,6 +477,11 @@ function setupStaticEventHandlers() {
       e.preventDefault();
       switchTab(tab);
     }
+  });
+
+  // Limpiar la conexión de Realtime al cerrar/recargar la página
+  window.addEventListener('beforeunload', () => {
+    cleanupRealtime();
   });
 }
 
@@ -1113,36 +1080,27 @@ async function cargarHistorialPuntos() {
 
 async function cargarPerfil() {
   const sb = await getSupabase();
-  const cached = getCache('PROFILE');
-  if (cached) {
-    appState.profile = cached;
-    renderProfile(cached);
-  }
+  const userId = appState.user.id;
+  const cacheKey = `profile_${userId}`;
 
   try {
-    // FIX: Usar maybeSingle() para evitar error 406/PGRST116 si el perfil no existe
-    const { data, error } = await sb.from('clientes')
-      .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
-      .eq('id', appState.user.id)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error cargando perfil:', error);
-      return;
-    }
+    const fetcher = () => sb.from('clientes')
+        .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
+        .eq('id', userId)
+        .maybeSingle();
+
+    let { data } = await GlobalCache.smartQuery(cacheKey, fetcher, 15);
 
     if (data) {
       processProfileData(data);
     } else {
       console.warn('Perfil no encontrado. Es posible que se esté creando...');
-      // Si no existe, esperamos 2 segundos y reintentamos una vez
+      // Reintento simple si no hay datos (posible creación en proceso)
       setTimeout(async () => {
-        const { data: retryData } = await sb.from('clientes')
-          .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
-          .eq('id', appState.user.id)
-          .maybeSingle();
-        if (retryData) {
-          processProfileData(retryData);
+        const retry = await fetcher();
+        if (retry.data) {
+            GlobalCache.set(cacheKey, retry.data, 15);
+            processProfileData(retry.data);
         }
       }, 2000);
     }
@@ -1157,7 +1115,8 @@ function processProfileData(data) {
     const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
     const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);
 
-    if (newPoints > oldPoints) {
+    // Solo mostrar notificaciones si ya teníamos un perfil cargado (evitar spam al inicio)
+    if (appState.profile && newPoints > oldPoints) {
         const unlocked = RECOMPENSAS.some(r => oldPoints < r.pts && newPoints >= r.pts);
         const levelUp = newLevel.nombre !== oldLevel.nombre;
         if ((unlocked || levelUp) && typeof confetti === 'function') {
@@ -1166,7 +1125,6 @@ function processProfileData(data) {
         }
     }
 
-    setCache('PROFILE', data, 15);
     appState.profile = data;
     
     renderProfile(data); // Renderizamos siempre para reflejar cambios de puntos en tiempo real
@@ -1195,14 +1153,12 @@ function renderServices(data) {
 
 async function cargarServicios() {
   const sb = await getSupabase();
-  const cached = getCache('SERVICES');
-  if (cached) renderServices(cached);
-
-  const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
-  if (data) {
-    setCache('SERVICES', data, 1440);
-    renderServices(data);
-  }
+  const { data } = await GlobalCache.smartQuery('services', async () => {
+      const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+      return data;
+  }, 1440); // 24 horas
+  
+  if (data) renderServices(data);
 }
 
 function processConfig(data) {
@@ -1211,14 +1167,12 @@ function processConfig(data) {
 
 async function cargarConfigNegocio() {
   const sb = await getSupabase();
-  const cached = getCache('CONFIG');
-  if (cached) processConfig(cached);
-
-  const { data, error } = await sb.from('configuracion_negocio').select('*').eq('negocio_id', negocioId).order('updated_at', { ascending: false }).limit(1).maybeSingle();
-  if (data) {
-    setCache('CONFIG', data, 60);
-    processConfig(data);
-  }
+  const { data } = await GlobalCache.smartQuery('config', async () => {
+      const { data } = await sb.from('configuracion_negocio').select('*').eq('negocio_id', negocioId).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      return data;
+  }, 60); // 1 hora
+  
+  if (data) processConfig(data);
 }
 
 async function verificarCitaActiva() {
@@ -1328,10 +1282,12 @@ function renderBarbersList(data) {
 
 async function cargarBarberos() {
   const sb = await getSupabase();
-  const cached = getCache('barberos');
-  if (cached) { renderBarbersList(cached); appState.barbers = cached; }
-  const { data } = await sb.from('barberos').select('id,nombre,usuario,avatar_url').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
-  if (data) { setCache('barberos', data, 60); renderBarbersList(data); appState.barbers = data; }
+  const { data } = await GlobalCache.smartQuery('barberos', async () => {
+      const { data } = await sb.from('barberos').select('id,nombre,usuario,avatar_url').eq('negocio_id', negocioId).eq('activo', true).order('nombre', { ascending: true });
+      return data;
+  }, 60);
+  
+  if (data) { renderBarbersList(data); appState.barbers = data; }
 }
 
 async function fetchDayData(negocioId, barberId, dateStr) {
@@ -1442,25 +1398,36 @@ async function cargarSlotsInteligente() {
 
   const dateStr = dp.value;
   const cacheKey = `slots_${dateStr}_${barberId}_${servicioName}`;
-  const cached = getCache(cacheKey);
-  if (cached) { renderSlotsToUI(cached.map(s => new Date(s))); return; }
 
   const slotsContainer = document.getElementById('slots-container');
   if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center py-8"><svg class="animate-spin h-8 w-8 mx-auto text-[#C1121F]" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
 
   try {
-    const data = await fetchDayData(negocioId, barberId, dateStr);
-    const { citas, weeklyBreaks, config, baseDay } = data;
-    
-    // Buscar duración del servicio
-    const cachedServices = getCache('SERVICES') || [];
-    const serv = cachedServices.find(s => s.nombre === servicioName);
-    const duration = serv ? serv.duracion_min : 30;
-    appState.serviceDuration = duration;
+    const { data: slots } = await GlobalCache.smartQuery(cacheKey, async () => {
+        const data = await fetchDayData(negocioId, barberId, dateStr);
+        const { citas, weeklyBreaks, config, baseDay } = data;
+        
+        // Buscar duración del servicio (usando caché global si es posible, o fetch directo)
+        // Nota: fetchDayData ya trae lo necesario, pero necesitamos la duración.
+        // Podemos reusar el caché de servicios cargado previamente en memoria o GlobalCache
+        const { data: services } = await GlobalCache.smartQuery('services', async () => {
+             const { data } = await (await getSupabase()).from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+             return data;
+        }, 1440);
+        
+        const serv = (services || []).find(s => s.nombre === servicioName);
+        const duration = serv ? serv.duracion_min : 30;
+        
+        // Guardamos duración en estado para uso posterior
+        appState.serviceDuration = duration;
 
-    const slots = calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, duration);
-    setCache(cacheKey, slots, 5);
-    renderSlotsToUI(slots);
+        return calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, duration);
+    }, 5); // 5 minutos de caché para slots
+
+    // Convertir strings de fecha de vuelta a objetos Date si vienen del caché
+    const slotsDates = (slots || []).map(s => new Date(s));
+    renderSlotsToUI(slotsDates);
+
   } catch (err) { 
     if (err.name !== 'AbortError') {
       console.error(err);

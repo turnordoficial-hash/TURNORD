@@ -40,29 +40,29 @@ console.info("Hello from Functions!");
 
 // ✅ 1. Uso correcto de OneSignal API
 async function enviarPush(telefono: string, title: string, body: string, url = "/panel_cliente.html") {
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("Missing SUPABASE_URL or SERVICE_ROLE for sender invocation.");
-    return { ok: false, reason: "missing_service_role" };
-  }
+  // OPTIMIZACIÓN: Llamada directa a OneSignal para reducir latencia y cold-starts
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+    if (!ONE_SIGNAL_KEY) throw new Error("Missing ONE_SIGNAL_REST_API_KEY");
+
+    const res = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Authorization": `Basic ${ONE_SIGNAL_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ telefono, title, body, url }),
+      body: JSON.stringify({
+        app_id: ONE_SIGNAL_APP_ID,
+        headings: { en: title, es: title },
+        contents: { en: body, es: body },
+        include_aliases: { external_id: [telefono] },
+        target_channel: "push",
+        url: url,
+      }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error("Sender function error:", data);
-    }
-    return { ok: res.ok, data };
+    return { ok: res.ok };
   } catch (e) {
-    console.error("Network error invoking sender function:", e);
-    return { ok: false, data: { error: e.message } };
+    console.error("Error sending push directly:", e);
+    return { ok: false };
   }
 }
 
@@ -122,25 +122,27 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
 
   const enEspera = turnos.filter((t: any) => t.estado === "En espera");
   
-  // ✅ 2. Reemplazo de forEach por for...of para manejar asincronía correctamente
-  for (const [index, turno] of enEspera.entries()) {
+  // OPTIMIZACIÓN: Procesamiento en paralelo con Promise.all
+  // En lugar de esperar uno por uno, disparamos todas las notificaciones simultáneamente
+  await Promise.all(enEspera.map(async (turno: any, index: number) => {
     const posicion = index + 1;
 
     if (posicion <= 2 && !turno.notificado_cerca && turno.telefono) {
       const nombre = turno.nombre || "Cliente";
       const { ok } = await enviarPush(turno.telefono, "Tu turno está cerca ✂️", `Hola ${nombre}, quedan pocas personas antes de ti.`);
       if (ok) {
-        await supabase.from("turnos").update({ notificado_cerca: true }).eq("id", turno.id);
+        // Update sin await para no bloquear el hilo principal innecesariamente si no dependemos del resultado inmediato
+        supabase.from("turnos").update({ notificado_cerca: true }).eq("id", turno.id).then();
       }
     }
     if (posicion === 1 && !turno.notificado_siguiente && turno.telefono) {
       const nombre = turno.nombre || "Cliente";
       const { ok } = await enviarPush(turno.telefono, "Prepárate, eres el siguiente 🔔", `Hola ${nombre}, serás atendido en breve.`);
       if (ok) {
-        await supabase.from("turnos").update({ notificado_siguiente: true }).eq("id", turno.id);
+        supabase.from("turnos").update({ notificado_siguiente: true }).eq("id", turno.id).then();
       }
     }
-  }
+  }));
 
   const enAtencion = turnos.find((t: any) => t.estado === "En atención");
   if (enAtencion && !enAtencion.notificado_llamado && enAtencion.telefono) {
@@ -175,7 +177,8 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
 
   if (citas && citas.length > 0) {
     const ahoraTs = ahora.getTime();
-    for (const cita of citas) {
+    
+    await Promise.all(citas.map(async (cita: any) => {
       const startTs = new Date(cita.start_at).getTime();
       const diffMin = Math.floor((startTs - ahoraTs) / 60000);
       const nombreCliente = cita.clientes?.nombre || "Cliente";
@@ -183,7 +186,7 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
       if (diffMin <= 60 && diffMin > 15 && !cita.recordatorio_1h && cita.cliente_telefono) {
         const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 1 hora 📅", `Hola ${nombreCliente}, te esperamos en JBarber.`);
         if (ok) {
-          await supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id);
+          supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id).then();
           // También enviar email de recordatorio
           const { data: cliente } = await supabase.from('clientes').select('email').eq('telefono', cita.cliente_telefono).maybeSingle();
           if (cliente?.email) {
@@ -197,15 +200,15 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
         }
       } else if (diffMin <= 15 && diffMin > 0 && !cita.recordatorio_15m && cita.cliente_telefono) {
         const { ok } = await enviarPush(cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", `Ya casi es tu momento, ${nombreCliente}.`);
-        if (ok) await supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id);
+        if (ok) supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id).then();
       }
       
       if (diffMin <= 10 && diffMin > 0 && !cita.recordatorio_barbero_10m && cita.barber_id) {
         const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         const { ok } = await enviarPush(String(`barber_${cita.barber_id}`), "Cita en 10 minutos 🔔", `Tienes una cita con ${nombreCliente} a las ${hora}.`);
-        if (ok) await supabase.from("citas").update({ recordatorio_barbero_10m: true }).eq("id", cita.id);
+        if (ok) supabase.from("citas").update({ recordatorio_barbero_10m: true }).eq("id", cita.id).then();
       }
-    }
+    }));
   }
 
   // Se elimina el envío de nuevas citas por cron para operar solo por eventos INSERT

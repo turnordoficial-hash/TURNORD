@@ -363,22 +363,10 @@
             // Fallback: Si no hay perfil en tabla clientes, guardamos al menos el ID de auth
             localStorage.setItem(`cliente_id_${negocioId}`, signInData.user.id);
             // CORRECCIÓN: Guardar metadata para evitar pantalla blanca en panel
-            if (signInData.user.user_metadata) {
-                 const mNombre = signInData.user.user_metadata.nombre;
-                 const mTel = signInData.user.user_metadata.telefono;
-                 if (mNombre) localStorage.setItem(`cliente_nombre_${negocioId}`, mNombre);
-                 if (mTel) {
-                   localStorage.setItem(`cliente_telefono_${negocioId}`, mTel);
-                   OneSignalDeferred.push(async function(OneSignal) {
-                     const currentExternalId = OneSignal.User.externalId;
-                     if (currentExternalId && currentExternalId !== String(mTel)) {
-                       await OneSignal.logout();
-                     }
-                     await OneSignal.login(String(mTel));
-                     if (mNombre) OneSignal.User.addTag("nombre", mNombre);
-                   });
-                 }
-            }
+            const mNombre = signInData.user.user_metadata?.nombre;
+            const mTel = signInData.user.user_metadata?.telefono;
+            if (mNombre) localStorage.setItem(`cliente_nombre_${negocioId}`, mNombre);
+            if (mTel) localStorage.setItem(`cliente_telefono_${negocioId}`, mTel);
         }
   
         window.location.href = 'panel_cliente.html';

@@ -37,63 +37,69 @@
       return session.user;
     }
 
-    async function ensureProfileExists(user) {
+    async function ensureProfileExists(user, retries = 3) {
       if (!user) return;
 
       const supabase = await ensureSupabase();
       const negocioId = 'barberia005';
 
-      try {
-        // 1. Verificar si el perfil existe usando maybeSingle
-        const { data: profile, error: selectError } = await supabase
-          .from('clientes')
-          .select('id, email, negocio_id')
-          .eq('id', user.id)
-          .maybeSingle();
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          // 1. Verificar si el perfil existe usando maybeSingle
+          const { data: profile, error: selectError } = await supabase
+            .from('clientes')
+            .select('id, email, negocio_id')
+            .eq('id', user.id)
+            .maybeSingle();
 
-        if (selectError) {
-          console.error('Error al verificar perfil (SELECT):', selectError);
-        }
+          if (selectError) throw selectError;
 
-        if (profile) {
-          console.log('Perfil verificado:', profile.id);
-          if (profile.negocio_id !== negocioId) {
-            console.warn('Actualizando negocio_id del perfil...');
-            await supabase.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
+          if (profile) {
+            console.log('Perfil verificado:', profile.id);
+            if (profile.negocio_id !== negocioId) {
+              console.warn('Actualizando negocio_id del perfil...');
+              await supabase.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
+            }
+            return; // Éxito, salir de la función
           }
-          return;
-        }
 
-        // 2. Si no existe, intentamos crearlo con INSERT simple
-        console.warn(`Perfil para usuario ${user.id} no encontrado. Creando...`);
-        
-        const newProfile = {
-          id: user.id,
-          email: user.email,
-          nombre: user.user_metadata?.nombre || 'Cliente',
-          telefono: user.user_metadata?.telefono || '',
-          negocio_id: negocioId,
-          updated_at: new Date().toISOString()
-        };
+          // 2. Si no existe, intentamos crearlo con INSERT simple
+          console.warn(`Perfil para usuario ${user.id} no encontrado. Creando...`);
+          
+          const newProfile = {
+            id: user.id,
+            email: user.email,
+            nombre: user.user_metadata?.nombre || 'Cliente',
+            telefono: user.user_metadata?.telefono || '',
+            negocio_id: negocioId,
+            updated_at: new Date().toISOString()
+          };
 
-        const { error: insertError } = await supabase
-          .from('clientes')
-          .insert([newProfile]); // Usar INSERT array para evitar conflictos de UPSERT/RLS
+          const { error: insertError } = await supabase
+            .from('clientes')
+            .insert([newProfile]);
 
-        if (insertError) {
-          console.error('Error al crear perfil (INSERT):', insertError);
-          if (insertError.code === '42501') {
-            console.error('RLS BLOCK: Verifica que auth.uid() coincida con el ID del perfil.');
-            console.log('ID Intentado:', user.id);
-            const { data: { session } } = await supabase.auth.getSession();
-            console.log('ID Actual Auth:', session?.user?.id);
+          if (insertError) {
+            // Si es error de RLS, no tiene sentido reintentar
+            if (insertError.code === '42501') {
+              console.error('RLS BLOCK: Verifica permisos.');
+              return;
+            }
+            throw insertError;
+          } else {
+            console.log('Perfil creado/actualizado con éxito.');
+            return; // Éxito
           }
-        } else {
-          console.log('Perfil creado/actualizado con éxito.');
+        } catch (err) {
+          console.error(`Intento ${attempt} fallido en ensureProfileExists:`, err);
+          if (attempt < retries) {
+            // Backoff exponencial: 1s, 2s, 4s...
+            const delay = 1000 * Math.pow(2, attempt - 1);
+            await new Promise(r => setTimeout(r, delay));
+          }
         }
-      } catch (err) {
-        console.error('Error inesperado en ensureProfileExists:', err);
       }
+      console.error('No se pudo verificar/crear el perfil después de varios intentos.');
     }
 
     verificarSesion().then(ensureProfileExists);
