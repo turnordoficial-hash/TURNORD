@@ -112,6 +112,11 @@ const SmartMarketingEngine = (function() {
       return 'Frecuente';
     }
 
+    reset() {
+      this.stopRotation();
+      this.profile = null;
+    }
+
     getMessages() {
       const points = this.profile?.puntos_actuales || 0;
       const nextRewardTier = RECOMPENSAS.find(r => points < r.pts);
@@ -190,8 +195,11 @@ const SmartMarketingEngine = (function() {
 
   return {
     getInstance: (profile) => {
-      if (!instance) instance = new Engine(profile);
-      else if (profile) instance.profile = profile;
+      if (!instance && profile) {
+        instance = new Engine(profile);
+      } else if (instance && profile) {
+        instance.profile = profile;
+      }
       return instance;
     }
   };
@@ -199,7 +207,8 @@ const SmartMarketingEngine = (function() {
 
 async function iniciarMotorMarketing() {
   if (!appState.profile) return;
-  SmartMarketingEngine.getInstance(appState.profile).startRotation();
+  const engine = SmartMarketingEngine.getInstance(appState.profile);
+  if (engine) engine.startRotation();
 }
 
 // Sanitización Universal
@@ -298,7 +307,14 @@ function animateNumber(el, to, duration = 500) {
 }
 
 function updateBanner(mode = 'default') {
-  return;
+  const banner = document.getElementById('banner-marketing');
+  if (!banner) return;
+  
+  if (mode === 'default') {
+    banner.classList.add('hidden');
+  } else {
+    banner.classList.remove('hidden');
+  }
 }
 
 // Notificaciones Push con OneSignal
@@ -329,10 +345,22 @@ function showToast(message, type = 'success') {
     document.body.appendChild(container);
   }
   const toast = document.createElement('div');
-  toast.className = 'toast';
-  const safeMsg = sanitizeHTML(message);
-  toast.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ${type === 'success' ? 'text-green-500' : 'text-red-500'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg><span class="font-medium text-gray-800 dark:text-white">${safeMsg}</span>`;
+  toast.className = `toast ${type}`;
+  
+  // Icono según tipo
+  const icon = document.createElement('div');
+  icon.innerHTML = type === 'success' 
+    ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+  
+  const text = document.createElement('span');
+  text.className = 'font-medium text-gray-800 dark:text-white';
+  text.textContent = message;
+
+  toast.appendChild(icon.firstChild);
+  toast.appendChild(text);
   container.appendChild(toast);
+
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateX(100%)';
@@ -348,8 +376,9 @@ window.toggleFab = () => {
 };
 
 window.logout = async () => {
-  SmartMarketingEngine.getInstance().stopRotation();
-  cleanupRealtime();
+  const engine = SmartMarketingEngine.getInstance();
+  if (engine) engine.reset();
+  await cleanupRealtime();
   Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`)).forEach(k => localStorage.removeItem(k));
   if (window.OneSignal) await OneSignalManager.logout();
   const sb = await getSupabase();
@@ -357,16 +386,21 @@ window.logout = async () => {
   window.location.href = 'login_cliente.html';
 };
 
-function cleanupRealtime() {
+async function cleanupRealtime() {
   if (realtimeChannel) {
-    getSupabase().then(sb => sb.removeChannel(realtimeChannel));
+    const sb = await getSupabase();
+    await sb.removeChannel(realtimeChannel);
     realtimeChannel = null;
   }
 }
 
 async function setupRealtime() {
   const sb = await getSupabase();
-  cleanupRealtime();
+  await cleanupRealtime();
+
+  const telefono = appState.profile?.telefono;
+  if (!telefono) return;
+  const safeTel = encodeURIComponent(telefono);
 
   const safeRefresh = () => {
     verificarCitaActiva();
@@ -379,7 +413,7 @@ async function setupRealtime() {
       event: '*', 
       schema: 'public', 
       table: 'citas', 
-      filter: `cliente_telefono=eq.${appState.profile?.telefono}` 
+      filter: `cliente_telefono=eq.${safeTel}` 
     }, safeRefresh)
     .subscribe();
 }
@@ -534,10 +568,6 @@ async function init() {
     setupStaticEventHandlers();
     setupThemeToggle();
     
-    document.addEventListener('mousemove', resetIdleTimer);
-    document.addEventListener('keydown', resetIdleTimer);
-    resetIdleTimer();
-
     await Promise.allSettled([
         cargarConfigNegocio(),
         cargarPerfil(),
@@ -547,6 +577,7 @@ async function init() {
     
     if (appState.profile?.telefono) {
         await setupRealtime();
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
         window.OneSignalDeferred.push(async () => {
             await OneSignalManager.init();
             await OneSignalManager.login(appState.profile.telefono, {
@@ -1010,10 +1041,33 @@ function renderProfile(data) {
 
 window.copiarLinkReferido = () => {
     const link = `${window.location.origin}/login_cliente.html?ref=${appState.user.id}`;
-    navigator.clipboard.writeText(link).then(() => {
-        showToast('Enlace copiado al portapapeles', 'success');
-    });
+    
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('Enlace copiado al portapapeles', 'success');
+        }).catch(() => fallbackCopyTextToClipboard(link));
+    } else {
+        fallbackCopyTextToClipboard(link);
+    }
 };
+
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        showToast('Enlace copiado al portapapeles', 'success');
+    } catch (err) {
+        console.error('Error al copiar:', err);
+    }
+    document.body.removeChild(textArea);
+}
 
 window.compartirReferido = async () => {
     const link = `${window.location.origin}/login_cliente.html?ref=${appState.user.id}`;
@@ -1069,18 +1123,16 @@ async function cargarPerfil() {
   }
 
   try {
-    // Usamos select().limit(1) para ser más robustos que maybeSingle() en entornos con RLS estricto
-    const { data: profiles, error } = await sb.from('clientes')
+    // FIX: Usar maybeSingle() para evitar error 406/PGRST116 si el perfil no existe
+    const { data, error } = await sb.from('clientes')
       .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
       .eq('id', appState.user.id)
-      .limit(1);
+      .maybeSingle();
     
     if (error) {
       console.error('Error cargando perfil:', error);
       return;
     }
-    
-    const data = profiles && profiles.length > 0 ? profiles[0] : null;
 
     if (data) {
       processProfileData(data);
@@ -1088,12 +1140,12 @@ async function cargarPerfil() {
       console.warn('Perfil no encontrado. Es posible que se esté creando...');
       // Si no existe, esperamos 2 segundos y reintentamos una vez
       setTimeout(async () => {
-        const { data: retryProfiles } = await sb.from('clientes')
+        const { data: retryData } = await sb.from('clientes')
           .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
           .eq('id', appState.user.id)
-          .limit(1);
-        if (retryProfiles && retryProfiles.length > 0) {
-          processProfileData(retryProfiles[0]);
+          .maybeSingle();
+        if (retryData) {
+          processProfileData(retryData);
         }
       }, 2000);
     }
@@ -1307,6 +1359,8 @@ async function fetchDayData(negocioId, barberId, dateStr) {
 
   const [resCitas, resEstado, resConfig] = await Promise.all([pCitas, pEstado, pConfig]);
   
+  appState.abortController = null;
+
   return { 
     citas: resCitas.data || [], 
     weeklyBreaks: resEstado.data?.weekly_breaks || [], 
@@ -1329,33 +1383,44 @@ function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationM
   const slots = [];
   let current = new Date(start);
 
+  // Pre-procesar citas para mejor rendimiento
+  const citasRanges = (citas || []).map(c => ({
+    start: new Date(c.start_at).getTime(),
+    end: new Date(c.end_at).getTime()
+  }));
+
+  // Pre-procesar breaks para mejor rendimiento
+  const breaksToday = (weeklyBreaks || [])
+    .filter(b => b.day === dayName)
+    .map(b => {
+      const [bhS, bmS] = b.start.split(':').map(Number);
+      const [bhE, bmE] = b.end.split(':').map(Number);
+      const bStart = new Date(baseDay); bStart.setHours(bhS, bmS, 0, 0);
+      const bEnd = new Date(baseDay); bEnd.setHours(bhE, bmE, 0, 0);
+      return { start: bStart.getTime(), end: bEnd.getTime() };
+    });
+
   while (current.getTime() + durationMin * 60000 <= end.getTime()) {
-    const slotEnd = new Date(current.getTime() + durationMin * 60000);
+    const slotStart = current.getTime();
+    const slotEnd = slotStart + durationMin * 60000;
     
     // 1. No en el pasado
-    if (current > now) {
+    if (slotStart > now.getTime()) {
       // 2. No solapa con citas
-      const overlapsCita = citas.some(c => {
-        const cStart = new Date(c.start_at).getTime();
-        const cEnd = new Date(c.end_at).getTime();
-        return (current.getTime() < cEnd && slotEnd.getTime() > cStart);
-      });
+      const overlapsCita = citasRanges.some(c => 
+        (slotStart < c.end && slotEnd > c.start)
+      );
 
-      // 3. No solapa con breaks (formato: { day: 'Lunes', start: '13:00', end: '14:00' })
-      const overlapsBreak = weeklyBreaks.some(b => {
-        if (b.day !== dayName) return false;
-        const [bhS, bmS] = b.start.split(':').map(Number);
-        const [bhE, bmE] = b.end.split(':').map(Number);
-        const bStart = new Date(baseDay); bStart.setHours(bhS, bmS, 0, 0);
-        const bEnd = new Date(baseDay); bEnd.setHours(bhE, bmE, 0, 0);
-        return (current.getTime() < bEnd.getTime() && slotEnd.getTime() > bStart.getTime());
-      });
+      // 3. No solapa con breaks
+      const overlapsBreak = breaksToday.some(b => 
+        (slotStart < b.end && slotEnd > b.start)
+      );
 
       if (!overlapsCita && !overlapsBreak) {
-        slots.push(new Date(current));
+        slots.push(new Date(slotStart));
       }
     }
-    current = new Date(current.getTime() + durationMin * 60000);
+    current = new Date(slotStart + durationMin * 60000);
   }
   return slots;
 }
@@ -1367,7 +1432,7 @@ async function cargarSlotsInteligente() {
   if (!barberId || !dp?.value || !servicioName) return;
 
   const dateStr = dp.value;
-  const cacheKey = `slots_${dateStr}_${barberId}`;
+  const cacheKey = `slots_${dateStr}_${barberId}_${servicioName}`;
   const cached = getCache(cacheKey);
   if (cached) { renderSlotsToUI(cached.map(s => new Date(s))); return; }
 
@@ -1375,7 +1440,8 @@ async function cargarSlotsInteligente() {
   if (slotsContainer) slotsContainer.innerHTML = '<div class="col-span-full text-center py-8"><svg class="animate-spin h-8 w-8 mx-auto text-[#C1121F]" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
 
   try {
-    const { citas, weeklyBreaks, config, baseDay } = await fetchDayData(negocioId, barberId, dateStr);
+    const data = await fetchDayData(negocioId, barberId, dateStr);
+    const { citas, weeklyBreaks, config, baseDay } = data;
     
     // Buscar duración del servicio
     const cachedServices = getCache('SERVICES') || [];
@@ -1426,7 +1492,13 @@ async function confirmarReservaManual() {
     return; 
   }
 
+  if (!appState.profile?.telefono) {
+    showToast('Perfil incompleto (Falta teléfono)', 'error');
+    return;
+  }
+
   confirmarAccion('Confirmar', '¿Deseas reservar esta cita?', async () => {
+    if (appState.isBooking) return; // Doble seguridad
     appState.isBooking = true;
     try {
       const duration = appState.serviceDuration || 30;

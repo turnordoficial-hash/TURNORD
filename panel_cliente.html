@@ -44,18 +44,16 @@
       const negocioId = 'barberia005';
 
       try {
-        // 1. Verificar si el perfil existe (Usamos SELECT simple con limit(1) para evitar 406/PGRST116)
-        const { data: profiles, error: selectError } = await supabase
+        // 1. Verificar si el perfil existe usando maybeSingle
+        const { data: profile, error: selectError } = await supabase
           .from('clientes')
           .select('id, email, negocio_id')
           .eq('id', user.id)
-          .limit(1);
+          .maybeSingle();
 
         if (selectError) {
           console.error('Error al verificar perfil (SELECT):', selectError);
         }
-
-        const profile = profiles && profiles.length > 0 ? profiles[0] : null;
 
         if (profile) {
           console.log('Perfil verificado:', profile.id);
@@ -66,7 +64,7 @@
           return;
         }
 
-        // 2. Si no existe, intentamos crearlo con UPSERT (más robusto)
+        // 2. Si no existe, intentamos crearlo con INSERT simple
         console.warn(`Perfil para usuario ${user.id} no encontrado. Creando...`);
         
         const newProfile = {
@@ -80,10 +78,10 @@
 
         const { error: insertError } = await supabase
           .from('clientes')
-          .upsert(newProfile, { onConflict: 'id' });
+          .insert([newProfile]); // Usar INSERT array para evitar conflictos de UPSERT/RLS
 
         if (insertError) {
-          console.error('Error al crear perfil (UPSERT):', insertError);
+          console.error('Error al crear perfil (INSERT):', insertError);
           if (insertError.code === '42501') {
             console.error('RLS BLOCK: Verifica que auth.uid() coincida con el ID del perfil.');
             console.log('ID Intentado:', user.id);
