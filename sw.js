@@ -1,7 +1,6 @@
-importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
-
-// sw.js - OneSignal Service Worker Standard
+// OneSignal Service Worker v16
 self.addEventListener('message', (event) => {
-    // Placeholder para evitar advertencias de "event handler must be added on initial evaluation"
-    // OneSignal maneja sus propios eventos internamente.
+    // Registrado inmediatamente para cumplir con la política de evaluación inicial de Chrome
 });
+
+importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");

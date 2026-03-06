@@ -36,6 +36,11 @@ async function initializeSupabase() {
         headers: {
           apikey: SUPABASE_KEY
         }
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
       }
     });
     // Expone la anon key en el cliente para usos de respaldo en fetch manual

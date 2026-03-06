@@ -7,57 +7,81 @@ async function init() {
     if (isInitialized || !window.OneSignal) return;
     
     try {
-        await window.OneSignal.init({
-            appId: ONESIGNAL_APP_ID,
-            serviceWorkerPath: 'sw.js',
-            allowLocalhostAsSecureOrigin: true // Útil para desarrollo local
-        });
+        // En v16, OneSignal ya puede estar inicializado si se usa OneSignalDeferred.
+        // Solo llamamos a init si no se ha hecho.
+        if (typeof window.OneSignal.init === 'function') {
+            await window.OneSignal.init({
+                appId: ONESIGNAL_APP_ID,
+                serviceWorkerPath: 'sw.js',
+                allowLocalhostAsSecureOrigin: true 
+            });
+        }
         isInitialized = true;
     } catch (error) {
-        if (error.message && error.message.includes('already initialized')) {
+        if (error && (error.message && error.message.includes('already initialized') || error.code === 'already_initialized')) {
             console.warn('OneSignal ya estaba inicializado.');
             isInitialized = true;
         } else {
-            throw error;
+            console.error('Error inicializando OneSignal:', error);
+            // No lanzamos el error para evitar que rompa el flujo principal
         }
     }
 }
 
 async function login(externalId, tags = {}) {
+    if (!externalId) {
+        console.warn('OneSignal: externalId no proporcionado.');
+        return;
+    }
+
     if (!isInitialized || !window.OneSignal) {
         await init();
     }
-    if (!isInitialized) return;
+    
+    // Esperar un momento para asegurar que User está listo
+    if (window.OneSignal && !window.OneSignal.User) {
+        console.warn('OneSignal: User object not ready. Waiting...');
+        await new Promise(r => setTimeout(r, 1000));
+    }
 
-    const currentExternalId = window.OneSignal.User.externalId;
+    if (!isInitialized || !window.OneSignal || !window.OneSignal.User) {
+        console.error('OneSignal: No se pudo inicializar o User no está disponible.');
+        return;
+    }
+
+    let currentExternalId = null;
+    try {
+        currentExternalId = window.OneSignal.User.externalId;
+    } catch (e) {
+        console.warn('OneSignal: No se pudo obtener el externalId actual:', e);
+    }
+
     if (currentExternalId === String(externalId)) {
         console.log(`OneSignal: El usuario ya está identificado como ${externalId}.`);
-        // Asegurar que los tags estén actualizados aunque ya esté logueado
         if (Object.keys(tags).length > 0) {
             window.OneSignal.User.addTags(tags);
         }
         return;
     }
 
-    // Cerrar sesión previa si hay un ID diferente para evitar conflictos 409
-    if (currentExternalId && currentExternalId !== String(externalId)) {
-        console.log(`OneSignal: Cambiando de usuario ${currentExternalId} a ${externalId}.`);
-        await window.OneSignal.logout();
-    }
-
     try {
+        console.log(`OneSignal: Identificando usuario como "${externalId}" (Length: ${String(externalId).length})...`);
+        
+        // En v16, login es asíncrono y devuelve una promesa
         await window.OneSignal.login(String(externalId));
+        
         if (Object.keys(tags).length > 0) {
             window.OneSignal.User.addTags(tags);
         }
-        console.log(`OneSignal: Usuario identificado como ${externalId}.`);
+        console.log(`OneSignal: Usuario identificado con éxito.`);
     } catch (error) {
-        console.error('Error en OneSignal login:', error);
-        // 409 Conflict: El usuario ya existe o tiene alias conflictivos. No es crítico.
-        if (error && (error.status === 409 || (error.message && error.message.includes('409')))) {
-            console.warn('OneSignal: Usuario ya registrado (409).');
+        // Manejar errores de forma más silenciosa si son comunes
+        if (error && (error.status === 409 || error.code === 409)) {
+            console.warn('OneSignal: Conflicto de identidad (409), el usuario ya existe.');
+        } else if (error && (error.status === 400 || error.code === 400)) {
+            console.error('OneSignal: Error 400 - Solicitud inválida. ID:', externalId, 'Error:', error);
         } else {
-            console.error('Error en OneSignal login:', error);
+            console.error('Error detallado en OneSignal login:', error);
         }
     }
 }
