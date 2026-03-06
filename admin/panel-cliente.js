@@ -34,6 +34,7 @@ const appState = {
   serviceDuration: 30,
   abortController: null, // Para cancelar peticiones de slots
   isBooking: false, // Protección anti-doble click
+  profileLoaded: false, // Control de carga inicial
 };
 
 // Instancia única de Supabase para evitar mezclas
@@ -577,13 +578,9 @@ async function init() {
     
     if (appState.profile?.telefono) {
         await setupRealtime();
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        window.OneSignalDeferred.push(async () => {
-            await OneSignalManager.init();
-            await OneSignalManager.login(appState.profile.telefono, {
-                negocio_id: negocioId,
-                role: 'cliente'
-            });
+        await OneSignalManager.login(appState.profile.telefono, {
+            negocio_id: negocioId,
+            role: 'cliente'
         });
     }
 
@@ -1171,8 +1168,13 @@ function processProfileData(data) {
 
     setCache('PROFILE', data, 15);
     appState.profile = data;
-    renderProfile(data);
-    if (data.telefono) OneSignalManager.login(data.telefono, { negocio_id: negocioId, role: 'cliente' });
+    
+    renderProfile(data); // Renderizamos siempre para reflejar cambios de puntos en tiempo real
+    
+    if (data.telefono && !window.onesignalLogged) {
+        window.onesignalLogged = true;
+        OneSignalManager.login(data.telefono, { negocio_id: negocioId, role: 'cliente' });
+    }
     iniciarMotorMarketing();
     cargarHistorialPuntos();
     setupRealtime();
@@ -1282,10 +1284,17 @@ async function verificarCitaActiva() {
 }
 
 async function sendPushNotification(title, body, url) {
-  const sb = await getSupabase();
-  const telefono = appState.profile?.telefono;
-  if (!telefono) return;
-  await sb.rpc('enviar_notificacion_rpc', { p_telefono: telefono, p_negocio_id: negocioId, p_title: title, p_body: body, p_url: url || '/panel_cliente.html' });
+  try {
+    const sb = await getSupabase();
+    const telefono = appState.profile?.telefono;
+    if (!telefono) return;
+
+    const { error } = await sb.rpc('enviar_notificacion_rpc', { p_telefono: telefono, p_negocio_id: negocioId, p_title: title, p_body: body, p_url: url || '/panel_cliente.html' });
+
+    if (error) throw error;
+  } catch (err) {
+    console.error("Error enviando push:", err);
+  }
 }
 
 function confirmarAccion(titulo, mensaje, onConfirm) {
