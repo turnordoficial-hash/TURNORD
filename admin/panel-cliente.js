@@ -510,12 +510,23 @@ function setupStaticEventHandlers() {
 
   if (barberSelect) {
       barberSelect.addEventListener('change', () => {
+          console.log('Barbero cambiado:', barberSelect.value);
           updateBarberUI();
           tryLoadSlots();
       });
   }
-  if (serviceSelect) serviceSelect.addEventListener('change', tryLoadSlots);
-  if (datePicker) datePicker.addEventListener('change', tryLoadSlots);
+  if (serviceSelect) {
+      serviceSelect.addEventListener('change', () => {
+          console.log('Servicio cambiado:', serviceSelect.value);
+          tryLoadSlots();
+      });
+  }
+  if (datePicker) {
+      datePicker.addEventListener('change', () => {
+          console.log('Fecha cambiada:', datePicker.value);
+          tryLoadSlots();
+      });
+  }
 
   // Limpiar la conexión de Realtime al cerrar/recargar la página
   window.addEventListener('beforeunload', () => {
@@ -1445,11 +1456,10 @@ async function cargarSlotsInteligente() {
         const data = await fetchDayData(negocioId, barberId, dateStr);
         const { citas, weeklyBreaks, config, baseDay } = data;
         
-        // Buscar duración del servicio (usando caché global si es posible, o fetch directo)
-        // Nota: fetchDayData ya trae lo necesario, pero necesitamos la duración.
-        // Podemos reusar el caché de servicios cargado previamente en memoria o GlobalCache
+        // Buscar duración del servicio
         const { data: services } = await GlobalCache.smartQuery('services', async () => {
-             const { data } = await (await getSupabase()).from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+             const sb = await getSupabase();
+             const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
              return data;
         }, 1440);
         
@@ -1460,7 +1470,7 @@ async function cargarSlotsInteligente() {
         appState.serviceDuration = duration;
 
         return calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, duration);
-    }, 5); // 5 minutos de caché para slots
+    }, 5);
 
     // Convertir strings de fecha de vuelta a objetos Date si vienen del caché
     const slotsDates = (slots || []).map(s => new Date(s));
@@ -1468,7 +1478,7 @@ async function cargarSlotsInteligente() {
 
   } catch (err) { 
     if (err.name !== 'AbortError') {
-      console.error(err);
+      console.error('Error en cargarSlotsInteligente:', err);
       showToast('Error al buscar horarios', 'error'); 
     }
   }
