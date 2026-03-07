@@ -342,8 +342,12 @@ window.logout = async () => {
 
 async function cleanupRealtime() {
   if (realtimeChannel) {
-    const sb = await getSupabase();
-    await sb.removeChannel(realtimeChannel);
+    try {
+      const sb = await getSupabase();
+      await sb.removeChannel(realtimeChannel);
+    } catch (e) {
+      console.warn('Realtime ya estaba cerrado o error al limpiar:', e);
+    }
     realtimeChannel = null;
   }
 }
@@ -354,10 +358,12 @@ async function setupRealtime() {
 
   const telefono = appState.profile?.telefono;
   if (!telefono) return;
-  const safeTel = telefono;
+  // Limpiar el teléfono de caracteres no numéricos para el filtro
+  const safeTel = String(telefono).replace(/\D/g, '');
 
   let refreshTimeout;
-  const safeRefresh = () => {
+  const safeRefresh = (payload) => {
+    console.log('Evento Realtime recibido:', payload);
     clearTimeout(refreshTimeout);
     refreshTimeout = setTimeout(() => {
       verificarCitaActiva();
@@ -375,7 +381,14 @@ async function setupRealtime() {
       table: 'citas', 
       filter: `cliente_telefono=eq.${safeTel}` 
     }, safeRefresh)
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('Realtime: Suscrito con éxito a cambios de citas.');
+      }
+      if (status === 'CHANNEL_ERROR') {
+        console.error('Realtime: Error al conectar con el canal de actualizaciones.');
+      }
+    });
 }
 
 window.addEventListener('click', function (e) {
@@ -624,6 +637,24 @@ async function init() {
   switchTab('inicio');
 
   document.getElementById('btn-ver-horarios')?.addEventListener('click', cargarSlotsInteligente);
+  
+  // Agregar validación para habilitar/deshabilitar botón
+  const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
+  inputsCita.forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      const bVal = document.getElementById('select-barbero-cita')?.value;
+      const sVal = document.getElementById('select-servicio-cita')?.value;
+      const dVal = document.getElementById('date-picker')?.value;
+      const btn = document.getElementById('btn-ver-horarios');
+      if (btn) {
+        const incompleto = !bVal || !sVal || !dVal;
+        btn.disabled = incompleto;
+        btn.classList.toggle('opacity-50', incompleto);
+        btn.classList.toggle('cursor-not-allowed', incompleto);
+      }
+    });
+  });
+
   document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
   document.getElementById('share-referral')?.addEventListener('click', compartirReferido);

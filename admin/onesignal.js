@@ -50,6 +50,17 @@ async function login(externalId, tags = {}) {
                 return;
             }
 
+            // Verificar si ya tiene una suscripción activa antes de intentar login
+            const hasSubscription = !!OneSignal.User.PushSubscription.id;
+            
+            if (hasSubscription && currentId) {
+                console.log('OneSignal: El usuario ya tiene una suscripción y un ID vinculado.');
+                if (tags && Object.keys(tags).length > 0) {
+                    OneSignal.User.addTags(tags);
+                }
+                return;
+            }
+
             console.log(`OneSignal: Identificando usuario como "${externalId}"...`);
             try {
                 await OneSignal.login(String(externalId));
