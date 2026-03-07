@@ -613,16 +613,6 @@ async function init() {
         cargarBarberos()
     ]);
     
-  if (appState.profile?.telefono) {
-    await setupRealtime();
-    await OneSignalManager.login(appState.profile.telefono, {
-      negocio_id: negocioId,
-      role: 'cliente',
-      cliente_id: appState.user.id,
-      segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
-    });
-  }
-
   // --- Final Initialization Steps ---
   const dp = document.getElementById('date-picker');
   if (dp) {
@@ -1201,9 +1191,8 @@ async function cargarPerfil() {
 
 function processProfileData(data) {
     const oldPoints = appState.profile?.puntos_actuales || 0;
-    const newPoints = data.puntos_actuales || 0;
-    const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
-    const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);
+    const newPoints = data.puntos_actuales || 0;    const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
+    const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);    
 
     // Solo mostrar notificaciones si ya teníamos un perfil cargado (evitar spam al inicio)
     if (appState.profile && newPoints > oldPoints) {
@@ -1219,13 +1208,22 @@ function processProfileData(data) {
     
     renderProfile(data); // Renderizamos siempre para reflejar cambios de puntos en tiempo real
     
-    if (data.telefono && !window.onesignalLogged) {
-        window.onesignalLogged = true;
-        OneSignalManager.login(data.telefono, { negocio_id: negocioId, role: 'cliente' });
+    // Iniciar lógica que depende del perfil (realtime, notificaciones)
+    // Se hace aquí para asegurar que appState.profile está disponible.
+    if (data.telefono) {
+        // OneSignalManager se encarga de no hacer login si ya está identificado.
+        Promise.all([
+            setupRealtime(),
+            OneSignalManager.login(data.telefono, { 
+                negocio_id: negocioId, 
+                role: 'cliente',
+                cliente_id: appState.user.id,
+                segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
+            })
+        ]);
     }
     iniciarMotorMarketing();
     cargarHistorialPuntos();
-    setupRealtime();
 }
 
 function renderServices(data) {
