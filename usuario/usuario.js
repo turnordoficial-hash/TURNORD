@@ -30,19 +30,6 @@ function getDeadlineKey(turno) {
     return `turnoDeadline:${negocioId}:${turno}`;
 }
 
- 
-
-function registrarServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
-  navigator.serviceWorker.register(swPath)
-    .then(async () => {})
-    .catch(error => {
-      console.error('Error al registrar el Service Worker:', error);
-    });
-}
-
- 
 
  
 
@@ -650,7 +637,6 @@ async function cancelarCitaUsuario(citaId) {
 window.cancelarCitaUsuario = cancelarCitaUsuario;
 
 window.addEventListener('DOMContentLoaded', async () => {
-    registrarServiceWorker(); // Registrar el service worker al cargar la página
     if (!negocioId) return;
     await ensureSupabase();
     await obtenerConfig();

@@ -224,11 +224,6 @@
         localStorage.setItem(`referral_code_${negocioId}`, refCode);
     }
 
-    // Lógica PWA para Login
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
-    }
-
     let deferredPrompt;
     const installBtn = document.getElementById('btn-install-pwa');
     
