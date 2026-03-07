@@ -51,12 +51,18 @@ async function login(externalId, tags = {}) {
             }
 
             console.log(`OneSignal: Identificando usuario como "${externalId}"...`);
-            await OneSignal.login(String(externalId));
+            try {
+                await OneSignal.login(String(externalId));
+                console.log(`OneSignal: Login exitoso para ${externalId}`);
+            } catch (err) {
+                // Si es un 409 o similar, OneSignal ya maneja la identidad si es posible.
+                // A veces ocurre si el ID ya está en uso por otra suscripción.
+                console.warn('OneSignal: Error no crítico durante login (posible conflicto):', err);
+            }
             
             if (tags && Object.keys(tags).length > 0) {
                 OneSignal.User.addTags(tags);
             }
-            console.log(`OneSignal: Login exitoso para ${externalId}`);
         } catch (error) {
             console.error('Error durante el login de OneSignal:', error);
         }

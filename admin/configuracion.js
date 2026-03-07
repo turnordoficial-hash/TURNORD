@@ -1,4 +1,4 @@
-import { ensureSupabase } from '../database.js';
+import { ensureSupabase } from '../database.js?v=2';
 
 function getNegocioId() {
   return document.body.dataset.negocioId || 'barberia005';

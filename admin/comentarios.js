@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js?v=2';
 
 function getNegocioId() {
     const id = document.body.dataset.negocioId;

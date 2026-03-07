@@ -3,7 +3,7 @@
  * Sistema de Recompensas, Puntos y Enganche (Fidelización)
  */
 
-import { supabase } from '../database.js';
+import { supabase } from '../database.js?v=2';
 
 const PUNTOS_POR_CADA_RD = 0.1; // 1 punto por cada 10 RD$
 export const RECOMPENSAS = [

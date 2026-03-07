@@ -57,7 +57,7 @@
 
   <!-- Scripts -->
   <script type="module">
-    import { supabase } from './database.js';
+    import { supabase } from './database.js?v=2';
 
     async function logout() {
       const { error } = await supabase.auth.signOut();

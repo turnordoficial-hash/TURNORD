@@ -9,6 +9,8 @@ let supabaseReadyResolve;
 export const supabaseReady = new Promise(r => { supabaseReadyResolve = r; });
 
 async function initializeSupabase() {
+  if (supabase) return; // Patrón Singleton: No inicializar si ya existe
+
   try {
     if (!navigator.onLine) {
       handleOfflineStatus(true);

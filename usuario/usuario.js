@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase } from '../database.js';
+import { supabase, ensureSupabase } from '../database.js?v=2';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.

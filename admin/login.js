@@ -1,6 +1,6 @@
 // Se importa el cliente de Supabase desde el archivo de configuración central (database.js).
 // Esto asegura que toda la aplicación utiliza la misma conexión segura.
-import { ensureSupabase } from '../database.js';
+import { ensureSupabase } from '../database.js?v=2';
 
 /**
  * Obtiene el ID del negocio desde el atributo `data-negocio-id` en el body.
