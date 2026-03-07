@@ -1063,11 +1063,11 @@ function renderProfile(data) {
 }
 
 window.copiarLinkReferido = () => {
-    const link = `${window.location.origin}/login_cliente.html?ref=${appState.user.id}`;
+    const link = `https://jbarber.vip/login_cliente.html?ref=${appState.user.id}`;
     
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(link).then(() => {
-            showToast('Enlace copiado al portapapeles', 'success');
+            showToast('Link copiado al portapapeles', 'success');
         }).catch(() => fallbackCopyTextToClipboard(link));
     } else {
         fallbackCopyTextToClipboard(link);
@@ -1085,7 +1085,7 @@ function fallbackCopyTextToClipboard(text) {
     textArea.select();
     try {
         document.execCommand('copy');
-        showToast('Enlace copiado al portapapeles', 'success');
+        showToast('Link copiado al portapapeles', 'success');
     } catch (err) {
         console.error('Error al copiar:', err);
     }
@@ -1757,31 +1757,6 @@ async function cancelarCita(id) {
       showToast('Error al cancelar la cita', 'error');
     }
   });
-}
-
-function copiarLinkReferido() {
-  const link = `https://jbarber.vip/login_cliente.html?ref=${appState.user.id}`;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(link).then(() => {
-      showToast('Link copiado al portapapeles', 'success');
-    }).catch(() => fallbackCopyTextToClipboard(link));
-  } else {
-    fallbackCopyTextToClipboard(link);
-  }
-}
-
-function fallbackCopyTextToClipboard(text) {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  document.body.appendChild(textArea);
-  textArea.select();
-  try {
-    document.execCommand('copy');
-    showToast('Link copiado al portapapeles', 'success');
-  } catch (err) {
-    console.error('Fallback: Oops, unable to copy', err);
-  }
-  document.body.removeChild(textArea);
 }
 
 function compartirReferido() {
