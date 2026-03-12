@@ -44,11 +44,9 @@
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(function(OneSignal) {
-      // Solicitar permiso automáticamente al cargar si no está concedido (v16 SDK)
-      if (!OneSignal.Notifications.permission) {
-        OneSignal.Notifications.requestPermission().catch(function(err) {
-          console.warn('Error al solicitar permiso push:', err);
-        });
+      if (!OneSignal || !OneSignal.Notifications) {
+          console.warn("OneSignal: SDK no disponible para notificaciones.");
+          return;
       }
 
       var btn = document.getElementById('enable-push-turno');
@@ -58,7 +56,13 @@
       if (OneSignal.Notifications.permission) btn.style.display = 'none';
 
       btn.addEventListener('click', function(){
-        OneSignal.Notifications.requestPermission().catch(function(){});
+        try {
+            OneSignal.Notifications.requestPermission().catch(function(err) {
+              console.warn('Error al solicitar permiso push:', err);
+            });
+        } catch (e) {
+            console.warn('Error fatal al intentar solicitar permiso:', e);
+        }
       });
 
       OneSignal.Notifications.addEventListener('permissionChange', function(permission){

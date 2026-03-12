@@ -71,9 +71,18 @@ function ymdLocal(dateLike) {
 
 // Actualiza los contadores de la UI (En espera, Atendidos, Total).
 function actualizarContadores(turnosHoy) {
-  document.getElementById('turnosEspera').textContent = turnosHoy.filter(t => t.estado === 'En espera').length;
-  document.getElementById('turnosAtendidos').textContent = turnosHoy.filter(t => t.estado === 'Atendido').length;
-  document.getElementById('turnosDia').textContent = turnosHoy.length;
+  const esperaEl = document.getElementById('turnosEspera');
+  const atendidosEl = document.getElementById('turnosAtendidos');
+  const totalEl = document.getElementById('turnosDia');
+
+  if(esperaEl)
+    esperaEl.textContent = turnosHoy.filter(t => t.estado === 'En espera').length;
+
+  if(atendidosEl)
+    atendidosEl.textContent = turnosHoy.filter(t => t.estado === 'Atendido').length;
+
+  if(totalEl)
+    totalEl.textContent = turnosHoy.length;
 }
 
 // Dibuja la tabla del historial de turnos del día.
@@ -103,7 +112,7 @@ function actualizarTabla(items) {
           return `
           <tr class="${item.isCita ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'} transition-colors">
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-medium text-gray-900 dark:text-white">${item.turno}</td>
-            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">${item.nombre || 'N/A'}</td>
+            <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">${obtenerNombreCliente(item)}</td>
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-mono text-xs">${item.hora || 'N/A'}</td>
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">
               <span class="${estadoClass} font-bold text-xs uppercase tracking-wider">${estadoTexto}</span>
@@ -140,7 +149,7 @@ async function cargarDatos() {
     .eq('negocio_id', negocioId)
     .gte('start_at', startOfDay.toISOString())
     .lte('start_at', endOfDay.toISOString())
-    .not('estado', 'in', '("Cancelada")'); // Incluir todas excepto canceladas
+    .neq('estado', 'Cancelada');
 
   if (citasError) throw citasError;
 
@@ -150,23 +159,22 @@ async function cargarDatos() {
   
   const telefonosCitas = (citasData || []).map(c => c.cliente_telefono).filter(Boolean);
   const telefonosTurnos = (turnosData || []).map(t => t.telefono).filter(Boolean);
-  const telefonos = [...new Set([...telefonosCitas, ...telefonosTurnos])];
+  const telefonos = [...new Set([...telefonosCitas, ...telefonosTurnos])].slice(0,50);
   
   const barberIds = [...new Set((citasData || []).map(c => c.barber_id).filter(Boolean))];
   let clientesMap = {};
   let barberosMap = {};
   
   if (telefonos.length > 0) {
-      // Sugerencia #3: Añadir manejo de errores
-      const { data: clientes } = await supabase
+      const { data: clientes, error: clientesError } = await supabase
           .from('clientes')
           .select('telefono, nombre')
           .eq('negocio_id', negocioId)
           .in('telefono', telefonos);
       
-      (clientes || []).forEach(c => {
-          if (clientesError) throw clientesError;
+      if (clientesError) throw clientesError;
 
+      (clientes || []).forEach(c => {
           if (c.telefono) {
               // Normalizar teléfono para el mapa (solo dígitos)
               const telNormalizado = c.telefono.replace(/\D/g, '');
@@ -184,6 +192,15 @@ async function cargarDatos() {
             .in('id', barberIds);
         (barberos || []).forEach(b => barberosMap[b.id] = b.nombre);
     }
+
+    // Procesar Turnos siempre para llenar la variable
+    turnosConNombre = (turnosData || []).map(t => {
+      return {
+        ...t,
+        nombre: obtenerNombreCliente(t, clientesMap),
+        isCita: false
+      };
+    });
 
     // Procesar Citas
     if (citasData && citasData.length > 0) {
@@ -224,7 +241,10 @@ async function cargarDatos() {
   } catch (err) {
     console.error('Error al cargar datos del panel:', err);
     handleAuthError(err);
-    document.getElementById('tablaHistorial').innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos.</td></tr>`;
+    const tabla = document.getElementById('tablaHistorial');
+    if (tabla) {
+      tabla.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error al cargar los datos.</td></tr>`;
+    }
   }
 }
 
@@ -259,7 +279,7 @@ function solicitarActualizacion() {
   refreshTimer = setTimeout(() => {
     cargarDatos();
     refreshTimer = null;
-  }, 500); // Espera 500ms antes de recargar
+  }, 300); // Espera 300ms antes de recargar
 }
 
 // Helper para notificaciones visuales
@@ -329,10 +349,13 @@ function suscribirseTurnos() {
       payload => {
         // 3. Debounce Inteligente: Solo refrescar si afecta al día actual
         const hoyLocal = ymdLocal(new Date());
-        if (payload.new && payload.new.fecha && payload.new.fecha !== hoyLocal) return;
-        if (payload.old && payload.old.fecha && payload.old.fecha !== hoyLocal) return;
+        const fecha = payload.new?.fecha || payload.old?.fecha;
+        if (fecha && fecha !== hoyLocal) return;
 
-        console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
+        console.log(
+         '🟢 Actualización de turnos:',
+         payload.new?.id || payload.old?.id
+        );
         
         if (payload.eventType === 'INSERT') {
             // Sugerencia #7: Simplificar notificación para evitar mostrar "Cliente"

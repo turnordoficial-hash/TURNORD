@@ -2,20 +2,6 @@ import { supabase, ensureSupabase, GlobalCache, getNegocioId } from '../database
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
-// Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
-window.addEventListener('unhandledrejection', (e) => {
-  const msg = e?.reason?.message || '';
-
-  if (
-    e?.reason?.name === 'UnknownError' ||
-    msg.includes('indexedDB') ||
-    msg.includes('OneSignal')
-  ) {
-    console.warn('OneSignal IndexedDB error suppressed.');
-    e.preventDefault();
-  }
-});
-
 const negocioId = getNegocioId();
 
 // Estado centralizado para la aplicación
@@ -314,23 +300,31 @@ function updateBanner(mode = 'default') {
 }
 
 // Notificaciones Push con OneSignal
-const ONESIGNAL_APP_ID = '85f98db3-968a-4580-bb02-8821411a6bee';
-
 async function solicitarPermisoNotificacion() {
-  return new Promise((resolve) => {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      try {
-        if (!OneSignal.Notifications.permission) {
-          await OneSignal.Notifications.requestPermission();
+  try {
+    await OneSignalManager.init();
+    return new Promise((resolve) => {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        try {
+          if (!OneSignal || !OneSignal.Notifications) {
+              console.warn("OneSignal: SDK no disponible para permisos.");
+              return resolve(false);
+          }
+          if (!OneSignal.Notifications.permission) {
+            await OneSignal.Notifications.requestPermission();
+          }
+          resolve(OneSignal.Notifications.permission);
+        } catch (err) {
+          console.warn('Error al solicitar permiso OneSignal:', err);
+          resolve(false);
         }
-        resolve(OneSignal.Notifications.permission);
-      } catch (err) {
-        console.warn('Error al solicitar permiso OneSignal:', err);
-        resolve(false);
-      }
+      });
     });
-  });
+  } catch (e) {
+    console.error("Error inicializando OneSignal para permisos:", e);
+    return false;
+  }
 }
 
 function showToast(message, type = 'success') {

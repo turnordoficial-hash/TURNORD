@@ -2,17 +2,6 @@ import { supabase, ensureSupabase } from '../database.js?v=2';
 import { RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
-// Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
-window.addEventListener('unhandledrejection', (e) => {
-    if (e.reason && (
-        e.reason.name === 'UnknownError' || 
-        (e.reason.message && e.reason.message.includes('indexedDB'))
-    )) {
-        console.warn('Supressed OneSignal IndexedDB error to prevent crash.');
-        e.preventDefault();
-    }
-});
-
 let dataRender = []; // Cache of waiting list turns for reordering
 let enAtencionCache = []; // Cache de turnos en atención para validaciones rápidas
 let turnoEnAtencionActual = null; // Variable Global de Estado Maestro
