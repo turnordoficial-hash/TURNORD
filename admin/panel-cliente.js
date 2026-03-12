@@ -4,12 +4,15 @@ import { OneSignalManager } from './onesignal.js';
 
 // Manejo global de errores de promesas (específicamente para OneSignal/IndexedDB)
 window.addEventListener('unhandledrejection', (e) => {
-  if (e.reason && (
-      e.reason.name === 'UnknownError' || 
-      (e.reason.message && e.reason.message.includes('indexedDB'))
-  )) {
-      console.warn('Supressed OneSignal IndexedDB error to prevent crash.');
-      e.preventDefault();
+  const msg = e?.reason?.message || '';
+
+  if (
+    e?.reason?.name === 'UnknownError' ||
+    msg.includes('indexedDB') ||
+    msg.includes('OneSignal')
+  ) {
+    console.warn('OneSignal IndexedDB error suppressed.');
+    e.preventDefault();
   }
 });
 
@@ -332,7 +335,7 @@ window.logout = async () => {
   const engine = SmartMarketingEngine.getInstance();
   if (engine) engine.reset();
   await cleanupRealtime();
-  GlobalCache.clear(); // Limpiar caché inteligente
+  GlobalCache.remove(`profile_${appState.user.id}`); // Limpieza selectiva
   Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`) && !k.includes('jbarber_cache')).forEach(k => localStorage.removeItem(k));
   if (window.OneSignal) await OneSignalManager.logout();
   const sb = await getSupabase();
@@ -360,6 +363,7 @@ async function setupRealtime() {
   if (!telefono) return;
   // Limpiar el teléfono de caracteres no numéricos para el filtro
   const safeTel = String(telefono).replace(/\D/g, '');
+  if (!safeTel) return;
 
   let refreshTimeout;
   const safeRefresh = (payload) => {
@@ -510,9 +514,10 @@ function setupStaticEventHandlers() {
       if (barber && card && img && name) {
           card.classList.remove('hidden');
           
-          const avatarUrl = (barber.avatar_url && !barber.avatar_url.startsWith('blob:'))
-              ? barber.avatar_url
-              : `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
+          let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
+          if (barber.avatar_url && barber.avatar_url.startsWith('http')) {
+              avatarUrl = barber.avatar_url;
+          }
           
           img.src = avatarUrl;
           name.textContent = barber.nombre || barber.usuario;
@@ -555,25 +560,25 @@ function setupStaticEventHandlers() {
   });
 }
 
-window.switchTab = (tab) => {
-  const panels = ['inicio', 'cita', 'perfil'];
-  panels.forEach(p => {
-    const el = document.getElementById(`tab-${p}-panel`);
-    if (!el) return;
-    if (p === tab) {
-      el.classList.remove('hidden');
-      requestAnimationFrame(() => el.classList.add('active'));
-    } else {
-      el.classList.remove('active', 'hidden');
-      el.classList.add('hidden');
-    }
-  });
+window.switchTab = function(tab){
 
-  document.querySelectorAll('[data-tab]').forEach(el => {
-    el.classList.toggle('active', el.dataset.tab === tab);
-    el.classList.toggle('text-white', el.dataset.tab === tab);
-  });
-};
+  document.querySelectorAll('[id$="-panel"]').forEach(el=>{
+    el.classList.add('hidden')
+  })
+
+  const panel = document.getElementById(`tab-${tab}-panel`)
+  if(panel){
+    panel.classList.remove('hidden')
+  }
+
+  document.querySelectorAll('.nav-item,.nav-link').forEach(btn=>{
+    btn.classList.remove('active')
+  })
+
+  document.querySelectorAll(`[data-tab="${tab}"]`).forEach(btn=>{
+    btn.classList.add('active')
+  })
+}
 
 function setupPosterTilt() {
   const poster = document.querySelector('.barber-poster-3d');
@@ -622,6 +627,7 @@ async function init() {
   }
 
   await verificarCitaActiva();
+  await setupRealtime();
   iniciarMotorMarketing();
 
   switchTab('inicio');
@@ -644,6 +650,18 @@ async function init() {
       }
     });
   });
+
+  // Ejecutar validación inicial para el botón al cargar la página
+  const bVal = document.getElementById('select-barbero-cita')?.value;
+  const sVal = document.getElementById('select-servicio-cita')?.value;
+  const dVal = document.getElementById('date-picker')?.value;
+  const btn = document.getElementById('btn-ver-horarios');
+  if (btn) {
+    const incompleto = !bVal || !sVal || !dVal;
+    btn.disabled = incompleto;
+    btn.classList.toggle('opacity-50', incompleto);
+    btn.classList.toggle('cursor-not-allowed', incompleto);
+  }
 
   document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
 
@@ -678,9 +696,25 @@ async function init() {
   registrarServiceWorker();
   checkPendingRatings();
   setupPosterTilt();
+
+  // ⭐ Mejora: Pre-carga de horarios al iniciar para una experiencia más rápida
+  const barberSelect = document.getElementById('select-barbero-cita');
+  const serviceSelect = document.getElementById('select-servicio-cita');
+  
+  if (appState.barbers.length > 0 && barberSelect && barberSelect.value === "") {
+      barberSelect.value = appState.barbers[0].id;
+  }
+  if (appState.services.length > 0 && serviceSelect && serviceSelect.value === "") {
+      serviceSelect.value = appState.services[0].id;
+  }
+  
+  // Disparar el evento change para que se actualice la UI y se carguen los slots
+  if (barberSelect.value && serviceSelect.value) {
+      barberSelect.dispatchEvent(new Event('change'));
+  }
 }
 
-function renderStructure() {
+function renderInicio() {
   const statusContainer = document.getElementById('inicio-status-container');
   if (statusContainer) {
     statusContainer.innerHTML = `
@@ -709,7 +743,9 @@ function renderStructure() {
       </div>
         `;
   }
+}
 
+function renderCitaPanel() {
   const citaPanel = document.getElementById('tab-cita-panel');
   if (citaPanel) {
     citaPanel.innerHTML = `
@@ -802,7 +838,7 @@ function renderStructure() {
                         </div>
                     </div>
 
-                    <button id="btn-ver-horarios" onclick="window.cargarSlotsInteligente()" class="w-full py-5 bg-[#C1121F] hover:bg-red-700 text-white font-black tracking-wide rounded-2xl shadow-lg shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.02] transition-all flex justify-center items-center gap-3 group">
+                    <button id="btn-ver-horarios" class="w-full py-5 bg-[#C1121F] hover:bg-red-700 text-white font-black tracking-wide rounded-2xl shadow-lg shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.02] transition-all flex justify-center items-center gap-3 group">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         VER HORARIOS DISPONIBLES
                     </button>
@@ -856,6 +892,11 @@ function renderStructure() {
             </div>
         `;
   }
+}
+
+function renderStructure() {
+  renderInicio();
+  renderCitaPanel();
 
   const perfilPanel = document.getElementById('tab-perfil-panel');
   if (perfilPanel) {
@@ -1017,7 +1058,7 @@ function renderProfile(data) {
  
     const avatarUrl = (data.avatar_url && data.avatar_url.includes('supabase.co'))
         ? `${data.avatar_url}?width=256&height=256&resize=cover&quality=80`
-        : (data.avatar_url && !data.avatar_url.startsWith('blob:'))
+        : (data.avatar_url && data.avatar_url.startsWith('http'))
             ? data.avatar_url
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre)}&background=C1121F&color=fff&bold=true`;
 
@@ -1083,7 +1124,7 @@ function renderProfile(data) {
     }
 }
 
-window.copiarLinkReferido = () => {
+function copiarLinkReferido() {
     const link = `https://jbarber.vip/login_cliente.html?ref=${appState.user.id}`;
     
     if (navigator.clipboard && window.isSecureContext) {
@@ -1093,7 +1134,7 @@ window.copiarLinkReferido = () => {
     } else {
         fallbackCopyTextToClipboard(link);
     }
-};
+}
 
 function fallbackCopyTextToClipboard(text) {
     const textArea = document.createElement("textarea");
@@ -1113,7 +1154,7 @@ function fallbackCopyTextToClipboard(text) {
     document.body.removeChild(textArea);
 }
 
-window.compartirReferido = async () => {
+async function compartirReferido() {
     const link = `${window.location.origin}/login_cliente.html?ref=${appState.user.id}`;
     const data = {
         title: 'Te invito a JBarber',
@@ -1124,9 +1165,9 @@ window.compartirReferido = async () => {
     if (navigator.share) {
         try { await navigator.share(data); } catch (err) {}
     } else {
-        window.copiarLinkReferido();
+        copiarLinkReferido();
     }
-};
+}
 
 async function cargarHistorialPuntos() {
     const sb = await getSupabase();
@@ -1232,8 +1273,8 @@ function renderServices(data) {
     select.innerHTML = '<option value="">Elegir servicio...</option>';
     (data || []).forEach(s => {
       const opt = document.createElement('option');
-      opt.value = s.nombre;
-      opt.textContent = `${s.nombre} - RD$ ${s.precio}`;
+      opt.value = s.id; // Cambiado de s.nombre a s.id
+      opt.textContent = `${sanitizeHTML(s.nombre)} - RD$ ${s.precio}`;
       select.appendChild(opt);
     });
   }
@@ -1246,7 +1287,10 @@ async function cargarServicios() {
       return data;
   }, 1440); // 24 horas
   
-  if (data) renderServices(data);
+  if (data) {
+    appState.services = data || [];
+    renderServices(data);
+  }
 }
 
 function processConfig(data) {
@@ -1279,7 +1323,7 @@ async function verificarCitaActiva() {
     .limit(1)
     .maybeSingle();
 
-  const estadosNoActivos = ['Cancelada', 'Atendida', 'Cita Atendida', 'Completada', 'Finalizada'];
+  const estadosNoActivos = ['Cancelada', 'Atendida', 'Cita Atendida', 'Completada', 'Finalizada', 'No presentado'];
   const cardCita = document.getElementById('card-cita-activa');
   const inicioCitaContainer = document.getElementById('inicio-cita-card-container');
 
@@ -1386,20 +1430,16 @@ async function cargarBarberos() {
       return data;
   }, 60);
   
-  if (data) { renderBarbersList(data); appState.barbers = data; }
+  if (data) { renderBarbersList(data); appState.barbers = data || []; }
 }
 
-async function fetchDayData(negocioId, barberId, dateStr) {
+async function fetchDayData(negocioId, barberId, dateStr, signal) {
   const sb = await getSupabase();
   const parts = dateStr.split('-');
   const baseDay = new Date(parts[0], parts[1] - 1, parts[2]);
   const startDayISO = new Date(baseDay).toISOString();
   const endDay = new Date(baseDay); endDay.setHours(23, 59, 59, 999);
   const endDayISO = endDay.toISOString();
-
-  if (appState.abortController) appState.abortController.abort();
-  appState.abortController = new AbortController();
-
   const pCitas = sb.from('citas')
     .select('start_at, end_at')
     .eq('negocio_id', negocioId)
@@ -1407,7 +1447,7 @@ async function fetchDayData(negocioId, barberId, dateStr) {
     .not('estado', 'in', '("Cancelada")')
     .gte('start_at', startDayISO)
     .lte('start_at', endDayISO)
-    .abortSignal(appState.abortController.signal);
+    .abortSignal(signal);
 
   const pEstado = sb.from('estado_negocio')
     .select('weekly_breaks')
@@ -1415,16 +1455,15 @@ async function fetchDayData(negocioId, barberId, dateStr) {
     .maybeSingle()
     .abortSignal(appState.abortController.signal);
 
-  const pConfig = sb.from('configuracion_negocio')
+  const pConfig = configCache
+    ? Promise.resolve({ data: configCache })
+    : sb.from('configuracion_negocio')
     .select('hora_apertura, hora_cierre, dias_operacion')
     .eq('negocio_id', negocioId)
     .maybeSingle()
-    .abortSignal(appState.abortController.signal);
+    .abortSignal(signal);
 
   const [resCitas, resEstado, resConfig] = await Promise.all([pCitas, pEstado, pConfig]);
-  
-  appState.abortController = null;
-
   return { 
     citas: resCitas.data || [], 
     weeklyBreaks: resEstado.data?.weekly_breaks || [], 
@@ -1446,6 +1485,7 @@ function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationM
   const now = new Date();
   const slots = [];
   let current = new Date(start);
+  const durationMs = durationMin * 60000;
 
   // Pre-procesar citas para mejor rendimiento
   const citasRanges = (citas || []).map(c => ({
@@ -1464,12 +1504,13 @@ function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationM
       return { start: bStart.getTime(), end: bEnd.getTime() };
     });
 
-  while (current.getTime() + durationMin * 60000 <= end.getTime()) {
+  while (current.getTime() + durationMs <= end.getTime()) {
     const slotStart = current.getTime();
-    const slotEnd = slotStart + durationMin * 60000;
+    const slotEnd = slotStart + durationMs;
     
+    const buffer = 5 * 60000; // 5 min buffer
     // 1. No en el pasado
-    if (slotStart > now.getTime()) {
+    if (slotStart > now.getTime() + buffer) {
       // 2. No solapa con citas
       const overlapsCita = citasRanges.some(c => 
         (slotStart < c.end && slotEnd > c.start)
@@ -1484,7 +1525,7 @@ function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationM
         slots.push(new Date(slotStart));
       }
     }
-    current = new Date(slotStart + durationMin * 60000);
+    current = new Date(slotStart + durationMs);
   }
   return slots;
 }
@@ -1492,17 +1533,23 @@ function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationM
 async function cargarSlotsInteligente() {
   const dp = document.getElementById('date-picker');
   const barberId = document.getElementById('select-barbero-cita')?.value;
-  const servicioName = document.getElementById('select-servicio-cita')?.value;
+  const servicioId = document.getElementById('select-servicio-cita')?.value;
   
-  console.log('Intentando cargar slots:', { barberId, date: dp?.value, servicioName });
+  console.log('Intentando cargar slots:', { barberId, date: dp?.value, servicioId });
 
-  if (!barberId || !dp?.value || !servicioName) {
+  if (!barberId || !dp?.value || !servicioId) {
       console.warn('Faltan datos para cargar slots');
       return;
   }
 
+  // Cancela la petición anterior si existe, para evitar race conditions
+  if (appState.abortController) {
+    appState.abortController.abort();
+  }
+  appState.abortController = new AbortController();
+
   const dateStr = dp.value;
-  const cacheKey = `slots_${dateStr}_${barberId}_${servicioName}`;
+  const cacheKey = `slots_${dateStr}_${barberId}_s${servicioId}`;
 
   const slotsContainer = document.getElementById('slots-container');
   const horariosLibres = document.getElementById('horarios-libres');
@@ -1510,26 +1557,34 @@ async function cargarSlotsInteligente() {
   if (horariosLibres) horariosLibres.classList.remove('hidden');
   if (slotsContainer) {
       slotsContainer.innerHTML = `
-        <div class="col-span-full text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#C1121F] border-t-transparent mb-4"></div>
-            <p class="text-gray-500 font-bold animate-pulse">Buscando horarios disponibles...</p>
+        <div class="col-span-full grid grid-cols-3 gap-3 animate-pulse">
+          ${Array(6).fill('<div class="h-12 rounded-xl bg-gray-200 dark:bg-white/5"></div>').join('')}
+          <div class="col-span-full text-center mt-4">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">Buscando horarios...</p>
+          </div>
         </div>
       `;
   }
 
   try {
     const { data: slots } = await GlobalCache.smartQuery(cacheKey, async () => {
-        const data = await fetchDayData(negocioId, barberId, dateStr);
+        // Pasa el signal del controlador de estado a la función de fetch
+        const data = await fetchDayData(negocioId, barberId, dateStr, appState.abortController.signal);
         const { citas, weeklyBreaks, config, baseDay } = data;
         
-        // Buscar duración del servicio
-        const { data: services } = await GlobalCache.smartQuery('services', async () => {
-             const sb = await getSupabase();
-             const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
-             return data;
-        }, 1440);
+        // Buscar duración del servicio usando appState.services
+        let services = appState.services;
+        if (!services || services.length === 0) {
+          const { data } = await GlobalCache.smartQuery('services', async () => {
+               const sb = await getSupabase();
+               const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
+               return data;
+          }, 1440);
+          services = data || [];
+          appState.services = services;
+        }
         
-        const serv = (services || []).find(s => s.nombre === servicioName);
+        const serv = services.find(s => String(s.id) === String(servicioId));
         const duration = serv ? serv.duracion_min : 30;
         
         // Guardamos duración en estado para uso posterior
@@ -1539,7 +1594,9 @@ async function cargarSlotsInteligente() {
     }, 5);
 
     // Convertir strings de fecha de vuelta a objetos Date si vienen del caché
-    const slotsDates = (slots || []).map(s => new Date(s));
+    const slotsDates = (slots || []).map(s => {
+        return (s instanceof Date) ? s : new Date(String(s));
+    });
     renderSlotsToUI(slotsDates);
 
   } catch (err) { 
@@ -1560,27 +1617,39 @@ function renderSlotsToUI(slots) {
 
   // Actualizar info del barbero si está disponible
   const barberId = document.getElementById('select-barbero-cita')?.value;
-  const barber = appState.barbers.find(b => String(b.id) === String(barberId));
+  const barber = (appState.barbers || []).find(b => String(b.id) === String(barberId));
   const infoCard = document.getElementById('barber-info-card');
   if (infoCard && barber) {
     infoCard.classList.remove('hidden');
     const nameDisp = document.getElementById('barber-name-display');
     const avatarDisp = document.getElementById('barber-avatar-display');
     if (nameDisp) nameDisp.textContent = barber.nombre;
-    if (avatarDisp) avatarDisp.src = barber.avatar_url || 'jbarber/jjj.png';
+    if (avatarDisp) {
+        if (barber.avatar_url && barber.avatar_url.startsWith('http')) {
+            avatarDisp.src = barber.avatar_url;
+        } else {
+            avatarDisp.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
+        }
+    }
   }
 
   if (!slots || slots.length === 0) {
+    container.className = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3";
     container.innerHTML = `
       <div class="col-span-full text-center py-8 text-gray-500">
         <p class="font-bold">No hay horarios disponibles</p>
         <p class="text-xs">Prueba con otra fecha o barbero</p>
+        <button onclick="cargarSlotsInteligente()" 
+class="mt-3 px-4 py-2 text-xs bg-[#C1121F] text-white rounded-lg">
+Actualizar
+</button>
       </div>
     `;
     return;
   }
 
   container.innerHTML = '';
+  container.className = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3";
   slots.forEach(slot => {
     const btn = document.createElement('button');
     btn.className = 'slot-btn p-3 border dark:border-white/10 rounded-xl font-bold hover:border-[#C1121F] dark:text-white transition-all text-sm';
@@ -1596,22 +1665,16 @@ async function seleccionarHora(slot, btn) {
   btn.classList.add('bg-[#C1121F]', 'text-white');
   
   // Actualizar Resumen de Reserva
-  const servicioName = document.getElementById('select-servicio-cita')?.value;
+  const servicioId = document.getElementById('select-servicio-cita')?.value;
   const summaryService = document.getElementById('summary-service');
   const summaryPrice = document.getElementById('summary-price');
   
-  if (summaryService) summaryService.textContent = servicioName;
+  const serv = (appState.services || []).find(s => String(s.id) === String(servicioId));
+
+  if (summaryService && serv) summaryService.textContent = serv.nombre;
   
-  if (summaryPrice) {
-    const { data: services } = await GlobalCache.smartQuery('services', async () => {
-         const sb = await getSupabase();
-         const { data } = await sb.from('servicios').select('*').eq('negocio_id', negocioId).eq('activo', true);
-         return data;
-    }, 1440);
-    const serv = (services || []).find(s => s.nombre === servicioName);
-    if (serv) {
-      summaryPrice.textContent = `RD$ ${Number(serv.precio).toLocaleString()}`;
-    }
+  if (summaryPrice && serv) {
+    summaryPrice.textContent = `RD$ ${Number(serv.precio).toLocaleString()}`;
   }
 
   document.getElementById('action-container')?.classList.remove('hidden');
@@ -1622,9 +1685,11 @@ async function confirmarReservaManual() {
   const sb = await getSupabase();
   const date = appState.selectedTimeSlot;
   const barberId = document.getElementById('select-barbero-cita')?.value;
-  const servicio = document.getElementById('select-servicio-cita')?.value;
+  const servicioId = document.getElementById('select-servicio-cita')?.value;
 
-  if (!date || !barberId || !servicio) { 
+  const serv = (appState.services || []).find(s => String(s.id) === String(servicioId));
+
+  if (!date || !barberId || !serv) { 
     showToast('Faltan datos', 'error'); 
     return; 
   }
@@ -1635,11 +1700,28 @@ async function confirmarReservaManual() {
   }
 
   confirmarAccion('Confirmar', '¿Deseas reservar esta cita?', async () => {
-    if (appState.isBooking) return; // Doble seguridad
+    if (appState.isBooking) return;
     appState.isBooking = true;
+
+    const btn = document.getElementById('btn-confirmar-reserva');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="animate-spin mr-2">⏳</span> Reservando...';
+    }
+
     try {
       const duration = appState.serviceDuration || 30;
       const endAt = new Date(date.getTime() + duration * 60000);
+
+      // Re-verificar disponibilidad antes de enviar
+      const dayData = await fetchDayData(negocioId, barberId, date.toISOString().split('T')[0], undefined);
+      const freshSlots = calculateAvailableSlots(dayData.baseDay, dayData.config, dayData.citas, dayData.weeklyBreaks, duration);
+      const isStillAvailable = freshSlots.some(s => s.getTime() === date.getTime());
+
+      if (!isStillAvailable) {
+        // Usar throw new Error para que el catch lo maneje
+        throw new Error("Este horario ya no está disponible. Por favor, elige otro.");
+      }
 
       const { error } = await sb.rpc('programar_cita', { 
         p_negocio_id: negocioId, 
@@ -1647,24 +1729,38 @@ async function confirmarReservaManual() {
         p_cliente_telefono: appState.profile.telefono, 
         p_start: date.toISOString(), 
         p_end: endAt.toISOString(), 
-        p_servicio: servicio 
+        p_servicio: serv.nombre 
       });
 
       if (error) throw error;
       
       showToast('Cita agendada correctamente');
+
+      // Invalidar el caché de slots para este día/barbero/servicio
+      const dateStr = date.toISOString().split('T')[0];
+      const cacheKey = `slots_${dateStr}_${barberId}_s${servicioId}`;
+      GlobalCache.remove(cacheKey);
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       await sendPushNotification('Cita Confirmada', `Tu cita para las ${timeStr} ha sido agendada.`);
-      await enviarCorreoConfirmacion(date.toISOString(), servicio, barberId);
+      await enviarCorreoConfirmacion(date.toISOString(), serv.nombre, barberId);
 
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      navigator.vibrate?.(50);
       
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(async () => {
+        await verificarCitaActiva();
+        switchTab('inicio');
+      }, 1200);
     } catch (e) { 
       showToast(e.message || 'Error al reservar', 'error'); 
-      appState.isBooking = false; 
+      appState.isBooking = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = 'CONFIRMAR RESERVA';
+      }
+      // Si el error es por disponibilidad, refrescar los slots para el usuario
+      if (e.message.includes("disponible")) {
+        cargarSlotsInteligente();
+      }
     }
   });
 }
@@ -1693,6 +1789,11 @@ window.subirAvatar = async (input) => {
   let file = input.files[0]; 
   if (!file || appState.isUploading) return;
   
+  if (file.size > 5 * 1024 * 1024) { 
+    showToast('Imagen demasiado grande (max 5MB)', 'error'); 
+    return; 
+  }
+
   appState.isUploading = true;
   const sb = await getSupabase();
   
@@ -1708,7 +1809,7 @@ window.subirAvatar = async (input) => {
     }
 
     file = await resizeImage(file, 512);
-    const fileName = `public/${appState.user.id}-${Date.now()}`;
+    const fileName = `${appState.user.id}-${Date.now()}`;
     
     const { error: uploadError } = await sb.storage
       .from('avatars')
@@ -1765,7 +1866,7 @@ async function cancelarCita(id) {
     const { data: cita } = await sb.from('citas')
       .select('id')
       .eq('cliente_telefono', appState.profile?.telefono)
-      .in('estado', ['Programada', 'Confirmada'])
+      .in('estado', ['Programada', 'Confirmada', 'Cita Programada', 'Cita Confirmada'])
       .limit(1)
       .maybeSingle();
     if (cita) id = cita.id;
@@ -1786,22 +1887,6 @@ async function cancelarCita(id) {
       showToast('Error al cancelar la cita', 'error');
     }
   });
-}
-
-function compartirReferido() {
-  const link = `https://jbarber.vip/login_cliente.html?ref=${appState.user.id}`;
-  const text = `¡Hola! Te invito a probar JBarber. Regístrate con mi link y obtén puntos en tu primer corte: ${link}`;
-  
-  if (navigator.share) {
-    navigator.share({
-      title: 'Invitación JBarber',
-      text: text,
-      url: link,
-    }).catch(console.error);
-  } else {
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(whatsappUrl, '_blank');
-  }
 }
 
 // Globalizar funciones para uso en onclick (Contexto Module)

@@ -34,6 +34,11 @@
         window.location.href = 'login_cliente.html';
         return null; // No user, stop here
       }
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (!session) {
+          window.location.href = "login_cliente.html";
+        }
+      });
       return session.user;
     }
 
@@ -104,8 +109,8 @@
 
     verificarSesion().then(ensureProfileExists);
   </script>
-  <script src="admin/tailwind-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="admin/tailwind-config.js"></script>
   <!-- Fuentes: Outfit + Playfair (toque elegante) -->
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -566,7 +571,7 @@
     </div>
 
     <div id="tab-cita-panel" class="hidden animate-fade-in">
-        <!-- Contenido Cita -->
+        <!-- Contenido dinámico inyectado por renderCitaPanel() en panel-cliente.js -->
     </div>
 
     <div id="tab-perfil-panel" class="hidden animate-fade-in">
@@ -720,40 +725,43 @@
   let idleTimer;
 
   /**
-   * Define la función para reiniciar el temporizador de inactividad.
-   * Esta función es llamada por panel-cliente.js para evitar que la sesión
-   * se cierre mientras el usuario está activo.
-   * @param {number} timeoutMinutes - Minutos de inactividad antes de cerrar sesión.
+   * Reinicia el temporizador de inactividad
+   * @param {number} timeoutMinutes
    */
-  function resetIdleTimer(timeoutMinutes = 20) {
-    // Si el primer argumento es un evento, ignorarlo y usar el valor predeterminado.
-    if (typeof timeoutMinutes !== 'number') {
-      timeoutMinutes = 20;
-    }
-
-    // Limpia cualquier temporizador existente para empezar de nuevo.
+  function resetIdleTimer(timeoutMinutes = 30) {
     clearTimeout(idleTimer);
 
-    const timeoutMilliseconds = timeoutMinutes * 60 * 1000;
-
-    // Configura el temporizador que se ejecutará después del período de inactividad.
     idleTimer = setTimeout(() => {
-      console.log(`Usuario inactivo por ${timeoutMinutes} minutos. Cerrando sesión.`);
-      
-      // Intenta cerrar la sesión de forma segura haciendo clic en el enlace de logout.
-      const logoutLink = document.getElementById('menu-logout');
-      if (logoutLink) {
-        logoutLink.click();
+      console.warn("Sesión cerrada por inactividad");
+
+      if (window.Swal) {
+        Swal.fire({
+          icon: "warning",
+          title: "Sesión cerrada",
+          text: "Tu sesión se cerró por inactividad.",
+          confirmButtonText: "Ir al login"
+        }).then(() => {
+          window.location.href = "login_cliente.html";
+        });
       } else {
-        // Si no se encuentra el enlace, redirige a la página de login como medida de seguridad.
-        window.location.href = 'login_cliente.html';
+        alert("Sesión cerrada por inactividad");
+        window.location.href = "login_cliente.html";
       }
-    }, timeoutMilliseconds);
+
+    }, timeoutMinutes * 60 * 1000);
   }
+
+  // Detectar actividad del usuario
+  ["click","mousemove","keydown","touchstart"].forEach(event => {
+    window.addEventListener(event, () => resetIdleTimer());
+  });
+
+  // iniciar
+  resetIdleTimer();
 </script>
 
 <!-- panel_cliente.html -->
-<script type="module" src="admin/panel-cliente.js?v=1.2"></script>
+<script type="module" src="admin/panel-cliente.js?v=3"></script>
   <script>
     window.addEventListener("load", () => {
       const loading = document.getElementById("loading-screen");

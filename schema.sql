@@ -1,4 +1,3 @@
--- Script: Tablas adicionales para TurnoRD (servicios y cierres de caja)
 -- Script: Esquema de Base de Datos para TurnoRD
 -- Ejecutar en el SQL Editor de Supabase
 
@@ -429,7 +428,7 @@ ALTER TABLE public.citas
 
 CREATE TABLE IF NOT EXISTS public.roles_negocio (
   negocio_id TEXT NOT NULL,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('admin','staff')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (negocio_id, user_id)
@@ -470,12 +469,12 @@ USING (auth.uid() = user_id);
 
 -- The destructive `DROP TABLE` command was removed in favor of a non-destructive fix below.
 CREATE TABLE IF NOT EXISTS public.clientes (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY,
   negocio_id TEXT NOT NULL,
   nombre TEXT NOT NULL,
   telefono TEXT,
   email TEXT NOT NULL,
-  documento_identidad TEXT, -- Cédula o Código (Opcional)
+  documento_identidad TEXT,
   avatar_url TEXT,
   puntos_actuales INTEGER DEFAULT 0,
   puntos_totales_historicos INTEGER DEFAULT 0,
