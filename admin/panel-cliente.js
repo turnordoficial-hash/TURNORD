@@ -772,22 +772,6 @@ async function init() {
   registrarServiceWorker();
   checkPendingRatings();
   setupPosterTilt();
-
-  // ⭐ Mejora: Pre-carga de horarios al iniciar para una experiencia más rápida
-  const barberSelect = document.getElementById('select-barbero-cita');
-  const serviceSelect = document.getElementById('select-servicio-cita');
-  
-  if (appState.barbers.length > 0 && barberSelect && barberSelect.value === "") {
-      barberSelect.value = appState.barbers[0].id;
-  }
-  if (appState.services.length > 0 && serviceSelect && serviceSelect.value === "") {
-      serviceSelect.value = appState.services[0].id;
-  }
-  
-  // Disparar el evento change para que se actualice la UI y se carguen los slots
-  if (barberSelect.value && serviceSelect.value) {
-      barberSelect.dispatchEvent(new Event('change'));
-  }
 }
 
 function renderInicio() {
@@ -1353,13 +1337,14 @@ function processProfileData(data) {
 function renderServices(data) {
   const select = document.getElementById('select-servicio-cita');
   if (select) {
-    select.innerHTML = '<option value="">Elegir servicio...</option>';
+    select.innerHTML = '<option value="" selected disabled>Elegir servicio...</option>';
     (data || []).forEach(s => {
       const opt = document.createElement('option');
-      opt.value = s.id; // Cambiado de s.nombre a s.id
+      opt.value = s.id;
       opt.textContent = `${sanitizeHTML(s.nombre)} - RD$ ${s.precio}`;
       select.appendChild(opt);
     });
+    select.value = ""; // Forzar valor vacío
   }
 }
 
@@ -1496,13 +1481,14 @@ function confirmarAccion(titulo, mensaje, onConfirm) {
 function renderBarbersList(data) {
   const select = document.getElementById('select-barbero-cita');
   if (select) {
-    select.innerHTML = '<option value="">Selecciona un barbero...</option>';
+    select.innerHTML = '<option value="" selected disabled>Selecciona un barbero...</option>';
     data.forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
       opt.textContent = sanitizeHTML(b.nombre || b.usuario);
       select.appendChild(opt);
     });
+    select.value = ""; // Forzar valor vacío
   }
 }
 
