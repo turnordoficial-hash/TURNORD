@@ -1336,7 +1336,9 @@ function processProfileData(data) {
         // OneSignalManager se encarga de no hacer login si ya está identificado.
         Promise.all([
             setupRealtime(),
-            OneSignalManager.login(data.telefono, { 
+            // FIX: Usar el UUID del usuario (appState.user.id) en lugar del teléfono para OneSignal.
+            // Esto asegura la consistencia con el schema de la base de datos.
+            OneSignalManager.login(appState.user.id, {
                 negocio_id: negocioId, 
                 role: 'cliente',
                 cliente_id: appState.user.id,

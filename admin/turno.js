@@ -325,11 +325,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await ensureSupabase();
     if (!negocioId) return;
 
+    // Obtener el usuario actual para usar su UUID en OneSignal
+    const { data: { user } } = await supabase.auth.getUser();
+
     // OneSignal Initialization
     try {
-        const adminId = `admin_${negocioId}`;
+        // FIX: Usar el UUID del usuario autenticado para OneSignal en lugar de un string arbitrario.
+        const oneSignalId = user ? user.id : `admin_${negocioId}`; // Fallback por seguridad
         await OneSignalManager.init();
-        await OneSignalManager.login(adminId, {
+        await OneSignalManager.login(oneSignalId, {
             negocio_id: negocioId,
             role: 'admin'
         });

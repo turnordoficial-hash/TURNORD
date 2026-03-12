@@ -209,6 +209,27 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
     negocio_id VARCHAR(255) NOT NULL
 );
 
+-- Asegurar que push_subscriptions tenga ON DELETE CASCADE y el tipo de dato correcto para user_id.
+-- Esto puede fallar si hay datos en user_id que no son UUIDs válidos.
+-- En ese caso, se necesitaría una limpieza manual de datos.
+
+-- FIX: Eliminar registros con user_id que no son UUIDs válidos antes de cambiar el tipo de columna.
+-- Esto es destructivo para esos registros, pero necesario para corregir la integridad del esquema.
+DELETE FROM public.push_subscriptions WHERE user_id::text !~* '^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$';
+
+ALTER TABLE public.push_subscriptions
+ALTER COLUMN user_id TYPE UUID
+USING user_id::uuid;
+
+ALTER TABLE public.push_subscriptions
+DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_fkey;
+
+ALTER TABLE public.push_subscriptions
+ADD CONSTRAINT push_subscriptions_user_id_fkey
+FOREIGN KEY (user_id)
+REFERENCES auth.users(id)
+ON DELETE CASCADE;
+
 -- Asegurar que la columna endpoint exista si la tabla ya fue creada anteriormente
 ALTER TABLE public.push_subscriptions ADD COLUMN IF NOT EXISTS endpoint TEXT;
 
@@ -370,12 +391,25 @@ CREATE TABLE IF NOT EXISTS public.barberos (
   nombre TEXT,
   usuario TEXT NOT NULL,
   password TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   avatar_url TEXT,
   activo BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ux_barberos_neg_usuario UNIQUE (negocio_id, usuario)
 );
+
+-- Migración: Añadir user_id si no existe y asegurar ON DELETE CASCADE.
+ALTER TABLE public.barberos ADD COLUMN IF NOT EXISTS user_id UUID;
+
+ALTER TABLE public.barberos
+DROP CONSTRAINT IF EXISTS barberos_user_id_fkey;
+
+ALTER TABLE public.barberos
+ADD CONSTRAINT barberos_user_id_fkey
+FOREIGN KEY (user_id)
+REFERENCES auth.users(id)
+ON DELETE CASCADE;
 
 ALTER TABLE public.barberos ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS barberos_select ON public.barberos;
@@ -435,32 +469,42 @@ CREATE TABLE IF NOT EXISTS public.roles_negocio (
 );
 
 -- FIX: Ensure ON DELETE CASCADE is correctly applied to roles_negocio.
--- This is a non-destructive and idempotent way to fix the foreign key.
-DO $$
-DECLARE
-  v_constraint_name text;
-  v_delete_rule char;
-BEGIN
-  SELECT con.conname, con.confdeltype INTO v_constraint_name, v_delete_rule
-  FROM pg_catalog.pg_constraint AS con JOIN pg_catalog.pg_class AS rel ON rel.oid = con.conrelid
-  WHERE rel.relname = 'roles_negocio' AND con.contype = 'f' AND con.confrelid = 'auth.users'::regclass LIMIT 1;
+ALTER TABLE public.roles_negocio
+DROP CONSTRAINT IF EXISTS roles_negocio_user_id_fkey_cascade;
+-- También borrar la restricción con el nombre estándar por si ya existe
+ALTER TABLE public.roles_negocio
+DROP CONSTRAINT IF EXISTS roles_negocio_user_id_fkey;
 
-  -- confdeltype: a = no action, r = restrict, c = cascade
-  IF v_constraint_name IS NOT NULL AND v_delete_rule <> 'c' THEN
-    EXECUTE 'ALTER TABLE public.roles_negocio DROP CONSTRAINT ' || quote_ident(v_constraint_name);
-    ALTER TABLE public.roles_negocio ADD CONSTRAINT roles_negocio_user_id_fkey_cascade FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-  ELSIF v_constraint_name IS NULL THEN
-    ALTER TABLE public.roles_negocio ADD CONSTRAINT roles_negocio_user_id_fkey_cascade FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-  END IF;
-END;
-$$;
+ALTER TABLE public.roles_negocio
+ADD CONSTRAINT roles_negocio_user_id_fkey
+FOREIGN KEY (user_id)
+REFERENCES auth.users(id)
+ON DELETE CASCADE;
 
 ALTER TABLE public.roles_negocio ENABLE ROW LEVEL SECURITY;
 
+-- Política de Selección: Permitir a los usuarios ver sus propios roles
 DROP POLICY IF EXISTS roles_select ON public.roles_negocio;
 CREATE POLICY roles_select
 ON public.roles_negocio
 FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- Política de Inserción: Permitir a los usuarios insertar su propio rol (necesario para el auto-link del primer login)
+DROP POLICY IF EXISTS roles_insert ON public.roles_negocio;
+CREATE POLICY roles_insert
+ON public.roles_negocio
+FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+-- Política de Actualización: Permitir a los usuarios actualizar su propio rol
+DROP POLICY IF EXISTS roles_update ON public.roles_negocio;
+CREATE POLICY roles_update
+ON public.roles_negocio
+FOR UPDATE
+TO authenticated
 USING (auth.uid() = user_id);
 
 -- ==============================================================================
@@ -488,25 +532,17 @@ CREATE TABLE IF NOT EXISTS public.clientes (
 );
 
 -- FIX: Ensure ON DELETE CASCADE is correctly applied to clientes.
--- This is a non-destructive and idempotent way to fix the foreign key.
-DO $$
-DECLARE
-  v_constraint_name text;
-  v_delete_rule char;
-BEGIN
-  SELECT con.conname, con.confdeltype INTO v_constraint_name, v_delete_rule
-  FROM pg_catalog.pg_constraint AS con JOIN pg_catalog.pg_class AS rel ON rel.oid = con.conrelid
-  WHERE rel.relname = 'clientes' AND con.contype = 'f' AND con.confrelid = 'auth.users'::regclass LIMIT 1;
+ALTER TABLE public.clientes
+DROP CONSTRAINT IF EXISTS clientes_id_fkey_cascade;
+-- También borrar la restricción con el nombre estándar por si ya existe
+ALTER TABLE public.clientes
+DROP CONSTRAINT IF EXISTS clientes_id_fkey;
 
-  -- confdeltype: a = no action, r = restrict, c = cascade
-  IF v_constraint_name IS NOT NULL AND v_delete_rule <> 'c' THEN
-    EXECUTE 'ALTER TABLE public.clientes DROP CONSTRAINT ' || quote_ident(v_constraint_name);
-    ALTER TABLE public.clientes ADD CONSTRAINT clientes_id_fkey_cascade FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
-  ELSIF v_constraint_name IS NULL THEN
-    ALTER TABLE public.clientes ADD CONSTRAINT clientes_id_fkey_cascade FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
-  END IF;
-END;
-$$;
+ALTER TABLE public.clientes
+ADD CONSTRAINT clientes_id_fkey
+FOREIGN KEY (id)
+REFERENCES auth.users(id)
+ON DELETE CASCADE;
 
 -- RLS para Clientes
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
@@ -606,6 +642,7 @@ DECLARE
   v_telefono TEXT;
   v_negocio_id TEXT;
   v_referido UUID;
+  v_barber_id BIGINT;
 BEGIN
   -- Extraer datos de metadata o usar defaults
   v_nombre := COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1));
@@ -620,9 +657,25 @@ BEGIN
     v_referido := NULL;
   END;
 
+  -- 1. Crear Perfil de Cliente
   INSERT INTO public.clientes (id, email, nombre, telefono, negocio_id, referido_por)
   VALUES (NEW.id, NEW.email, v_nombre, v_telefono, v_negocio_id, v_referido)
   ON CONFLICT (id) DO NOTHING;
+
+  -- 2. VINCULACIÓN AUTOMÁTICA DE BARBERO
+  -- Si el email existe en la tabla barberos, vinculamos el user_id de Auth.
+  UPDATE public.barberos 
+  SET user_id = NEW.id 
+  WHERE usuario = NEW.email 
+  RETURNING id INTO v_barber_id;
+
+  -- 3. ASIGNACIÓN AUTOMÁTICA DE ROL
+  -- Si se vinculó un barbero, le asignamos el rol en roles_negocio.
+  IF v_barber_id IS NOT NULL THEN
+    INSERT INTO public.roles_negocio (negocio_id, user_id, rol)
+    VALUES (v_negocio_id, NEW.id, CASE WHEN NEW.email = 'jbarber.vip@gmail.com' THEN 'admin' ELSE 'staff' END)
+    ON CONFLICT (negocio_id, user_id) DO NOTHING;
+  END IF;
 
   RETURN NEW;
 END;
