@@ -63,15 +63,20 @@ async function login(externalId, tags = {}) {
     window.OneSignalDeferred.push(async function (OneSignal) {
 
         try {
-
             const currentId = OneSignal.User.externalId;
-
             if (currentId === String(externalId)) {
-                console.log("Usuario ya conectado:", externalId);
+                console.log("OneSignal: Usuario ya conectado (login omitido)");
                 return;
             }
 
-            await OneSignal.login(String(externalId));
+            // Capturar errores de red de OneSignal que causan el 409
+            await OneSignal.login(String(externalId)).catch(e => {
+                if (e?.status === 409 || e?.message?.includes('409')) {
+                    // Ignorar silenciosamente
+                } else {
+                    throw e;
+                }
+            });
 
             console.log("Login OneSignal OK:", externalId);
 

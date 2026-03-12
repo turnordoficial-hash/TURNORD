@@ -33,6 +33,44 @@ const appState = {
   profileRefreshed: false, // Nueva propiedad para control de refresco
 };
 
+// --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS ---
+function vincularEventosCita() {
+  const btnVer = document.getElementById('btn-ver-horarios');
+  const btnConfirmar = document.getElementById('btn-confirmar-reserva');
+  
+  if (btnVer) {
+      btnVer.removeEventListener('click', cargarSlotsInteligente);
+      btnVer.addEventListener('click', cargarSlotsInteligente);
+  }
+  
+  if (btnConfirmar) {
+      btnConfirmar.removeEventListener('click', confirmarReservaManual);
+      btnConfirmar.addEventListener('click', confirmarReservaManual);
+  }
+  
+  const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
+  inputsCita.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('change', updateBtnStatus);
+      el.addEventListener('change', updateBtnStatus);
+    }
+  });
+}
+
+function updateBtnStatus() {
+  const bVal = document.getElementById('select-barbero-cita')?.value;
+  const sVal = document.getElementById('select-servicio-cita')?.value;
+  const dVal = document.getElementById('date-picker')?.value;
+  const btn = document.getElementById('btn-ver-horarios');
+  if (btn) {
+    const incompleto = !bVal || !sVal || !dVal;
+    btn.disabled = incompleto;
+    btn.classList.toggle('opacity-50', incompleto);
+    btn.classList.toggle('cursor-not-allowed', incompleto);
+  }
+}
+
 // Instancia única de Supabase para evitar mezclas
 let sbInstance = null;
 let realtimeChannel = null;
@@ -715,46 +753,6 @@ async function init() {
   updateBtnStatus();
 
   document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
-
-  // --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS ---
-  const vincularEventosCita = () => {
-    const btnVer = document.getElementById('btn-ver-horarios');
-    const btnConfirmar = document.getElementById('btn-confirmar-reserva');
-    
-    if (btnVer) {
-        btnVer.removeEventListener('click', cargarSlotsInteligente);
-        btnVer.addEventListener('click', cargarSlotsInteligente);
-    }
-    
-    if (btnConfirmar) {
-        btnConfirmar.removeEventListener('click', confirmarReservaManual);
-        btnConfirmar.addEventListener('click', confirmarReservaManual);
-    }
-    
-    const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
-    inputsCita.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.removeEventListener('change', updateBtnStatus);
-        el.addEventListener('change', updateBtnStatus);
-      }
-    });
-  };
-
-  const updateBtnStatus = () => {
-    const bVal = document.getElementById('select-barbero-cita')?.value;
-    const sVal = document.getElementById('select-servicio-cita')?.value;
-    const dVal = document.getElementById('date-picker')?.value;
-    const btn = document.getElementById('btn-ver-horarios');
-    if (btn) {
-      const incompleto = !bVal || !sVal || !dVal;
-      btn.disabled = incompleto;
-      btn.classList.toggle('opacity-50', incompleto);
-      btn.classList.toggle('cursor-not-allowed', incompleto);
-    }
-  };
-
-  vincularEventosCita();
 
   const formPerfil = document.getElementById('form-perfil');
   if (formPerfil) {
@@ -1490,14 +1488,32 @@ function confirmarAccion(titulo, mensaje, onConfirm) {
   const msgEl = document.getElementById('confirm-message');
   const btnOk = document.getElementById('btn-confirm-ok');
   const btnCancel = document.getElementById('btn-confirm-cancel');
-  if (!modal) { if (confirm(mensaje)) onConfirm(); return; }
+  
+  if (!modal) { 
+    if (confirm(mensaje)) onConfirm(); 
+    return; 
+  }
+
   titleEl.textContent = titulo;
   msgEl.textContent = mensaje;
+  
   const newOk = btnOk.cloneNode(true);
   btnOk.parentNode.replaceChild(newOk, btnOk);
-  newOk.onclick = () => { modal.classList.add('hidden'); onConfirm(); };
-  btnCancel.onclick = () => modal.classList.add('hidden');
+  
+  newOk.onclick = () => { 
+    modal.classList.add('hidden', 'opacity-0'); 
+    onConfirm(); 
+  };
+  
+  btnCancel.onclick = () => {
+    modal.classList.add('hidden', 'opacity-0');
+  };
+  
   modal.classList.remove('hidden');
+  // Pequeño timeout para permitir la animación de Tailwind
+  setTimeout(() => {
+    modal.classList.remove('opacity-0');
+  }, 10);
 }
 
 function renderBarbersList(data) {

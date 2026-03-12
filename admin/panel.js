@@ -17,16 +17,19 @@ const itemsPerPage = 10;
 function obtenerNombreCliente(obj, clientesMap = {}) {
   if (!obj) return 'Cliente';
 
-  if (obj.nombre && obj.nombre.trim() !== '') {
+  if (obj.nombre && obj.nombre.trim() !== '' && obj.nombre !== 'Cliente') {
     return obj.nombre.trim();
   }
 
-  if (obj.telefono && clientesMap[obj.telefono]) {
-    return clientesMap[obj.telefono];
+  const tel = (obj.telefono || obj.cliente_telefono || '').replace(/\D/g, '');
+  if (tel && clientesMap[tel]) {
+    return clientesMap[tel];
   }
 
-  if (obj.cliente_telefono && clientesMap[obj.cliente_telefono]) {
-    return clientesMap[obj.cliente_telefono];
+  // Intento con el original por si acaso
+  const telOriginal = obj.telefono || obj.cliente_telefono;
+  if (telOriginal && clientesMap[telOriginal]) {
+    return clientesMap[telOriginal];
   }
 
   return 'Cliente';
@@ -98,7 +101,7 @@ function actualizarTabla(items) {
           }
 
           return `
-          <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+          <tr class="${item.isCita ? 'bg-purple-50 dark:bg-purple-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'} transition-colors">
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-medium text-gray-900 dark:text-white">${item.turno}</td>
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10">${item.nombre || 'N/A'}</td>
             <td class="py-3 px-4 border-b border-gray-100 dark:border-white/10 font-mono text-xs">${item.hora || 'N/A'}</td>
@@ -117,51 +120,62 @@ async function cargarDatos() {
   try {
     const hoyLocal = ymdLocal(new Date());
     
-    // 1. Cargar Turnos
+    // 1. Cargar Turnos (Sugerencia #10: Se añade 'fecha' para el handler de realtime)
     const { data: turnosData, error: turnosError } = await supabase
       .from('turnos')
-      .select('id, turno, nombre, telefono, estado, hora, servicio, started_at, created_at') // 2. Optimización de consulta
+      .select('id, turno, nombre, telefono, estado, hora, servicio, started_at, created_at, fecha')
       .eq('negocio_id', negocioId)
       .eq('fecha', hoyLocal)
       .order('created_at', { ascending: false });
 
     if (turnosError) throw turnosError;
 
-    // 2. Cargar Citas Programadas para hoy
-    const startOfDay = new Date(hoyLocal + 'T00:00:00');
-    const endOfDay = new Date(hoyLocal + 'T23:59:59');
+  // 2. Cargar Citas Programadas para hoy
+  const startOfDay = new Date(hoyLocal + 'T00:00:00');
+  const endOfDay = new Date(hoyLocal + 'T23:59:59');
 
-    const { data: citasData, error: citasError } = await supabase
-      .from('citas')
-      .select('id, cliente_telefono, start_at, estado, barber_id, servicio')
-      .eq('negocio_id', negocioId)
-      .gte('start_at', startOfDay.toISOString())
-      .lte('start_at', endOfDay.toISOString())
-      .eq('estado', 'Programada');
+  const { data: citasData, error: citasError } = await supabase
+    .from('citas')
+    .select('id, cliente_telefono, start_at, estado, barber_id, servicio')
+    .eq('negocio_id', negocioId)
+    .gte('start_at', startOfDay.toISOString())
+    .lte('start_at', endOfDay.toISOString())
+    .not('estado', 'in', '("Cancelada")'); // Incluir todas excepto canceladas
 
-    if (citasError) throw citasError;
+  if (citasError) throw citasError;
 
-    // 3. Obtener nombres de clientes para las citas y turnos
-    let citasConNombre = [];
-    let turnosConNombre = [];
-    
-    const telefonosCitas = (citasData || []).map(c => c.cliente_telefono).filter(Boolean);
-    const telefonosTurnos = (turnosData || []).map(t => t.telefono).filter(Boolean);
-    const telefonos = [...new Set([...telefonosCitas, ...telefonosTurnos])];
-    
-    const barberIds = [...new Set((citasData || []).map(c => c.barber_id).filter(Boolean))];
-    let clientesMap = {};
-    let barberosMap = {};
-    
-    if (telefonos.length > 0) {
-        const { data: clientes } = await supabase
-            .from('clientes')
-            .select('telefono, nombre')
-            .eq('negocio_id', negocioId)
-            .in('telefono', telefonos);
-        
-        (clientes || []).forEach(c => clientesMap[c.telefono] = c.nombre);
-    }
+  // 3. Obtener nombres de clientes y barberos para las citas y turnos
+  let citasConNombre = [];
+  let turnosConNombre = [];
+  
+  const telefonosCitas = (citasData || []).map(c => c.cliente_telefono).filter(Boolean);
+  const telefonosTurnos = (turnosData || []).map(t => t.telefono).filter(Boolean);
+  const telefonos = [...new Set([...telefonosCitas, ...telefonosTurnos])];
+  
+  const barberIds = [...new Set((citasData || []).map(c => c.barber_id).filter(Boolean))];
+  let clientesMap = {};
+  let barberosMap = {};
+  
+  if (telefonos.length > 0) {
+      // Sugerencia #3: Añadir manejo de errores
+      const { data: clientes } = await supabase
+          .from('clientes')
+          .select('telefono, nombre')
+          .eq('negocio_id', negocioId)
+          .in('telefono', telefonos);
+      
+      (clientes || []).forEach(c => {
+          if (clientesError) throw clientesError;
+
+          if (c.telefono) {
+              // Normalizar teléfono para el mapa (solo dígitos)
+              const telNormalizado = c.telefono.replace(/\D/g, '');
+              clientesMap[telNormalizado] = c.nombre;
+              // También guardar el original por si acaso
+              clientesMap[c.telefono] = c.nombre;
+          }
+      });
+  }
     if (barberIds.length > 0) {
         const { data: barberos } = await supabase
             .from('barberos')
@@ -199,22 +213,14 @@ async function cargarDatos() {
         });
     }
 
-    // Procesar Turnos
-    turnosConNombre = (turnosData || []).map(t => ({
-        ...t,
-        nombre: obtenerNombreCliente(t, clientesMap)
-    }));
-
     // Combinar y ordenar por fecha de creación/inicio
     const historialCombinado = [...turnosConNombre, ...citasConNombre].sort((a, b) => {
         return new Date(b.created_at) - new Date(a.created_at);
     });
-
     historialGlobal = historialCombinado;
     actualizarContadores(turnosConNombre);
     renderPaginationHistorial();
     actualizarTurnoEnAtencion(turnosConNombre);
-
   } catch (err) {
     console.error('Error al cargar datos del panel:', err);
     handleAuthError(err);
@@ -329,11 +335,14 @@ function suscribirseTurnos() {
         console.log('🟢 Actualización de turnos en tiempo real:', payload.new.id);
         
         if (payload.eventType === 'INSERT') {
-            const nombre = payload.new.nombre || 'Cliente';
-            mostrarNotificacion(`Nuevo turno: ${payload.new.turno} - ${nombre}`, 'info');
+            // Sugerencia #7: Simplificar notificación para evitar mostrar "Cliente"
+            mostrarNotificacion(`Nuevo turno: ${payload.new.turno}`, 'info');
         }
         
-        solicitarActualizacion();
+        // Sugerencia #4: Refrescar solo en eventos relevantes
+        if (['INSERT', 'UPDATE', 'DELETE'].includes(payload.eventType)) {
+            solicitarActualizacion();
+        }
       }
     )
     .subscribe();
@@ -409,7 +418,10 @@ function actualizarTurnoEnAtencion(turnosHoy) {
         const minutos = Math.floor(restanteMs / 60000);
         const segundos = Math.floor((restanteMs % 60000) / 1000);
         timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-        if (restanteMs === 0) clearInterval(atencionInterval);
+        if (restanteMs === 0) {
+            clearInterval(atencionInterval);
+            timerEl.textContent = "Finalizado"; // Sugerencia #6
+        }
       };
 
       updateTimer();
@@ -424,23 +436,64 @@ function actualizarTurnoEnAtencion(turnosHoy) {
   }
 }
 
+// Sugerencia #8: Limpieza automática de turnos de días anteriores
+async function limpiarHistorialAntiguo() {
+    if (!negocioId) return;
+    const todayStr = ymdLocal(new Date());
+    const lastCleanupKey = `lastCleanup_${negocioId}`;
+    const lastCleanup = localStorage.getItem(lastCleanupKey);
+
+    if (lastCleanup === todayStr) return; // Ya se limpió hoy
+
+    try {
+        console.log('Ejecutando limpieza automática de turnos antiguos...');
+        const { error } = await supabase
+            .from('turnos')
+            .delete()
+            .eq('negocio_id', negocioId)
+            .lt('fecha', todayStr) // lt = less than
+            .in('estado', ['Atendido', 'Cancelado', 'No presentado']);
+
+        if (error) throw error;
+        
+        localStorage.setItem(lastCleanupKey, todayStr);
+        console.log('Limpieza automática completada.');
+    } catch (error) {
+        console.error('Error en limpieza automática:', error);
+    }
+}
+
 // Inicialización segura de la página.
 async function init() {
   setupSidebar();
   await ensureSupabase();
   
-  // 1. Seguridad: Intentar obtener negocioId desde la sesión (Backend Source of Truth)
-  // Eliminado fallback a dataset para evitar manipulación
+  // Sugerencia #5: Obtener negocioId de forma segura desde una tabla de roles
   const { data: { user } } = await supabase.auth.getUser();
-  if (user && user.user_metadata && user.user_metadata.negocio_id) {
-      negocioId = user.user_metadata.negocio_id;
-  }
-
-  if (!negocioId) {
-      console.error('No se pudo identificar el negocio.');
+  // auth-guard.js debería haber redirigido si no hay usuario, pero esto es un seguro.
+  if (!user) {
+      console.error('No hay sesión de usuario. Redirigiendo a login.');
+      window.location.replace('login.html'); // Login genérico
       return;
   }
 
+  const { data: roleData, error: roleError } = await supabase
+    .from('roles_negocio')
+    .select('negocio_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .single();
+
+  if (roleError || !roleData) {
+    console.error('Acceso no autorizado o error al obtener rol:', roleError?.message);
+    alert('No tienes permiso para acceder a este panel.');
+    await supabase.auth.signOut();
+    window.location.replace('login.html');
+    return;
+  }
+  negocioId = roleData.negocio_id;
+
+  await limpiarHistorialAntiguo();
   await cargarServicios();
   await cargarDatos();
   suscribirseTurnos();

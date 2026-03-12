@@ -1,4 +1,4 @@
-import { supabase, ensureSupabase, getNegocioId } from '../database.js?v=2';
+import { supabase, ensureSupabase } from '../database.js?v=2';
 import { RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
@@ -39,16 +39,19 @@ let basePricePago = 0;
 function obtenerNombreCliente(obj) {
     if (!obj) return 'Cliente';
 
-    if (obj.nombre && obj.nombre.trim() !== '') {
+    if (obj.nombre && obj.nombre.trim() !== '' && obj.nombre !== 'Cliente') {
         return obj.nombre.trim();
     }
 
-    if (obj.telefono && clientesMap[obj.telefono]) {
-        return clientesMap[obj.telefono];
+    const tel = (obj.telefono || obj.cliente_telefono || '').replace(/\D/g, '');
+    if (tel && clientesMap[tel]) {
+        return clientesMap[tel];
     }
 
-    if (obj.cliente_telefono && clientesMap[obj.cliente_telefono]) {
-        return clientesMap[obj.cliente_telefono];
+    // Intento con el original por si acaso
+    const telOriginal = obj.telefono || obj.cliente_telefono;
+    if (telOriginal && clientesMap[telOriginal]) {
+        return clientesMap[telOriginal];
     }
 
     return 'Cliente';
@@ -67,18 +70,7 @@ function formatearHora(fecha) {
  * @returns {string|null} El ID del negocio o null si no está presente.
  */
 
-
-
-function getNegocioId() {
-    const id = document.body.dataset.negocioId;
-    if (!id) {
-        console.error('Error crítico: Atributo data-negocio-id no encontrado en el body.');
-        alert('Error de configuración: No se pudo identificar el negocio.');
-    }
-    return id;
-}
-
-const negocioId = getNegocioId();
+const negocioId = document.body.dataset.negocioId;
 
 // CONSTANTES DE ESTADO CENTRALIZADAS
 const ESTADOS = {
@@ -1002,7 +994,11 @@ async function cargarTurnos() {
             .in('telefono', uniquePhones);
         
         (newClients || []).forEach(c => {
-            if (c.telefono) clientesMap[c.telefono] = c.nombre;
+            if (c.telefono) {
+                const telNormalizado = c.telefono.replace(/\D/g, '');
+                clientesMap[telNormalizado] = c.nombre;
+                clientesMap[c.telefono] = c.nombre;
+            }
         });
     }
 
@@ -1634,7 +1630,7 @@ function renderCitas() {
             const end = new Date(c.end_at);
             const dur = Math.max(0, Math.round((end - start) / 60000));
             const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
-            const clientName = clientesMap[c.cliente_telefono] || 'Cliente';
+            const clientName = obtenerNombreCliente(c);
             const card = document.createElement('div');
             card.className = 'bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800 transition-all cursor-pointer hover:shadow-md hover:scale-[1.02]';
             card.ondblclick = () => abrirModalAccionesCita(c.id, `Cita: ${clientName} - ${formatearHora(start)}`);
@@ -1661,7 +1657,7 @@ function renderCitas() {
             const start = new Date(c.start_at);
             const end = new Date(c.end_at);
             const bName = barberosMap[c.barber_id] || `#${c.barber_id}`;
-            const clientName = clientesMap[c.cliente_telefono] || 'Cliente';
+            const clientName = obtenerNombreCliente(c);
             const card = document.createElement('div');
             card.className = 'bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg shadow-sm border border-violet-100 dark:border-violet-800 transition-all';
             card.innerHTML = `
