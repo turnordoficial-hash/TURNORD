@@ -707,41 +707,54 @@ async function init() {
   iniciarMotorMarketing();
 
   switchTab('inicio');
-
-  document.getElementById('btn-ver-horarios')?.addEventListener('click', cargarSlotsInteligente);
   
-  // Agregar validación para habilitar/deshabilitar botón
-  const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
-  inputsCita.forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => {
-      const bVal = document.getElementById('select-barbero-cita')?.value;
-      const sVal = document.getElementById('select-servicio-cita')?.value;
-      const dVal = document.getElementById('date-picker')?.value;
-      const btn = document.getElementById('btn-ver-horarios');
-      if (btn) {
-        const incompleto = !bVal || !sVal || !dVal;
-        btn.disabled = incompleto;
-        btn.classList.toggle('opacity-50', incompleto);
-        btn.classList.toggle('cursor-not-allowed', incompleto);
-      }
-    });
-  });
+  // Re-vincular eventos cada vez que se renderiza el panel de citas
+  vincularEventosCita();
 
   // Ejecutar validación inicial para el botón al cargar la página
-  const bVal = document.getElementById('select-barbero-cita')?.value;
-  const sVal = document.getElementById('select-servicio-cita')?.value;
-  const dVal = document.getElementById('date-picker')?.value;
-  const btn = document.getElementById('btn-ver-horarios');
-  if (btn) {
-    const incompleto = !bVal || !sVal || !dVal;
-    btn.disabled = incompleto;
-    btn.classList.toggle('opacity-50', incompleto);
-    btn.classList.toggle('cursor-not-allowed', incompleto);
-  }
-
-  document.getElementById('btn-confirmar-reserva')?.addEventListener('click', confirmarReservaManual);
+  updateBtnStatus();
 
   document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
+
+  // --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS ---
+  const vincularEventosCita = () => {
+    const btnVer = document.getElementById('btn-ver-horarios');
+    const btnConfirmar = document.getElementById('btn-confirmar-reserva');
+    
+    if (btnVer) {
+        btnVer.removeEventListener('click', cargarSlotsInteligente);
+        btnVer.addEventListener('click', cargarSlotsInteligente);
+    }
+    
+    if (btnConfirmar) {
+        btnConfirmar.removeEventListener('click', confirmarReservaManual);
+        btnConfirmar.addEventListener('click', confirmarReservaManual);
+    }
+    
+    const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
+    inputsCita.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.removeEventListener('change', updateBtnStatus);
+        el.addEventListener('change', updateBtnStatus);
+      }
+    });
+  };
+
+  const updateBtnStatus = () => {
+    const bVal = document.getElementById('select-barbero-cita')?.value;
+    const sVal = document.getElementById('select-servicio-cita')?.value;
+    const dVal = document.getElementById('date-picker')?.value;
+    const btn = document.getElementById('btn-ver-horarios');
+    if (btn) {
+      const incompleto = !bVal || !sVal || !dVal;
+      btn.disabled = incompleto;
+      btn.classList.toggle('opacity-50', incompleto);
+      btn.classList.toggle('cursor-not-allowed', incompleto);
+    }
+  };
+
+  vincularEventosCita();
 
   const formPerfil = document.getElementById('form-perfil');
   if (formPerfil) {
@@ -865,7 +878,7 @@ function renderCitaPanel() {
                         </label>
                         <div class="relative group">
                             <select id="select-servicio-cita" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-[#C1121F] outline-none transition-all appearance-none cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10">
-                                <option value="">Elegir servicio...</option>
+                                <option value="" selected disabled>Elegir servicio...</option>
                             </select>
                             <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -882,7 +895,7 @@ function renderCitaPanel() {
                             </label>
                             <div class="relative group">
                                 <select id="select-barbero-cita" class="w-full p-4 pl-5 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-[#C1121F] outline-none transition-all appearance-none cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10">
-                                    <option value="">Cargando...</option>
+                                    <option value="" selected disabled>Selecciona un barbero...</option>
                                 </select>
                                 <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -951,6 +964,11 @@ function renderCitaPanel() {
                 </div>
             </div>
         `;
+    
+    // IMPORTANTE: Re-vincular eventos después de inyectar el HTML
+    if (typeof vincularEventosCita === 'function') {
+        vincularEventosCita();
+    }
   }
 }
 
@@ -1091,7 +1109,11 @@ function registrarServiceWorker() {
   const swPath = location.pathname.replace(/[^/]*$/, '') + 'sw.js';
   navigator.serviceWorker.register(swPath)
     .then(() => {})
-    .catch(err => console.warn('SW no registrado:', err.message || err));
+    .catch(err => {
+      // Silenciar advertencias de OneSignal que no afectan la funcionalidad
+      if (err.message?.includes('message')) return;
+      console.warn('SW no registrado:', err.message || err);
+    });
 }
 
 function renderProfile(data) {
@@ -1753,6 +1775,12 @@ Actualizar
 
   container.innerHTML = '';
   container.className = "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3";
+  
+  // Limpiar estado previo de selección
+  document.getElementById('action-container')?.classList.add('hidden');
+  document.getElementById('btn-reset-slots')?.remove();
+  appState.selectedTimeSlot = null;
+
   slots.forEach(slot => {
     const btn = document.createElement('button');
     btn.className = 'slot-btn p-3 border dark:border-white/10 rounded-xl font-bold hover:border-[#C1121F] dark:text-white transition-all text-sm';
@@ -1764,8 +1792,33 @@ Actualizar
 
 async function seleccionarHora(slot, btn) {
   appState.selectedTimeSlot = slot;
-  document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('bg-[#C1121F]', 'text-white'));
-  btn.classList.add('bg-[#C1121F]', 'text-white');
+  
+  // 1. Ocultar todos los slots excepto el seleccionado
+  const allSlots = document.querySelectorAll('.slot-btn');
+  allSlots.forEach(b => {
+    if (b === btn) {
+      b.classList.add('bg-[#C1121F]', 'text-white', 'ring-4', 'ring-[#C1121F]/20');
+      b.classList.remove('hover:border-[#C1121F]');
+    } else {
+      b.classList.add('hidden'); // Ocultar los demás
+    }
+  });
+
+  // 2. Mostrar botón de "Cambiar hora" por si se equivoca
+  let resetBtn = document.getElementById('btn-reset-slots');
+  if (!resetBtn) {
+    resetBtn = document.createElement('button');
+    resetBtn.id = 'btn-reset-slots';
+    resetBtn.className = 'col-span-full mt-2 text-xs font-bold text-[#C1121F] uppercase tracking-widest hover:underline';
+    resetBtn.textContent = '✕ Cambiar horario';
+    resetBtn.onclick = () => {
+      allSlots.forEach(b => b.classList.remove('hidden', 'bg-[#C1121F]', 'text-white', 'ring-4', 'ring-[#C1121F]/20'));
+      resetBtn.remove();
+      document.getElementById('action-container')?.classList.add('hidden');
+      appState.selectedTimeSlot = null;
+    };
+    btn.parentNode.appendChild(resetBtn);
+  }
   
   // Actualizar Resumen de Reserva
   const servicioId = document.getElementById('select-servicio-cita')?.value;
@@ -1780,7 +1833,14 @@ async function seleccionarHora(slot, btn) {
     summaryPrice.textContent = `RD$ ${Number(serv.precio).toLocaleString()}`;
   }
 
-  document.getElementById('action-container')?.classList.remove('hidden');
+  const actionContainer = document.getElementById('action-container');
+  if (actionContainer) {
+    actionContainer.classList.remove('hidden');
+    // 3. Scroll suave hacia el contenedor de acción (confirmación)
+    setTimeout(() => {
+      actionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
 }
 
 async function confirmarReservaManual() {
@@ -1792,8 +1852,13 @@ async function confirmarReservaManual() {
 
   const serv = (appState.services || []).find(s => String(s.id) === String(servicioId));
 
-  if (!date || !barberId || !serv) { 
-    showToast('Faltan datos', 'error'); 
+  if (!date) {
+    showToast('Por favor selecciona un horario', 'error');
+    return;
+  }
+
+  if (!barberId || !serv) { 
+    showToast('Faltan datos de la reserva', 'error'); 
     return; 
   }
 

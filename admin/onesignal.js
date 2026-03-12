@@ -1,15 +1,35 @@
 const ONESIGNAL_APP_ID = '85f98db3-968a-4580-bb02-8821411a6bee';
 
 let initialized = false;
+let initError = false;
 
 async function init() {
     if (initialized) return;
+    
+    // Si ya hubo un error de dominio, no intentar más
+    if (initError) return;
+
+    // Validación de dominio para evitar errores en localhost o dominios no autorizados
+    const allowedDomain = 'jbarber.vip';
+    const currentDomain = window.location.hostname;
+    
+    if (currentDomain !== allowedDomain && !currentDomain.includes('localhost') && !currentDomain.includes('127.0.0.1')) {
+        console.warn(`OneSignal: El dominio ${currentDomain} no coincide con ${allowedDomain}. SDK omitido.`);
+        initError = true;
+        return;
+    }
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
     return new Promise((resolve) => {
         window.OneSignalDeferred.push(async function (OneSignal) {
             try {
+                // Verificar si ya está inicializado por el SDK mismo
+                if (OneSignal.initialized) {
+                    initialized = true;
+                    resolve();
+                    return;
+                }
 
                 await OneSignal.init({
                     appId: ONESIGNAL_APP_ID,
@@ -18,11 +38,15 @@ async function init() {
                 });
 
                 initialized = true;
-
                 console.log("OneSignal inicializado");
 
             } catch (error) {
-                console.error("Error iniciando OneSignal:", error);
+                if (error.message?.includes('already initialized')) {
+                    initialized = true;
+                } else {
+                    console.error("Error iniciando OneSignal:", error);
+                    initError = true;
+                }
             }
 
             resolve();
@@ -31,10 +55,10 @@ async function init() {
 }
 
 async function login(externalId, tags = {}) {
-
     if (!externalId) return;
 
     await init();
+    if (!initialized) return;
 
     window.OneSignalDeferred.push(async function (OneSignal) {
 
@@ -56,8 +80,8 @@ async function login(externalId, tags = {}) {
             }
 
             // --- REGISTRO EN SUPABASE ---
-            const pushId = OneSignal.User.pushSubscriptionId;
-            if (pushId && tags.cliente_id) {
+            // Usamos externalId (teléfono) como fuente de verdad para el registro
+            if (externalId && tags.cliente_id) {
                 const { ensureSupabase } = await import('../database.js?v=2');
                 const sb = await ensureSupabase();
                 
@@ -66,29 +90,35 @@ async function login(externalId, tags = {}) {
                 const deviceType = isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Web');
                 const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
+                // Intentar obtener el ID de suscripción actual si existe
+                const pushId = OneSignal.User.pushSubscriptionId;
+
                 // Actualizar según el rol (cliente o barbero)
                 if (tags.role === 'cliente') {
-                    await sb.from('clientes').update({ 
-                        onesignal_player_id: pushId,
+                    const updateData = { 
                         device_type: deviceType,
                         pwa_installed: isPWA
-                    }).eq('id', tags.cliente_id);
+                    };
+                    if (pushId) updateData.onesignal_player_id = pushId;
+
+                    await sb.from('clientes').update(updateData).eq('id', tags.cliente_id);
                 } else if (tags.role === 'barbero' && tags.barber_id) {
-                    await sb.from('barberos').update({ 
-                        onesignal_player_id: pushId 
-                    }).eq('id', tags.barber_id);
+                    if (pushId) {
+                        await sb.from('barberos').update({ 
+                            onesignal_player_id: pushId 
+                        }).eq('id', tags.barber_id);
+                    }
                 }
-                console.log("OneSignal: Registro en Supabase OK");
+                console.log("OneSignal: Sincronización con Supabase finalizada");
             }
 
         } catch (err) {
-
-            if (err?.status === 409) {
-                console.warn("OneSignal conflicto de identidad (no crítico)");
-            } else {
-                console.error("Error login OneSignal:", err);
+            // Silenciar el error 409 Conflict - OneSignal ya está manejando la identidad
+            if (err?.status === 409 || (err?.message && err.message.includes('409'))) {
+                console.log("OneSignal: Identidad ya vinculada (Conflict 409 ignorado)");
+                return;
             }
-
+            console.error("Error en operación OneSignal:", err);
         }
 
     });
