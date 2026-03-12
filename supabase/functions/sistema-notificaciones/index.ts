@@ -18,11 +18,11 @@ type Cita = {
   cliente_telefono?: string;
   barber_id?: number;
   start_at: string;
-  recordatorio_1h?: boolean;
-  recordatorio_15m?: boolean;
-  recordatorio_barbero_10m?: boolean;
+  reminder_24h_sent?: boolean;
+  reminder_2h_sent?: boolean;
+  reminder_30m_sent?: boolean;
   notificado_barbero?: boolean;
-  negocio_id: string; // Añadido para consistencia
+  negocio_id: string;
   clientes?: { nombre: string };
 };
 
@@ -184,25 +184,24 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
   }
 }
 
-// ✅ Función de citas completamente refactorizada
+// ✅ Función de citas completamente refactorizada para Recordatorios Booksy (24h, 2h, 30m)
 async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: string) {
   const ahora = new Date();
-  // Rango de tiempo más preciso: desde ahora hasta 61 minutos en el futuro
-  const unaHoraDespues = new Date(ahora.getTime() + 61 * 60 * 1000);
+  // Rango de tiempo para cubrir desde 30 min hasta 25 horas en el futuro
+  const maxFuturo = new Date(ahora.getTime() + 25 * 60 * 60 * 1000);
 
-  // ✅ 5. Filtro optimizado en consulta con JOIN a clientes
+  // Filtro optimizado: citas futuras que aún no han pasado
   const { data: citas, error: citasError } = await supabase
     .from("citas")
     .select<"*", Cita>("*, clientes(nombre)")
     .eq("negocio_id", negocioId)
     .in("estado", ["Programada", "Confirmada"])
     .gte("start_at", ahora.toISOString())
-    .lte("start_at", unaHoraDespues.toISOString());
+    .lte("start_at", maxFuturo.toISOString());
 
-  // ✅ 3. Validación de errores Supabase
   if (citasError) {
     console.error(`[${negocioId}] Error fetching appointment reminders:`, citasError);
-    // No retornamos aquí para permitir que se verifiquen las citas nuevas
+    return;
   }
 
   if (citas && citas.length > 0) {
@@ -212,36 +211,43 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
       const startTs = new Date(cita.start_at).getTime();
       const diffMin = Math.floor((startTs - ahoraTs) / 60000);
       const nombreCliente = cita.clientes?.nombre || "Cliente";
+      const horaStr = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      if (diffMin <= 60 && diffMin > 15 && !cita.recordatorio_1h && cita.cliente_telefono) {
-        const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Tu cita es en 1 hora 📅", `Hola ${nombreCliente}, te esperamos en JBarber.`);
+      // 1. Recordatorio 24 horas antes (entre 23h y 25h de antelación)
+      if (diffMin <= 1500 && diffMin > 1380 && !cita.reminder_24h_sent && cita.cliente_telefono) {
+        const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Cita mañana 💈", `Hola ${nombreCliente}, te recordamos tu cita de mañana a las ${horaStr}.`);
         if (ok) {
-          supabase.from("citas").update({ recordatorio_1h: true }).eq("id", cita.id).then();
-          // También enviar email de recordatorio
+          supabase.from("citas").update({ reminder_24h_sent: true }).eq("id", cita.id).then();
+        }
+      } 
+      
+      // 2. Recordatorio 2 horas antes (entre 105 min y 135 min de antelación)
+      else if (diffMin <= 135 && diffMin > 105 && !cita.reminder_2h_sent && cita.cliente_telefono) {
+        const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Tu cita es en 2 horas ⏰", `Hola ${nombreCliente}, prepárate para tu cita a las ${horaStr}.`);
+        if (ok) {
+          supabase.from("citas").update({ reminder_2h_sent: true }).eq("id", cita.id).then();
+          // Email de recordatorio
           const { data: cliente } = await supabase.from('clientes').select('email').eq('telefono', cita.cliente_telefono).maybeSingle();
           if (cliente?.email) {
-            await enviarEmail(cliente.email, "⏰ Recordatorio: Cita en 1 hora", "cita_recordatorio", {
+            await enviarEmail(cliente.email, "⏰ Recordatorio: Cita en 2 horas", "cita_recordatorio", {
               nombre_cliente: nombreCliente,
-              barbero: "Tu Barbero", // Podríamos traer el nombre real con un join
-              hora_cita: new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              tiempo_restante: "1 hora"
+              barbero: "Tu Barbero",
+              hora_cita: horaStr,
+              tiempo_restante: "2 horas"
             });
           }
         }
-      } else if (diffMin <= 15 && diffMin > 0 && !cita.recordatorio_15m && cita.cliente_telefono) {
-        const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Tu cita es en 15 minutos 🔔", `Ya casi es tu momento, ${nombreCliente}.`);
-        if (ok) supabase.from("citas").update({ recordatorio_15m: true }).eq("id", cita.id).then();
       }
-      
-      if (diffMin <= 10 && diffMin > 0 && !cita.recordatorio_barbero_10m && cita.barber_id) {
-        const hora = new Date(cita.start_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        const { ok } = await enviarPush(supabase, negocioId, String(`barber_${cita.barber_id}`), "Cita en 10 minutos 🔔", `Tienes una cita con ${nombreCliente} a las ${hora}.`);
-        if (ok) supabase.from("citas").update({ recordatorio_barbero_10m: true }).eq("id", cita.id).then();
+
+      // 3. Recordatorio 30 minutos antes (entre 15 min y 45 min de antelación)
+      else if (diffMin <= 45 && diffMin > 15 && !cita.reminder_30m_sent && cita.cliente_telefono) {
+        const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Cita en 30 minutos 🔔", `¡Ya casi es tu momento, ${nombreCliente}! Te esperamos.`);
+        if (ok) {
+          supabase.from("citas").update({ reminder_30m_sent: true }).eq("id", cita.id).then();
+        }
       }
     }));
   }
-
-  // Se elimina el envío de nuevas citas por cron para operar solo por eventos INSERT
 }
 
 // Cache simple en memoria para configuraciones (Edge Cache)

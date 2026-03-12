@@ -24,97 +24,14 @@
       document.documentElement.classList.remove('dark');
     }
   </script>
-  <!-- Verificación de Sesión -->
-  <script type="module">
-    import { ensureSupabase, getNegocioId } from './database.js?v=2';
-    async function verificarSesion() {
-      const supabase = await ensureSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = 'login_cliente.html';
-        return null; // No user, stop here
-      }
-      supabase.auth.onAuthStateChange((event, session) => {
-        if (!session) {
-          window.location.href = "login_cliente.html";
-        }
-      });
-      return session.user;
-    }
-
-    async function ensureProfileExists(user, retries = 3) {
-      if (!user) return;
-
-      const supabase = await ensureSupabase();
-      const negocioId = getNegocioId();
-
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-          // 1. Verificar si el perfil existe usando maybeSingle
-          const { data: profile, error: selectError } = await supabase
-            .from('clientes')
-            .select('id, email, negocio_id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (selectError) throw selectError;
-
-          if (profile) {
-            console.log('Perfil verificado:', profile.id);
-            if (profile.negocio_id !== negocioId) {
-              console.warn('Actualizando negocio_id del perfil...');
-              await supabase.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
-            }
-            return; // Éxito, salir de la función
-          }
-
-          // 2. Si no existe, intentamos crearlo con INSERT simple
-          console.warn(`Perfil para usuario ${user.id} no encontrado. Creando...`);
-          
-          const newProfile = {
-            id: user.id,
-            email: user.email,
-            nombre: user.user_metadata?.nombre || 'Cliente',
-            telefono: user.user_metadata?.telefono || '',
-            negocio_id: negocioId,
-            updated_at: new Date().toISOString()
-          };
-
-          const { error: insertError } = await supabase
-            .from('clientes')
-            .insert([newProfile]);
-
-          if (insertError) {
-            // Si es error de RLS, no tiene sentido reintentar
-            if (insertError.code === '42501') {
-              console.error('RLS BLOCK: Verifica permisos.');
-              return;
-            }
-            throw insertError;
-          } else {
-            console.log('Perfil creado/actualizado con éxito.');
-            return; // Éxito
-          }
-        } catch (err) {
-          console.error(`Intento ${attempt} fallido en ensureProfileExists:`, err);
-          if (attempt < retries) {
-            // Backoff exponencial: 1s, 2s, 4s...
-            const delay = 1000 * Math.pow(2, attempt - 1);
-            await new Promise(r => setTimeout(r, delay));
-          }
-        }
-      }
-      console.error('No se pudo verificar/crear el perfil después de varios intentos.');
-    }
-
-    verificarSesion().then(ensureProfileExists);
-  </script>
+  <!-- Verificación de Sesión consolidada en panel-cliente.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="admin/tailwind-config.js"></script>
   <!-- Fuentes: Outfit + Playfair (toque elegante) -->
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="admin/pwa-manager.js"></script>
   
   <style>
     /* Fondo premium barber */

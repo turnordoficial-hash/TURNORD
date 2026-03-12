@@ -679,24 +679,21 @@ CREATE POLICY "Admin view history" ON public.historial_uso_promociones FOR SELEC
 -- 12) Automatización de Correos (Recordatorios y Marketing)
 -- ==============================================================================
 
+-- Estandarización de columnas de recordatorios para citas (Nivel Booksy)
 ALTER TABLE public.citas
-  ADD COLUMN IF NOT EXISTS reminder_1h_sent BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS reminder_30m_sent BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS reminder_15m_sent BOOLEAN DEFAULT FALSE;
+  ADD COLUMN IF NOT EXISTS reminder_24h_sent BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reminder_2h_sent BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reminder_30m_sent BOOLEAN DEFAULT FALSE;
+
+-- Eliminar columnas antiguas si existen para evitar confusión
+ALTER TABLE public.citas
+  DROP COLUMN IF EXISTS recordatorio_1h,
+  DROP COLUMN IF EXISTS recordatorio_15m,
+  DROP COLUMN IF EXISTS recordatorio_barbero_10m;
+
 ALTER TABLE public.citas
   ADD COLUMN IF NOT EXISTS notificado_barbero BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.citas
-  ADD COLUMN IF NOT EXISTS recordatorio_barbero_10m BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.citas
-  DROP COLUMN IF EXISTS reminder_30m_sent;
-ALTER TABLE public.citas
-  DROP COLUMN IF EXISTS reminder_1h_sent;
-ALTER TABLE public.citas
-  DROP COLUMN IF EXISTS reminder_15m_sent;
-ALTER TABLE public.citas
-  ADD COLUMN IF NOT EXISTS recordatorio_1h BOOLEAN DEFAULT FALSE;
-ALTER TABLE public.citas
-  ADD COLUMN IF NOT EXISTS recordatorio_15m BOOLEAN DEFAULT FALSE;
+
 ALTER TABLE public.turnos
   ADD COLUMN IF NOT EXISTS notificado_cerca BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS notificado_siguiente BOOLEAN DEFAULT FALSE,
@@ -1373,5 +1370,30 @@ CREATE POLICY "Usuarios suben sus propios avatares" ON storage.objects
 DROP POLICY IF EXISTS "Usuarios actualizan sus propios avatares" ON storage.objects;
 CREATE POLICY "Usuarios actualizan sus propios avatares" ON storage.objects
   FOR UPDATE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+
+-- ==============================================================================
+-- 12) Extensiones para PWA y OneSignal
+-- ==============================================================================
+-- Agregar columnas necesarias a la tabla de clientes si no existen
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='onesignal_player_id') THEN
+        ALTER TABLE public.clientes ADD COLUMN onesignal_player_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='device_type') THEN
+        ALTER TABLE public.clientes ADD COLUMN device_type TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='pwa_installed') THEN
+        ALTER TABLE public.clientes ADD COLUMN pwa_installed BOOLEAN DEFAULT false;
+    END IF;
+END $$;
+
+-- También para barberos (panel admin)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='barberos' AND column_name='onesignal_player_id') THEN
+        ALTER TABLE public.barberos ADD COLUMN onesignal_player_id TEXT;
+    END IF;
+END $$;
 
 COMMIT;

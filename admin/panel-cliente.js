@@ -30,6 +30,7 @@ const appState = {
   abortController: null, // Para cancelar peticiones de slots
   isBooking: false, // Protección anti-doble click
   profileLoaded: false, // Control de carga inicial
+  profileRefreshed: false, // Nueva propiedad para control de refresco
 };
 
 // Instancia única de Supabase para evitar mezclas
@@ -599,22 +600,96 @@ function setupPosterTilt() {
   });
 }
 
+/**
+ * Asegura que el perfil del cliente exista en la base de datos.
+ * @param {object} user Objeto de usuario de Supabase Auth
+ * @returns {Promise<object|null>} Perfil del cliente
+ */
+async function ensureProfileExists(user, retries = 3) {
+  if (!user) return null;
+  const sb = await getSupabase();
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // 1. Verificar si el perfil existe
+      const { data: profile, error: selectError } = await sb
+        .from('clientes')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+
+      if (profile) {
+        // Si el negocio_id no coincide, lo actualizamos silenciosamente
+        if (profile.negocio_id !== negocioId) {
+          await sb.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
+          profile.negocio_id = negocioId;
+        }
+        return profile;
+      }
+
+      // 2. Si no existe, crearlo
+      console.warn(`Creando perfil inicial para ${user.id}...`);
+      const newProfile = {
+        id: user.id,
+        email: user.email,
+        nombre: user.user_metadata?.nombre || 'Cliente',
+        telefono: user.user_metadata?.telefono || '',
+        negocio_id: negocioId,
+        puntos_actuales: 0,
+        puntos_totales_historicos: 0
+      };
+
+      const { data: created, error: insertError } = await sb
+        .from('clientes')
+        .insert([newProfile])
+        .select()
+        .maybeSingle();
+
+      if (insertError) throw insertError;
+      return created || newProfile;
+
+    } catch (err) {
+      console.error(`Intento ${attempt} fallido en ensureProfileExists:`, err);
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      }
+    }
+  }
+  return null;
+}
+
 async function init() {
     const sb = await getSupabase();
-    const { data: { user }, error: sessionError } = await sb.auth.getUser();
-    if (sessionError || !user) {
+    
+    // 1. Verificación de sesión ÚNICA (Previene colisiones de lock)
+    const { data: { user }, error: authError } = await sb.auth.getUser();
+    
+    if (authError || !user) {
+        console.warn('Sesión no encontrada o error de auth:', authError);
         window.location.href = 'login_cliente.html';
         return;
     }
+    
     appState.user = user;
 
+    // 2. Asegurar perfil antes de continuar (Critical Path)
+    const profile = await ensureProfileExists(user);
+    if (profile) {
+        appState.profile = profile;
+        appState.profileLoaded = true;
+    }
+
+    // 3. Renderizado y UI base
     renderStructure();
     setupStaticEventHandlers();
     setupThemeToggle();
     
+    // 4. Carga paralela de datos de negocio
     await Promise.allSettled([
         cargarConfigNegocio(),
-        cargarPerfil(),
+        cargarPerfil(), // Esta función ahora usará el perfil ya cargado o lo refrescará
         cargarServicios(),
         cargarBarberos()
     ]);
@@ -1211,13 +1286,20 @@ async function cargarPerfil() {
         .eq('id', userId)
         .maybeSingle();
 
+    // 1. ✅ Prioridad: Si ya tenemos perfil cargado en init, lo usamos para el renderizado inicial rápido
+    if (appState.profile && !appState.profileRefreshed) {
+        processProfileData(appState.profile);
+        appState.profileRefreshed = true;
+    }
+
+    // 2. ✅ Refresco inteligente con caché
     let { data } = await GlobalCache.smartQuery(cacheKey, fetcher, 15);
 
     if (data) {
       processProfileData(data);
     } else {
-      console.warn('Perfil no encontrado. Es posible que se esté creando...');
-      // Reintento simple si no hay datos (posible creación en proceso)
+      console.warn('Perfil no encontrado en refresco. Es posible que se esté creando...');
+      // Reintento simple
       setTimeout(async () => {
         const retry = await fetcher();
         if (retry.data) {
@@ -1775,9 +1857,9 @@ async function confirmarReservaManual() {
       const dateStr = date.toISOString().split('T')[0];
       const cacheKey = `slots_${dateStr}_${barberId}_s${servicioId}`;
       GlobalCache.remove(cacheKey);
-      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      await sendPushNotification('Cita Confirmada', `Tu cita para las ${timeStr} ha sido agendada.`);
-      await enviarCorreoConfirmacion(date.toISOString(), serv.nombre, barberId);
+
+      // Notificaciones: Ahora las maneja el backend (Edge Functions + Triggers)
+      // para mayor confiabilidad y evitar duplicados.
 
       navigator.vibrate?.(50);
       

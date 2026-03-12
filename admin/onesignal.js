@@ -55,6 +55,32 @@ async function login(externalId, tags = {}) {
                 await OneSignal.User.addTags(tags);
             }
 
+            // --- REGISTRO EN SUPABASE ---
+            const pushId = OneSignal.User.pushSubscriptionId;
+            if (pushId && tags.cliente_id) {
+                const { ensureSupabase } = await import('../database.js?v=2');
+                const sb = await ensureSupabase();
+                
+                const isAndroid = /Android/i.test(navigator.userAgent);
+                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                const deviceType = isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Web');
+                const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+                // Actualizar según el rol (cliente o barbero)
+                if (tags.role === 'cliente') {
+                    await sb.from('clientes').update({ 
+                        onesignal_player_id: pushId,
+                        device_type: deviceType,
+                        pwa_installed: isPWA
+                    }).eq('id', tags.cliente_id);
+                } else if (tags.role === 'barbero' && tags.barber_id) {
+                    await sb.from('barberos').update({ 
+                        onesignal_player_id: pushId 
+                    }).eq('id', tags.barber_id);
+                }
+                console.log("OneSignal: Registro en Supabase OK");
+            }
+
         } catch (err) {
 
             if (err?.status === 409) {
