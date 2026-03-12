@@ -35,6 +35,7 @@ const appState = {
 // Instancia única de Supabase para evitar mezclas
 let sbInstance = null;
 let realtimeChannel = null;
+let configCache = null; // Declaración de la variable de caché para la configuración
 async function getSupabase() {
   if (!sbInstance) {
     await ensureSupabase();
@@ -1473,14 +1474,48 @@ async function fetchDayData(negocioId, barberId, dateStr, signal) {
 }
 
 function calculateAvailableSlots(baseDay, config, citas, weeklyBreaks, durationMin = 30) {
-  const dayName = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][baseDay.getDay()];
-  if (!config.dias_operacion.includes(dayName)) return [];
+  const diasSemana = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]; // en minúsculas para normalizar
+  const dayName = diasSemana[baseDay.getDay()];
+
+  // 1. ✅ Corrección: Manejo robusto de 'dias_operacion' (puede ser string o array)
+  let diasOperacion = config.dias_operacion || [];
+  if (typeof diasOperacion === 'string') {
+    try {
+      // Intenta convertir el string (ej. "[\"Lunes\"]") a un array real.
+      diasOperacion = JSON.parse(diasOperacion);
+    } catch (e) {
+      console.error("No se pudo parsear 'dias_operacion':", diasOperacion, e);
+      diasOperacion = []; // Fallback a un array vacío si el parseo falla.
+    }
+  }
+  
+  const diasOperacionNormalizados = (Array.isArray(diasOperacion) ? diasOperacion : []).map(d => String(d).toLowerCase());
+
+  console.log('DEBUG: calculateAvailableSlots', {
+    dayName,
+    diasOperacion: config.dias_operacion,
+    diasOperacionNormalizados,
+    hora_apertura: config.hora_apertura,
+    hora_cierre: config.hora_cierre,
+    citasCount: citas.length,
+  });
+
+  if (!diasOperacionNormalizados.includes(dayName)) {
+    console.log(`Día ${dayName} no está en los días de operación.`);
+    return [];
+  }
 
   const [hOpen, mOpen] = (config.hora_apertura || '09:00').split(':').map(Number);
   const [hClose, mClose] = (config.hora_cierre || '18:00').split(':').map(Number);
 
   const start = new Date(baseDay); start.setHours(hOpen, mOpen, 0, 0);
   const end = new Date(baseDay); end.setHours(hClose, mClose, 0, 0);
+
+  // 2. ✅ Corrección: Manejo de horario nocturno (ej. abre 18:00, cierra 03:00)
+  if (end.getTime() <= start.getTime()) {
+    console.log("Horario nocturno detectado. Ajustando fecha de cierre al día siguiente.");
+    end.setDate(end.getDate() + 1);
+  }
   
   const now = new Date();
   const slots = [];

@@ -76,9 +76,16 @@ async function cargarBarberos() {
 function renderBarberos(items) {
   const tbody = document.getElementById('barberos-lista');
   if (!tbody) return;
-  tbody.innerHTML = items.map(b => `
+  tbody.innerHTML = items.map(b => {
+    // Sanitización y fallback de avatar para evitar errores de blob o bucket no encontrado
+    let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(b.nombre || b.usuario)}&background=C1121F&color=fff`;
+    if (b.avatar_url && b.avatar_url.startsWith('http')) {
+      avatarUrl = b.avatar_url;
+    }
+
+    return `
     <tr>
-      <td class="border-b p-2"><img src="${b.avatar_url || ''}" class="w-10 h-10 rounded-full object-cover bg-gray-200"></td>
+      <td class="border-b p-2"><img src="${avatarUrl}" class="w-10 h-10 rounded-full object-cover bg-gray-200" onerror="this.src='https://ui-avatars.com/api/?name=U&background=ccc&color=333'"></td>
       <td class="border-b p-2">${b.nombre || ''}</td>
       <td class="border-b p-2">${b.usuario}</td>
       <td class="border-b p-2">${b.activo ? 'Activo' : 'Inactivo'}</td>
@@ -87,7 +94,7 @@ function renderBarberos(items) {
         <button data-id="${b.id}" class="px-3 py-1 rounded bg-red-600 text-white" data-action="delete">Eliminar</button>
       </td>
     </tr>
-  `).join('');
+  `;}).join('');
   tbody.querySelectorAll('button').forEach(btn => {
     const id = Number(btn.dataset.id);
     const action = btn.dataset.action;
@@ -111,7 +118,15 @@ async function editarBarbero(id) {
   document.getElementById('barber-usuario').value = data.usuario || '';
   document.getElementById('barber-password').value = data.password || '';
   document.getElementById('barber-activo').checked = !!data.activo;
-  document.getElementById('barber-avatar-preview').src = data.avatar_url || '';
+  
+  const preview = document.getElementById('barber-avatar-preview');
+  if (preview) {
+    let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.nombre || data.usuario)}&background=C1121F&color=fff`;
+    if (data.avatar_url && data.avatar_url.startsWith('http')) {
+      avatarUrl = data.avatar_url;
+    }
+    preview.src = avatarUrl;
+  }
 }
 
 async function eliminarBarbero(id) {
@@ -158,9 +173,12 @@ async function subirAvatar(usuario) {
     return pub?.publicUrl || null;
 
   } catch (error) {
-    // No usar fallback a DataURL, ya que causa problemas de almacenamiento y carga.
     console.error('Error subiendo avatar:', error);
-    alert(`Error al subir el avatar: ${error.message}`);
+    if (error.message.includes('Bucket not found')) {
+        alert('Error: El bucket "avatars" no existe en Supabase. Por favor, créalo en el panel de Storage de Supabase.');
+    } else {
+        alert(`Error al subir el avatar: ${error.message}`);
+    }
     return null;
   }
 }

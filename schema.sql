@@ -949,6 +949,7 @@ ON public.turnos (negocio_id, fecha, estado, orden);
 
 -- Para citas
 CREATE INDEX IF NOT EXISTS idx_citas_negocio_fecha ON public.citas(negocio_id, start_at);
+CREATE INDEX IF NOT EXISTS idx_citas_barber_fecha ON public.citas(barber_id, start_at);
 
 -- ==============================================================================
 -- 13) Función RPC: Procesar Cita a Turno (Transaccional)
@@ -1348,5 +1349,29 @@ WITH CHECK (auth.uid() = id);
 -- Otorgar permisos específicos a roles de Supabase (por si acaso)
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.clientes TO authenticated;
 GRANT SELECT, INSERT ON public.clientes TO anon;
+
+-- ==============================================================================
+-- 11) Configuración de Storage (Buckets)
+-- ==============================================================================
+-- Crear bucket 'avatars' si no existe y configurar acceso público
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Políticas de Storage para el bucket 'avatars'
+-- Permitir que cualquiera vea los avatares
+DROP POLICY IF EXISTS "Avatares públicos" ON storage.objects;
+CREATE POLICY "Avatares públicos" ON storage.objects
+  FOR SELECT USING (bucket_id = 'avatars');
+
+-- Permitir que usuarios autenticados suban sus propios avatares
+DROP POLICY IF EXISTS "Usuarios suben sus propios avatares" ON storage.objects;
+CREATE POLICY "Usuarios suben sus propios avatares" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+
+-- Permitir que usuarios actualicen sus propios objetos
+DROP POLICY IF EXISTS "Usuarios actualizan sus propios avatares" ON storage.objects;
+CREATE POLICY "Usuarios actualizan sus propios avatares" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'avatars' AND auth.role() = 'authenticated');
 
 COMMIT;
