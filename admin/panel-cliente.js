@@ -746,6 +746,15 @@ async function init() {
   await setupRealtime();
   iniciarMotorMarketing();
 
+  // Forzar solicitud de permiso de notificaciones al inicio
+  setTimeout(async () => {
+    try {
+      await solicitarPermisoNotificacion();
+    } catch (e) {
+      console.warn('Error al solicitar permiso inicial:', e);
+    }
+  }, 2000);
+
   switchTab('inicio');
   
   // Re-vincular eventos cada vez que se renderiza el panel de citas
@@ -1942,6 +1951,17 @@ async function confirmarReservaManual() {
       if (error) throw error;
       
       showToast('Cita agendada correctamente');
+      
+      // Notificaciones y Correos (Frontend fallback + Backend)
+      try {
+        await Promise.all([
+          enviarCorreoConfirmacion(date.toISOString(), serv.nombre, barberId),
+          solicitarPermisoNotificacion() // Re-intentar permiso después de una acción positiva
+        ]);
+      } catch (notiErr) {
+        console.warn('Error en notificaciones post-cita:', notiErr);
+      }
+
       // Reset booking flag on success
       appState.isBooking = false;
 

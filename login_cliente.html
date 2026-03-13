@@ -456,29 +456,6 @@
       }
     });
 
-    const readyOverlay = document.getElementById('readyOverlay');
-    if (readyOverlay) {
-      readyOverlay.classList.remove('hidden');
-      readyOverlay.classList.add('flex');
-      setTimeout(() => {
-        readyOverlay.classList.add('hidden');
-        readyOverlay.classList.remove('flex');
-      }, 2500);
-    }
   </script>
-  <div id="readyOverlay" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm items-center justify-center p-6">
-    <div class="w-full max-w-sm bg-white/10 border border-white/20 rounded-2xl p-8 text-center shadow-2xl">
-      <img src="jbarber/jjj.png" alt="JBarber" class="w-16 h-16 rounded-lg mx-auto mb-4 shadow-lg shadow-red-500/30 object-cover">
-      <h3 class="text-white font-extrabold text-2xl tracking-tight">Listo, ya puedes tomar turno</h3>
-      <p class="text-white/80 text-sm mt-2">Bienvenido a JBarber.</p>
-      <div class="mt-4 flex items-center justify-center gap-2 text-white/80">
-        <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle>
-          <path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75"></path>
-        </svg>
-        <span class="text-sm">Cargando…</span>
-      </div>
-    </div>
-  </div>
 </body>
 </html>
