@@ -219,8 +219,8 @@
     // 4. Redirección si ya hay sesión
     (async () => {
       const client = await ensureSupabase();
-      const { data: { session } } = await client.auth.getSession();
-      if (session) {
+      const { data: { user } } = await client.auth.getUser();
+      if (user) {
         window.location.href = "panel_cliente.html";
       }
     })();
