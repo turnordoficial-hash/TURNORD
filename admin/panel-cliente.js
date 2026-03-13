@@ -18,33 +18,10 @@ const appState = {
   profileLoaded: false, // Control de carga inicial
   profileRefreshed: false, // Nueva propiedad para control de refresco
   oneSignalLogged: false,
+  isEventsActivated: false, // Flag para activar eventos una sola vez
 };
 
-// --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS ---
-function vincularEventosCita() {
-  const btnVer = document.getElementById('btn-ver-horarios');
-  const btnConfirmar = document.getElementById('btn-confirmar-reserva');
-  
-  if (btnVer) {
-      btnVer.removeEventListener('click', cargarSlotsInteligente);
-      btnVer.addEventListener('click', cargarSlotsInteligente);
-  }
-  
-  if (btnConfirmar) {
-      btnConfirmar.removeEventListener('click', confirmarReservaManual);
-      btnConfirmar.addEventListener('click', confirmarReservaManual);
-  }
-  
-  const inputsCita = ['select-servicio-cita', 'select-barbero-cita', 'date-picker'];
-  inputsCita.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.removeEventListener('change', updateBtnStatus);
-      el.addEventListener('change', updateBtnStatus);
-    }
-  });
-}
-
+// --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS (Integrado en activarEventosReserva) ---
 function updateBtnStatus() {
   const bVal = document.getElementById('select-barbero-cita')?.value;
   const sVal = document.getElementById('select-servicio-cita')?.value;
@@ -566,9 +543,12 @@ window.switchTab = function(tab){
  * Se debe llamar después de que los selectores de servicio y barbero se hayan poblado.
  */
 function activarEventosReserva() {
+  console.log('--- ACTIVANDO EVENTOS DE RESERVA (1 sola vez) ---');
   const barberSelect = document.getElementById('select-barbero-cita');
   const serviceSelect = document.getElementById('select-servicio-cita');
   const datePicker = document.getElementById('date-picker');
+  const btnVer = document.getElementById('btn-ver-horarios');
+  const btnConfirmar = document.getElementById('btn-confirmar-reserva');
 
   const updateBarberUI = () => {
     const barberId = barberSelect?.value;
@@ -581,7 +561,7 @@ function activarEventosReserva() {
       return;
     }
     
-    const barber = appState.barbers.find(b => b.id == barberId);
+    const barber = appState.barbers.find(b => String(b.id) === String(barberId));
     const img = document.getElementById('barber-avatar-display');
     const name = document.getElementById('barber-name-display');
 
@@ -600,21 +580,38 @@ function activarEventosReserva() {
 
   const handleBarberChange = () => {
     updateBarberUI();
+    updateBtnStatus();
     cargarSlotsInteligente();
   };
 
+  // 1. Eventos de Inputs
   if (barberSelect) {
-    barberSelect.removeEventListener('change', handleBarberChange); // Evita duplicados
     barberSelect.addEventListener('change', handleBarberChange);
   }
   if (serviceSelect) {
-    serviceSelect.removeEventListener('change', cargarSlotsInteligente);
-    serviceSelect.addEventListener('change', cargarSlotsInteligente);
+    serviceSelect.addEventListener('change', () => {
+        updateBtnStatus();
+        cargarSlotsInteligente();
+    });
   }
   if (datePicker) {
-    datePicker.removeEventListener('change', cargarSlotsInteligente);
-    datePicker.addEventListener('change', cargarSlotsInteligente);
+    datePicker.addEventListener('change', () => {
+        updateBtnStatus();
+        cargarSlotsInteligente();
+    });
   }
+
+  // 2. Eventos de Botones
+  if (btnVer) {
+      btnVer.addEventListener('click', cargarSlotsInteligente);
+  }
+  
+  if (btnConfirmar) {
+      btnConfirmar.addEventListener('click', confirmarReservaManual);
+  }
+
+  // 3. Validación inicial
+  updateBtnStatus();
 }
 
 function setupPosterTilt() {
@@ -703,6 +700,7 @@ async function ensureProfileExists(user, retries = 3) {
 }
 
 async function init() {
+    console.log('--- INIT PANEL CLIENTE ---');
     const sb = await getSupabase();
     
     // 1. Verificación de sesión ÚNICA (Previene colisiones de lock)
@@ -728,74 +726,63 @@ async function init() {
     setupStaticEventHandlers();
     setupThemeToggle();
     
-    // 4. Carga paralela de datos de negocio
-    // Se mueven cargarServicios y cargarBarberos a processProfileData para asegurar que se ejecuten después del login de OneSignal
+    // 4. Iniciar flujo secuencial solicitado
+    // init -> cargarPerfil
     await Promise.all([
         cargarConfigNegocio(),
-        cargarPerfil() // Esta función ahora usará el perfil ya cargado o lo refrescará
+        cargarPerfil() // Esto llamará a processProfileData -> cargarServicios/Barberos -> activarEventosReserva
     ]);
-  // --- Final Initialization Steps ---
-  const dp = document.getElementById('date-picker');
-  if (dp) {
-      const today = new Date().toLocaleDateString('en-CA');
-      dp.value = today;
-      dp.min = today;
-  }
 
-  await verificarCitaActiva();
-  await setupRealtime();
-  iniciarMotorMarketing();
-
-  // Forzar solicitud de permiso de notificaciones al inicio
-  setTimeout(async () => {
-    try {
-      await solicitarPermisoNotificacion();
-    } catch (e) {
-      console.warn('Error al solicitar permiso inicial:', e);
+    // --- Final Initialization Steps ---
+    const dp = document.getElementById('date-picker');
+    if (dp) {
+        const today = new Date().toLocaleDateString('en-CA');
+        dp.value = today;
+        dp.min = today;
     }
-  }, 2000);
 
-  switchTab('inicio');
-  
-  // Re-vincular eventos cada vez que se renderiza el panel de citas
-  vincularEventosCita();
+    await verificarCitaActiva();
+    // setupRealtime e iniciarMotorMarketing se movieron a processProfileData
+    
+    switchTab('inicio');
+    
+    // Ejecutar validación inicial para el botón al cargar la página
+    updateBtnStatus();
 
-  // Ejecutar validación inicial para el botón al cargar la página
-  updateBtnStatus();
+    document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
 
-  document.getElementById('share-referral')?.addEventListener('click', compartirReferido);
+    const formPerfil = document.getElementById('form-perfil');
+    if (formPerfil) {
+        const telInput = document.getElementById('edit-telefono');
+        if (telInput) {
+            telInput.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+            });
+        }
 
-  const formPerfil = document.getElementById('form-perfil');
-  if (formPerfil) {
-      const telInput = document.getElementById('edit-telefono');
-      if (telInput) {
-        telInput.addEventListener('input', function() {
-          this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+        formPerfil.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('edit-nombre').value.trim();
+            const email = document.getElementById('edit-email').value.trim();
+            const telefono = document.getElementById('edit-telefono').value.trim();
+
+            if (telefono.length !== 10) return showToast('El teléfono debe tener 10 dígitos.', 'error');
+            if (nombre.length < 3) return showToast('El nombre es muy corto.', 'error');
+
+            const client = await getSupabase();
+            const { error } = await client.from('clientes').update({ nombre, email, telefono }).eq('id', appState.user.id);
+            if (error) showToast('Error al actualizar el perfil', 'error');
+            else {
+                showToast('Perfil actualizado con éxito', 'success');
+                // Al actualizar perfil, forzamos refresco completo para asegurar consistencia
+                appState.profileRefreshed = false;
+                cargarPerfil();
+            }
         });
-      }
+    }
 
-      formPerfil.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const nombre = document.getElementById('edit-nombre').value.trim();
-          const email = document.getElementById('edit-email').value.trim();
-          const telefono = document.getElementById('edit-telefono').value.trim();
-
-          if (telefono.length !== 10) return showToast('El teléfono debe tener 10 dígitos.', 'error');
-          if (nombre.length < 3) return showToast('El nombre es muy corto.', 'error');
-
-          const client = await getSupabase();
-          const { error } = await client.from('clientes').update({ nombre, email, telefono }).eq('id', appState.user.id);
-          if (error) showToast('Error al actualizar el perfil', 'error');
-          else {
-              showToast('Perfil actualizado con éxito', 'success');
-              cargarPerfil();
-          }
-      });
-  }
-
-  registrarServiceWorker();
-  checkPendingRatings();
-  setupPosterTilt();
+    registrarServiceWorker();
+    setupPosterTilt();
 }
 
 function renderInicio() {
@@ -976,13 +963,8 @@ function renderCitaPanel() {
             </div>
         `;
     
-    // IMPORTANTE: Re-vincular eventos después de inyectar el HTML
-    if (typeof vincularEventosCita === 'function') {
-        vincularEventosCita();
-    }
-    if (typeof activarEventosReserva === 'function') {
-        activarEventosReserva();
-    }
+    // El flujo principal ahora se encarga de activar los eventos en el momento correcto
+    // (tras cargar servicios y barberos en processProfileData)
   }
 }
 
@@ -1379,21 +1361,30 @@ async function processProfileData(data) {
     // Cargar servicios y barberos aquí para asegurar que no se bloqueen por errores de OneSignal
     await Promise.all([cargarServicios(), cargarBarberos()]);
 
-    // Activar eventos del formulario de reserva ahora que los selects están poblados
-    activarEventosReserva();
+    // Activar eventos del formulario de reserva ahora que los selects están poblados (1 sola vez)
+    if (!appState.isEventsActivated) {
+        activarEventosReserva();
+        appState.isEventsActivated = true;
+    }
 }
 
 function renderServices(data) {
   const select = document.getElementById('select-servicio-cita');
   if (select) {
+    const currentVal = select.value;
+    // Si ya tiene opciones y valor seleccionado, no repintar para no perder selección
+    if (select.options.length > 1 && currentVal) return;
+    
     select.innerHTML = '<option value="" selected disabled>Elegir servicio...</option>';
     (data || []).forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = `${sanitizeHTML(s.nombre)} - RD$ ${s.precio}`;
+      if (currentVal && String(s.id) === String(currentVal)) opt.selected = true;
       select.appendChild(opt);
     });
-    select.value = ""; // Forzar valor vacío
+    // Solo forzar vacío si no había valor previo
+    if (!currentVal) select.value = "";
   }
 }
 
@@ -1548,14 +1539,20 @@ function confirmarAccion(titulo, mensaje, onConfirm) {
 function renderBarbersList(data) {
   const select = document.getElementById('select-barbero-cita');
   if (select) {
+    const currentVal = select.value;
+    // Si ya tiene opciones y valor seleccionado, no repintar para no perder selección
+    if (select.options.length > 1 && currentVal) return;
+    
     select.innerHTML = '<option value="" selected disabled>Selecciona un barbero...</option>';
     data.forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
       opt.textContent = sanitizeHTML(b.nombre || b.usuario);
+      if (currentVal && String(b.id) === String(currentVal)) opt.selected = true;
       select.appendChild(opt);
     });
-    select.value = ""; // Forzar valor vacío
+    // Solo forzar vacío si no había valor previo
+    if (!currentVal) select.value = "";
   }
 }
 
@@ -2175,3 +2172,6 @@ function cerrarModalCalificacion() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+     
+  
