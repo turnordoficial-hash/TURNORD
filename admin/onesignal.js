@@ -92,84 +92,76 @@ async function init() {
 }
 
 async function login(externalId, tags = {}) {
-    if (!externalId || isSDKDisabled) return;
+  if (!externalId || isSDKDisabled) return;
 
+  try {
     await init();
     if (!initialized || isSDKDisabled) return;
 
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function (OneSignal) {
-
-        try {
-            // Verificación extra de salud del SDK antes de llamar a login
-            if (!OneSignal || !OneSignal.User) {
-                console.warn("OneSignal: SDK no está en un estado saludable para login.");
-                return;
-            }
-
-            const currentId = OneSignal.User.externalId;
-            if (currentId === String(externalId)) {
-                console.log("OneSignal: Usuario ya conectado (login omitido)");
-                return;
-            }
-
-            // Capturar errores de red de OneSignal que causan el 409
-            await OneSignal.login(String(externalId)).catch(e => {
-                if (e?.status === 409 || e?.message?.includes('409')) {
-                    // Ignorar silenciosamente
-                } else {
-                    throw e;
-                }
-            });
-
-            console.log("Login OneSignal OK:", externalId);
-
-            if (Object.keys(tags).length) {
-                await OneSignal.User.addTags(tags);
-            }
-
-            // --- REGISTRO EN SUPABASE ---
-            if (externalId && tags.cliente_id) {
-                const { ensureSupabase } = await import('../database.js?v=2');
-                const sb = await ensureSupabase();
-                
-                const isAndroid = /Android/i.test(navigator.userAgent);
-                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-                const deviceType = isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Web');
-                const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-                const pushId = OneSignal.User.pushSubscriptionId;
-
-                if (tags.role === 'cliente') {
-                    const updateData = { 
-                        device_type: deviceType,
-                        pwa_installed: isPWA
-                    };
-                    if (pushId) updateData.onesignal_player_id = pushId;
-
-                    await sb.from('clientes').update(updateData).eq('id', tags.cliente_id);
-                } else if (tags.role === 'barbero' && tags.barber_id) {
-                    if (pushId) {
-                        await sb.from('barberos').update({ 
-                            onesignal_player_id: pushId 
-                        }).eq('id', tags.barber_id);
-                    }
-                }
-                console.log("OneSignal: Sincronización con Supabase finalizada");
-            }
-
-        } catch (err) {
-            if (err?.status === 409 || (err?.message && err.message.includes('409'))) {
-                console.log("OneSignal: Identidad ya vinculada (Conflict 409 ignorado)");
-                return;
-            }
-            console.error("Error en operación OneSignal:", err);
-            // Si hay un error de tipo TypeError (como el de 'Ye'), desactivamos el SDK para evitar bucles de error
-            if (err instanceof TypeError) {
-                isSDKDisabled = true;
-            }
+      try {
+        // Verificación extra de salud del SDK antes de llamar a login
+        if (!OneSignal || !OneSignal.User) {
+          console.warn("OneSignal: SDK no está en un estado saludable para login.");
+          return;
         }
 
+        const currentId = OneSignal.User.externalId;
+        if (currentId !== String(externalId)) {
+          await OneSignal.login(String(externalId));
+          console.log("Login OneSignal OK:", externalId);
+        } else {
+          console.log("OneSignal: Usuario ya conectado (login omitido)");
+        }
+
+        if (Object.keys(tags).length) {
+          await OneSignal.User.addTags(tags);
+        }
+
+        // --- REGISTRO EN SUPABASE ---
+        if (externalId && (tags.cliente_id || tags.barber_id)) {
+          const { ensureSupabase } = await import('../database.js?v=2');
+          const sb = await ensureSupabase();
+          
+          const isAndroid = /Android/i.test(navigator.userAgent);
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const deviceType = isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Web');
+          const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+          const pushId = OneSignal.User.pushSubscriptionId;
+
+          if (tags.role === 'cliente' && tags.cliente_id) {
+              const updateData = { 
+                  device_type: deviceType,
+                  pwa_installed: isPWA
+              };
+              if (pushId) updateData.onesignal_player_id = pushId;
+
+              await sb.from('clientes').update(updateData).eq('id', tags.cliente_id);
+          } else if (tags.role === 'barbero' && tags.barber_id) {
+              if (pushId) {
+                  await sb.from('barberos').update({ 
+                      onesignal_player_id: pushId 
+                  }).eq('id', tags.barber_id);
+              }
+          }
+          console.log("OneSignal: Sincronización con Supabase finalizada");
+        }
+
+      } catch (err) {
+        // Ignorar errores de conflicto (409) o TypeErrors ('Ye') para no romper el flujo.
+        if (err?.status === 409 || (err?.message && err.message.includes('409')) || err instanceof TypeError) {
+          console.warn("OneSignal: Error de login ignorado para no romper el flujo:", err.message);
+          if (err instanceof TypeError) isSDKDisabled = true;
+        } else {
+          console.error("Error en operación OneSignal (dentro de push):", err);
+        }
+      }
     });
+  } catch (e) {
+    console.warn("Error en el proceso de login de OneSignal (fuera de push):", e);
+  }
 }
 
 async function logout() {

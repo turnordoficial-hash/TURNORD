@@ -527,67 +527,6 @@ function setupStaticEventHandlers() {
     }
   });
 
-  // --- Lógica de Selección de Barbero y Carga Automática ---
-  const barberSelect = document.getElementById('select-barbero-cita');
-  const serviceSelect = document.getElementById('select-servicio-cita');
-  const datePicker = document.getElementById('date-picker');
-
-  const updateBarberUI = () => {
-      const barberId = barberSelect?.value;
-      const card = document.getElementById('barber-info-card');
-      
-      if (!barberId) {
-          if (card) card.classList.add('hidden');
-          return;
-      }
-      
-      const barber = appState.barbers.find(b => b.id == barberId);
-      const img = document.getElementById('barber-avatar-display');
-      const name = document.getElementById('barber-name-display');
-
-      if (barber && card && img && name) {
-          card.classList.remove('hidden');
-          
-          let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
-          if (barber.avatar_url && barber.avatar_url.startsWith('http')) {
-              avatarUrl = barber.avatar_url;
-          }
-          
-          img.src = avatarUrl;
-          name.textContent = barber.nombre || barber.usuario;
-      }
-  };
-
-  const tryLoadSlots = () => {
-      const bVal = document.getElementById('select-barbero-cita')?.value;
-      const sVal = document.getElementById('select-servicio-cita')?.value;
-      const dVal = document.getElementById('date-picker')?.value;
-      
-      if (bVal && sVal && dVal) {
-          cargarSlotsInteligente();
-      }
-  };
-
-  if (barberSelect) {
-      barberSelect.addEventListener('change', () => {
-          console.log('Barbero cambiado:', barberSelect.value);
-          updateBarberUI();
-          tryLoadSlots();
-      });
-  }
-  if (serviceSelect) {
-      serviceSelect.addEventListener('change', () => {
-          console.log('Servicio cambiado:', serviceSelect.value);
-          tryLoadSlots();
-      });
-  }
-  if (datePicker) {
-      datePicker.addEventListener('change', () => {
-          console.log('Fecha cambiada:', datePicker.value);
-          tryLoadSlots();
-      });
-  }
-
   // Limpiar la conexión de Realtime al cerrar/recargar la página
   window.addEventListener('beforeunload', () => {
     cleanupRealtime();
@@ -612,6 +551,62 @@ window.switchTab = function(tab){
   document.querySelectorAll(`[data-tab="${tab}"]`).forEach(btn=>{
     btn.classList.add('active')
   })
+}
+
+/**
+ * Vincula los eventos a los selectores del formulario de citas.
+ * Se debe llamar después de que los selectores de servicio y barbero se hayan poblado.
+ */
+function activarEventosReserva() {
+  const barberSelect = document.getElementById('select-barbero-cita');
+  const serviceSelect = document.getElementById('select-servicio-cita');
+  const datePicker = document.getElementById('date-picker');
+
+  const updateBarberUI = () => {
+    const barberId = barberSelect?.value;
+    const card = document.getElementById('barber-info-card');
+    
+    if (!card) return;
+
+    if (!barberId) {
+      card.classList.add('hidden');
+      return;
+    }
+    
+    const barber = appState.barbers.find(b => b.id == barberId);
+    const img = document.getElementById('barber-avatar-display');
+    const name = document.getElementById('barber-name-display');
+
+    if (barber && img && name) {
+      card.classList.remove('hidden');
+      
+      let avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(barber.nombre || barber.usuario)}&background=C1121F&color=fff`;
+      if (barber.avatar_url && barber.avatar_url.startsWith('http')) {
+        avatarUrl = barber.avatar_url;
+      }
+      
+      img.src = avatarUrl;
+      name.textContent = barber.nombre || barber.usuario;
+    }
+  };
+
+  const handleBarberChange = () => {
+    updateBarberUI();
+    cargarSlotsInteligente();
+  };
+
+  if (barberSelect) {
+    barberSelect.removeEventListener('change', handleBarberChange); // Evita duplicados
+    barberSelect.addEventListener('change', handleBarberChange);
+  }
+  if (serviceSelect) {
+    serviceSelect.removeEventListener('change', cargarSlotsInteligente);
+    serviceSelect.addEventListener('change', cargarSlotsInteligente);
+  }
+  if (datePicker) {
+    datePicker.removeEventListener('change', cargarSlotsInteligente);
+    datePicker.addEventListener('change', cargarSlotsInteligente);
+  }
 }
 
 function setupPosterTilt() {
@@ -719,13 +714,11 @@ async function init() {
     setupThemeToggle();
     
     // 4. Carga paralela de datos de negocio
+    // Se mueven cargarServicios y cargarBarberos a processProfileData para asegurar que se ejecuten después del login de OneSignal
     await Promise.allSettled([
         cargarConfigNegocio(),
-        cargarPerfil(), // Esta función ahora usará el perfil ya cargado o lo refrescará
-        cargarServicios(),
-        cargarBarberos()
+        cargarPerfil() // Esta función ahora usará el perfil ya cargado o lo refrescará
     ]);
-    
   // --- Final Initialization Steps ---
   const dp = document.getElementById('date-picker');
   if (dp) {
@@ -1302,7 +1295,7 @@ async function cargarPerfil() {
         const retry = await fetcher();
         if (retry.data) {
             GlobalCache.set(cacheKey, retry.data, 15);
-            processProfileData(retry.data);
+            await processProfileData(retry.data);
         }
       }, 2000);
     }
@@ -1311,7 +1304,7 @@ async function cargarPerfil() {
   }
 }
 
-function processProfileData(data) {
+async function processProfileData(data) {
     const oldPoints = appState.profile?.puntos_actuales || 0;
     const newPoints = data.puntos_actuales || 0;    const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
     const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);    
@@ -1333,21 +1326,29 @@ function processProfileData(data) {
     // Iniciar lógica que depende del perfil (realtime, notificaciones)
     // Se hace aquí para asegurar que appState.profile está disponible.
     if (data.telefono) {
-        // OneSignalManager se encarga de no hacer login si ya está identificado.
-        Promise.all([
-            setupRealtime(),
-            // FIX: Usar el UUID del usuario (appState.user.id) en lugar del teléfono para OneSignal.
-            // Esto asegura la consistencia con el schema de la base de datos.
-            OneSignalManager.login(appState.user.id, {
-                negocio_id: negocioId, 
+        // Iniciar Realtime sin esperar
+        setupRealtime();
+
+        // Intentar login en OneSignal de forma segura, sin bloquear el resto del flujo.
+        try {
+            await OneSignalManager.login(appState.user.id, {
+                negocio_id: negocioId,
                 role: 'cliente',
                 cliente_id: appState.user.id,
                 segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
-            })
-        ]);
+            });
+        } catch (e) {
+            console.warn("OneSignal login error was caught and ignored:", e);
+        }
     }
     iniciarMotorMarketing();
     cargarHistorialPuntos();
+
+    // Cargar servicios y barberos aquí para asegurar que no se bloqueen por errores de OneSignal
+    await Promise.all([cargarServicios(), cargarBarberos()]);
+
+    // Activar eventos del formulario de reserva ahora que los selects están poblados
+    activarEventosReserva();
 }
 
 function renderServices(data) {
