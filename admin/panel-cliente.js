@@ -17,6 +17,7 @@ const appState = {
   isBooking: false, // Protección anti-doble click
   profileLoaded: false, // Control de carga inicial
   profileRefreshed: false, // Nueva propiedad para control de refresco
+  oneSignalLogged: false,
 };
 
 // --- RE-VINCULACIÓN DE EVENTOS DINÁMICOS ---
@@ -195,6 +196,7 @@ async function iniciarMotorMarketing() {
 
 // Sanitización Universal
 function sanitizeHTML(str) {
+  if (!str) return '';
   const temp = document.createElement('div');
   temp.textContent = str;
   return temp.innerHTML;
@@ -303,26 +305,17 @@ function updateBanner(mode = 'default') {
 async function solicitarPermisoNotificacion() {
   try {
     await OneSignalManager.init();
-    return new Promise((resolve) => {
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        try {
-          if (!OneSignal || !OneSignal.Notifications) {
-              console.warn("OneSignal: SDK no disponible para permisos.");
-              return resolve(false);
-          }
-          if (!OneSignal.Notifications.permission) {
-            await OneSignal.Notifications.requestPermission();
-          }
-          resolve(OneSignal.Notifications.permission);
-        } catch (err) {
-          console.warn('Error al solicitar permiso OneSignal:', err);
-          resolve(false);
-        }
-      });
-    });
+
+    if (!window.OneSignal) {
+      console.warn("OneSignal no cargó.");
+      return false;
+    }
+
+    const permission = await window.OneSignal.Notifications.requestPermission();
+    return permission;
+
   } catch (e) {
-    console.error("Error inicializando OneSignal para permisos:", e);
+    console.warn('Error OneSignal permiso:', e);
     return false;
   }
 }
@@ -372,6 +365,7 @@ window.logout = async () => {
   GlobalCache.remove(`profile_${appState.user.id}`); // Limpieza selectiva
   Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`) && !k.includes('jbarber_cache')).forEach(k => localStorage.removeItem(k));
   if (window.OneSignal) await OneSignalManager.logout();
+  appState.oneSignalLogged = false;
   const sb = await getSupabase();
   await sb.auth.signOut();
   window.location.href = 'login_cliente.html';
@@ -421,10 +415,11 @@ async function setupRealtime() {
     }, safeRefresh)
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log('Realtime: Suscrito con éxito a cambios de citas.');
+        console.log('Realtime conectado');
       }
       if (status === 'CHANNEL_ERROR') {
-        console.error('Realtime: Error al conectar con el canal de actualizaciones.');
+        console.warn('Reconectando realtime...');
+        setTimeout(setupRealtime, 3000);
       }
     });
 }
@@ -635,6 +630,7 @@ function setupPosterTilt() {
 async function ensureProfileExists(user, retries = 3) {
   if (!user) return null;
   const sb = await getSupabase();
+  const cacheKey = `profile_${user.id}`;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -653,6 +649,7 @@ async function ensureProfileExists(user, retries = 3) {
           await sb.from('clientes').update({ negocio_id: negocioId }).eq('id', user.id);
           profile.negocio_id = negocioId;
         }
+        GlobalCache.set(cacheKey, profile, 15); // Poblar caché para evitar doble carga
         return profile;
       }
 
@@ -670,12 +667,14 @@ async function ensureProfileExists(user, retries = 3) {
 
       const { data: created, error: insertError } = await sb
         .from('clientes')
-        .insert([newProfile])
+        .upsert(newProfile, { onConflict: 'id' })
         .select()
         .maybeSingle();
 
       if (insertError) throw insertError;
-      return created || newProfile;
+      const finalProfile = created || newProfile;
+      GlobalCache.set(cacheKey, finalProfile, 15); // Poblar caché para evitar doble carga
+      return finalProfile;
 
     } catch (err) {
       console.error(`Intento ${attempt} fallido en ensureProfileExists:`, err);
@@ -744,9 +743,11 @@ async function init() {
   const formPerfil = document.getElementById('form-perfil');
   if (formPerfil) {
       const telInput = document.getElementById('edit-telefono');
-      telInput?.addEventListener('input', function() {
+      if (telInput) {
+        telInput.addEventListener('input', function() {
           this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
-      });
+        });
+      }
 
       formPerfil.addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -953,6 +954,9 @@ function renderCitaPanel() {
     // IMPORTANTE: Re-vincular eventos después de inyectar el HTML
     if (typeof vincularEventosCita === 'function') {
         vincularEventosCita();
+    }
+    if (typeof activarEventosReserva === 'function') {
+        activarEventosReserva();
     }
   }
 }
@@ -1329,16 +1333,19 @@ async function processProfileData(data) {
         // Iniciar Realtime sin esperar
         setupRealtime();
 
-        // Intentar login en OneSignal de forma segura, sin bloquear el resto del flujo.
-        try {
-            await OneSignalManager.login(appState.user.id, {
-                negocio_id: negocioId,
-                role: 'cliente',
-                cliente_id: appState.user.id,
-                segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
-            });
-        } catch (e) {
-            console.warn("OneSignal login error was caught and ignored:", e);
+        // Intentar login en OneSignal solo una vez por sesión para evitar errores 409.
+        if (!appState.oneSignalLogged) {
+            try {
+                await OneSignalManager.login(appState.user.id, {
+                    negocio_id: negocioId,
+                    role: 'cliente',
+                    cliente_id: appState.user.id,
+                    segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
+                });
+                appState.oneSignalLogged = true;
+            } catch (e) {
+                console.warn("OneSignal login error was caught and ignored:", e);
+            }
         }
     }
     iniciarMotorMarketing();
@@ -1557,7 +1564,7 @@ async function fetchDayData(negocioId, barberId, dateStr, signal) {
     .select('weekly_breaks')
     .eq('negocio_id', negocioId)
     .maybeSingle()
-    .abortSignal(appState.abortController.signal);
+    .abortSignal(signal);
 
   const pConfig = configCache
     ? Promise.resolve({ data: configCache })
@@ -1679,6 +1686,9 @@ async function cargarSlotsInteligente() {
       console.warn('Faltan datos para cargar slots');
       return;
   }
+
+  // Mejora: Evitar errores si el usuario navega a otra pestaña rápidamente
+  if (!document.getElementById('slots-container')) return;
 
   // Cancela la petición anterior si existe, para evitar race conditions
   if (appState.abortController) {
@@ -1916,6 +1926,8 @@ async function confirmarReservaManual() {
       if (error) throw error;
       
       showToast('Cita agendada correctamente');
+      // Reset booking flag on success
+      appState.isBooking = false;
 
       // Invalidar el caché de slots para este día/barbero/servicio
       const dateStr = date.toISOString().split('T')[0];
