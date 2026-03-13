@@ -196,9 +196,9 @@ async function iniciarMotorMarketing() {
 
 // Sanitización Universal
 function sanitizeHTML(str) {
-  if (!str) return '';
+  if (str === null || str === undefined) return '';
   const temp = document.createElement('div');
-  temp.textContent = str;
+  temp.textContent = String(str);
   return temp.innerHTML;
 }
 
@@ -306,18 +306,18 @@ async function solicitarPermisoNotificacion() {
   try {
     await OneSignalManager.init();
 
-    if (!window.OneSignal) {
-      console.warn("OneSignal no cargó.");
-      return false;
-    }
+    if (!window.OneSignal || !window.OneSignal.Notifications) { 
+      console.warn("OneSignal no está listo aún."); 
+      return false; 
+    } 
 
-    const permission = await window.OneSignal.Notifications.requestPermission();
-    return permission;
+    const permission = await window.OneSignal.Notifications.requestPermission(); 
+    return permission; 
 
-  } catch (e) {
-    console.warn('Error OneSignal permiso:', e);
-    return false;
-  }
+  } catch (e) { 
+    console.warn('Error OneSignal permiso:', e); 
+    return false; 
+  } 
 }
 
 function showToast(message, type = 'success') {
@@ -361,13 +361,24 @@ window.toggleFab = () => {
 window.logout = async () => {
   const engine = SmartMarketingEngine.getInstance();
   if (engine) engine.reset();
+
   await cleanupRealtime();
-  GlobalCache.remove(`profile_${appState.user.id}`); // Limpieza selectiva
-  Object.keys(localStorage).filter(k => k.includes(`_${negocioId}_`) && !k.includes('jbarber_cache')).forEach(k => localStorage.removeItem(k));
+
+  if (appState.user?.id) { 
+    GlobalCache.remove(`profile_${appState.user.id}`); 
+  } 
+
+  Object.keys(localStorage)
+    .filter(k => k.includes(`_${negocioId}_`) && !k.includes('jbarber_cache'))
+    .forEach(k => localStorage.removeItem(k));
+
   if (window.OneSignal) await OneSignalManager.logout();
+
   appState.oneSignalLogged = false;
+
   const sb = await getSupabase();
   await sb.auth.signOut();
+
   window.location.href = 'login_cliente.html';
 };
 
@@ -385,6 +396,8 @@ async function cleanupRealtime() {
 
 async function setupRealtime() {
   const sb = await getSupabase();
+  if (!appState.user?.id) return; 
+
   await cleanupRealtime();
 
   const telefono = appState.profile?.telefono;
@@ -401,12 +414,12 @@ async function setupRealtime() {
       verificarCitaActiva();
       checkPendingRatings();
       // Invalidar caché de perfil para forzar recarga fresca
-      GlobalCache.remove(`profile_${appState.user.id}`);
+      if (appState.user?.id) GlobalCache.remove(`profile_${appState.user.id}`);
       cargarPerfil();
     }, 800);
   };
 
-  realtimeChannel = sb.channel(`cliente-updates-${negocioId}-${appState.user.id}`)
+  realtimeChannel = sb.channel(`cliente-updates-${negocioId}-${appState.user?.id || 'guest'}`)
     .on('postgres_changes', { 
       event: '*', 
       schema: 'public', 
@@ -655,6 +668,9 @@ async function ensureProfileExists(user, retries = 3) {
 
       // 2. Si no existe, crearlo
       console.warn(`Creando perfil inicial para ${user.id}...`);
+      
+      await sb.auth.getSession();
+
       const newProfile = {
         id: user.id,
         email: user.email,
@@ -714,7 +730,7 @@ async function init() {
     
     // 4. Carga paralela de datos de negocio
     // Se mueven cargarServicios y cargarBarberos a processProfileData para asegurar que se ejecuten después del login de OneSignal
-    await Promise.allSettled([
+    await Promise.all([
         cargarConfigNegocio(),
         cargarPerfil() // Esta función ahora usará el perfil ya cargado o lo refrescará
     ]);

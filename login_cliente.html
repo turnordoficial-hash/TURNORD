@@ -14,9 +14,7 @@
   <link rel="icon" type="image/png" href="jbarber/jjj.png" />
   <link rel="apple-touch-icon" href="jbarber/jjj.png" />
   <link rel="shortcut icon" href="jbarber/jjj.png" type="image/png"/>
-  <link rel="manifest" href="imegenlogin/site.webmanifest">
   
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#C1121F">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -218,6 +216,15 @@
     import { ensureSupabase } from './database.js?v=2';
     const negocioId = 'barberia005';
 
+    // 4. Redirección si ya hay sesión
+    (async () => {
+      const client = await ensureSupabase();
+      const { data: { session } } = await client.auth.getSession();
+      if (session) {
+        window.location.href = "panel_cliente.html";
+      }
+    })();
+
     // 1. Capturar código de referido de la URL
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -386,6 +393,12 @@
       const telefono = document.getElementById('reg_telefono').value.trim();
       const email = document.getElementById('reg_email').value.trim();
       const pass = document.getElementById('reg_password').value.trim();
+
+      // 5. Validación de email
+      if (!email.includes('@')) {
+        alert('Introduce un correo electrónico válido.');
+        return;
+      }
       
       // Validación de formato de teléfono (Solo números, 8-15 dígitos)
       if (!/^\d{8,15}$/.test(telefono)) {
