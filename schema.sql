@@ -1141,17 +1141,27 @@ AS $$
 DECLARE
   v_service_role text;
 BEGIN
-  SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+  -- Intentar obtener la clave de servicio de varias posibles fuentes en Vault
+  SELECT decrypted_secret INTO v_service_role 
+  FROM vault.decrypted_secrets 
+  WHERE name IN ('SUPABASE_SERVICE_ROLE_KEY', 'service_role', 'SERVICE_ROLE_KEY') 
+  LIMIT 1;
+  
+  -- Si aún es nulo, intentar con la anon por si la función es semi-pública
+  IF v_service_role IS NULL THEN
+    SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_ANON_KEY' LIMIT 1;
+  END IF;
+
   -- Se cambia a PERFORM sin collect_response para evitar bloqueos del cron job.
   PERFORM net.http_post(
     url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'apikey', COALESCE(v_service_role, ''), -- Fallback para evitar 401 si es posible
+      'apikey', COALESCE(v_service_role, ''),
       'Authorization', 'Bearer ' || COALESCE(v_service_role, '')
     ),
     body := '{}'::jsonb,
-    timeout_milliseconds := 3000 -- Añadir un timeout para evitar esperas indefinidas
+    timeout_milliseconds := 5000 -- Aumentado un poco
   );
 END;
 $$;
@@ -1200,7 +1210,14 @@ BEGIN
     'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD)::jsonb ELSE NULL END
   );
 
-  SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+  SELECT decrypted_secret INTO v_service_role 
+  FROM vault.decrypted_secrets 
+  WHERE name IN ('SUPABASE_SERVICE_ROLE_KEY', 'service_role', 'SERVICE_ROLE_KEY') 
+  LIMIT 1;
+  
+  IF v_service_role IS NULL THEN
+    SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_ANON_KEY' LIMIT 1;
+  END IF;
 
   -- 1. Intentar llamar a la función directamente (Sincrónico para eventos críticos)
   -- Si falla (por timeout o error), al menos queda registrado en notification_events
@@ -1214,7 +1231,7 @@ BEGIN
           'Authorization', 'Bearer ' || v_service_role
         ),
         body := v_payload,
-        timeout_milliseconds := 1500 -- Aumentado un poco para dar tiempo a la función
+        timeout_milliseconds := 2000 -- Aumentado para dar tiempo a la función
       );
     EXCEPTION WHEN OTHERS THEN
       -- Ignorar error de red para no bloquear la transacción principal
@@ -1306,7 +1323,11 @@ BEGIN
       DECLARE
         v_service_role text;
       BEGIN
-        SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+        -- Intentar obtener la clave de servicio de varias posibles fuentes en Vault
+        SELECT decrypted_secret INTO v_service_role 
+        FROM vault.decrypted_secrets 
+        WHERE name IN ('SUPABASE_SERVICE_ROLE_KEY', 'service_role', 'SERVICE_ROLE_KEY') 
+        LIMIT 1;
         
         IF v_service_role IS NULL THEN
            -- Intentar obtener la clave anon si la de servicio no está disponible

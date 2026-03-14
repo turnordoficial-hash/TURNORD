@@ -12,13 +12,18 @@ const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY");
  */
 
 serve(async (req) => {
+  console.info("--- SEND PUSH NOTIFICATION (v2): INICIO ---");
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
-    const payload = await req.json();
+    const payload = await req.json().catch(() => ({}));
     const { telefono, title, body, url, negocio_id } = payload;
+    
+    console.info(`Destinatario (Tel): ${telefono}`);
+    console.info(`Título: ${title}`);
 
     if (!telefono || !title || !body) {
+      console.error("Error: Faltan campos obligatorios");
       return new Response(JSON.stringify({ error: "Faltan campos obligatorios: telefono, title, body" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -26,6 +31,7 @@ serve(async (req) => {
     }
 
     if (!ONE_SIGNAL_KEY || !ONESIGNAL_APP_ID) {
+      console.error("Error: Variables de entorno faltantes");
       throw new Error("Configuración de OneSignal faltante (ONE_SIGNAL_APP_ID/KEY)");
     }
 
@@ -45,6 +51,7 @@ serve(async (req) => {
     async function fetchWithRetry(url: string, options: any, maxRetries = 3): Promise<Response> {
       for (let i = 0; i < maxRetries; i++) {
         try {
+          console.info(`Intento ${i + 1} de envío a OneSignal...`);
           const response = await fetch(url, options);
           
           // Si es éxito o error del cliente (4xx), no reintentar (excepto 429)
@@ -52,7 +59,6 @@ serve(async (req) => {
             return response;
           }
           
-          // Si es 5xx o 429, reintentar
           console.warn(`Retry attempt ${i + 1} due to status ${response.status}`);
         } catch (err) {
           if (i === maxRetries - 1) throw err;
@@ -75,6 +81,7 @@ serve(async (req) => {
     });
 
     const result = await response.json().catch(() => ({}));
+    console.info(`OneSignal API Status: ${response.status}`);
 
     if (!response.ok) {
       console.error("OneSignal Error:", result);
@@ -84,11 +91,13 @@ serve(async (req) => {
       });
     }
 
+    console.info(`Push enviado con éxito. ID: ${result.id}`);
     return new Response(JSON.stringify({ success: true, id: result.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
   } catch (err) {
+    console.error("Excepción en send-push-notification:", err);
     return handleError(err);
   }
 });

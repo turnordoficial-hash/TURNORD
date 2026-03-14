@@ -38,35 +38,43 @@ const ONE_SIGNAL_KEY = Deno.env.get("ONE_SIGNAL_REST_API_KEY") || "";
 
 console.info("Hello from Functions!");
 
-// ✅ 1. Uso correcto de OneSignal API
+// ✅ 1. Uso de Edge Function para OneSignal
 async function enviarPush(supabase: SupabaseClient, negocioId: string, telefono: string, title: string, body: string, url = "/panel_cliente.html") {
-  // OPTIMIZACIÓN: Llamada directa a OneSignal para reducir latencia y cold-starts
-  let status = 'failed';
-  let responseData = {};
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  console.info(`[Push] Iniciando envío para: ${telefono}`);
+  console.info(`[Push] Título: ${title}`);
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[Push] Faltan variables de entorno");
+    return { ok: false };
+  }
 
   try {
-    if (!ONE_SIGNAL_KEY) throw new Error("Missing ONE_SIGNAL_REST_API_KEY");
-
-    const res = await fetch("https://api.onesignal.com/notifications", {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-onesignal-notification`, {
       method: "POST",
       headers: {
-        "Authorization": `Basic ${ONE_SIGNAL_KEY}`,
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        app_id: ONE_SIGNAL_APP_ID,
-        headings: { en: title, es: title },
-        contents: { en: body, es: body },
-        include_aliases: { external_id: [telefono] },
-        target_channel: "push",
-        url: url,
+        telefono,
+        title,
+        body,
+        url,
+        negocio_id: negocioId
       }),
     });
     
-    status = res.ok ? 'sent' : 'failed';
-    responseData = await res.json().catch(() => ({}));
+    const responseData = await res.json().catch(() => ({}));
+    const status = res.ok ? 'sent' : 'failed';
+    
+    console.info(`[Push] Status: ${status} (${res.status})`);
+    if (!res.ok) console.error("[Push] Error:", responseData);
 
-    // Log a historial (Fire and forget para no bloquear, pero idealmente await si es crítico)
+    // Log a historial
     await supabase.from('notification_history').insert({
       negocio_id: negocioId,
       recipient: telefono,
@@ -79,9 +87,8 @@ async function enviarPush(supabase: SupabaseClient, negocioId: string, telefono:
 
     return { ok: res.ok };
   } catch (e) {
-    console.error("Error sending push directly:", e);
+    console.error("[Push] Excepción:", e);
     
-    // Log error
     await supabase.from('notification_history').insert({
       negocio_id: negocioId,
       recipient: telefono,
@@ -100,7 +107,14 @@ async function enviarPush(supabase: SupabaseClient, negocioId: string, telefono:
 async function enviarEmail(to: string, subject: string, template: string, data: any) {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return { ok: false };
+  
+  console.info(`[Email] Iniciando envío para: ${to}`);
+  console.info(`[Email] Subject: ${subject}`);
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[Email] Faltan variables de entorno");
+    return { ok: false };
+  }
   
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
@@ -112,9 +126,14 @@ async function enviarEmail(to: string, subject: string, template: string, data: 
       },
       body: JSON.stringify({ to, subject, template, data }),
     });
+
+    const resData = await res.json().catch(() => ({}));
+    console.info(`[Email] Status: ${res.ok ? 'sent' : 'failed'} (${res.status})`);
+    if (!res.ok) console.error("[Email] Error:", resData);
+
     return { ok: res.ok };
   } catch (e) {
-    console.error("Error enviando email:", e);
+    console.error("[Email] Excepción:", e);
     return { ok: false };
   }
 }
@@ -132,6 +151,7 @@ function ymdLocal(d: Date): string {
 
 // ✅ Función de turnos completamente refactorizada
 async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
+  console.info(`[Polling] Verificando turnos para: ${negocioId}`);
   const hoy = ymdLocal(new Date());
   
   // ✅ 5. Filtro optimizado en consulta
@@ -149,16 +169,21 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
     console.error(`[${negocioId}] Error fetching turns:`, error);
     return;
   }
+  
+  console.info(`[Polling] ${turnos?.length || 0} turnos encontrados para hoy`);
   if (!turnos || turnos.length === 0) return;
 
   const enEspera = turnos.filter((t: any) => t.estado === "En espera");
+  console.info(`[Polling] ${enEspera.length} en espera`);
   
   // OPTIMIZACIÓN: Procesamiento en paralelo con Promise.all
   // En lugar de esperar uno por uno, disparamos todas las notificaciones simultáneamente
   await Promise.all(enEspera.map(async (turno: any, index: number) => {
     const posicion = index + 1;
+    console.info(`[Polling] Turno ${turno.id} en posición ${posicion}`);
 
     if (posicion <= 2 && !turno.notificado_cerca && turno.telefono) {
+      console.info(`[Polling] Notificando cerca a ${turno.telefono}`);
       const nombre = turno.nombre || "Cliente";
       const { ok } = await enviarPush(supabase, negocioId, turno.telefono, "Tu turno está cerca ✂️", `Hola ${nombre}, quedan pocas personas antes de ti.`);
       if (ok) {
@@ -167,6 +192,7 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
       }
     }
     if (posicion === 1 && !turno.notificado_siguiente && turno.telefono) {
+      console.info(`[Polling] Notificando siguiente a ${turno.telefono}`);
       const nombre = turno.nombre || "Cliente";
       const { ok } = await enviarPush(supabase, negocioId, turno.telefono, "Prepárate, eres el siguiente 🔔", `Hola ${nombre}, serás atendido en breve.`);
       if (ok) {
@@ -177,6 +203,7 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
 
   const enAtencion = turnos.find((t: any) => t.estado === "En atención");
   if (enAtencion && !enAtencion.notificado_llamado && enAtencion.telefono) {
+    console.info(`[Polling] Notificando atención inmediata a ${enAtencion.telefono}`);
     const nombre = enAtencion.nombre || "Cliente";
     const { ok } = await enviarPush(supabase, negocioId, enAtencion.telefono, "Es tu turno ahora", `¡Pasa ${nombre}! Te estamos llamando.`);
     if (ok) {
@@ -187,6 +214,7 @@ async function verificarTurnos(supabase: SupabaseClient, negocioId: string) {
 
 // ✅ Función de citas completamente refactorizada para Recordatorios Booksy (24h, 2h, 30m)
 async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: string) {
+  console.info(`[Polling] Verificando recordatorios de citas para: ${negocioId}`);
   const ahora = new Date();
   // Rango de tiempo para cubrir desde 30 min hasta 25 horas en el futuro
   const maxFuturo = new Date(ahora.getTime() + 25 * 60 * 60 * 1000);
@@ -205,6 +233,7 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
     return;
   }
 
+  console.info(`[Polling] ${citas?.length || 0} citas próximas encontradas`);
   if (citas && citas.length > 0) {
     const ahoraTs = ahora.getTime();
     
@@ -213,9 +242,12 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
       const diffMin = Math.floor((startTs - ahoraTs) / 60000);
       const nombreCliente = cita.clientes?.nombre || "Cliente";
       const horaStr = new Date(cita.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      console.info(`[Polling] Cita ${cita.id} en ${diffMin} min`);
 
       // 1. Recordatorio 24 horas antes (entre 23h y 25h de antelación)
       if (diffMin <= 1500 && diffMin > 1380 && !cita.reminder_24h_sent && cita.cliente_telefono) {
+        console.info(`[Polling] Enviando recordatorio 24h a ${cita.cliente_telefono}`);
         const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Cita mañana 💈", `Hola ${nombreCliente}, te recordamos tu cita de mañana a las ${horaStr}.`);
         if (ok) {
           supabase.from("citas").update({ reminder_24h_sent: true }).eq("id", cita.id).then();
@@ -224,12 +256,14 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
       
       // 2. Recordatorio 2 horas antes (entre 105 min y 135 min de antelación)
       else if (diffMin <= 135 && diffMin > 105 && !cita.reminder_2h_sent && cita.cliente_telefono) {
+        console.info(`[Polling] Enviando recordatorio 2h a ${cita.cliente_telefono}`);
         const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Tu cita es en 2 horas ⏰", `Hola ${nombreCliente}, prepárate para tu cita a las ${horaStr}.`);
         if (ok) {
           supabase.from("citas").update({ reminder_2h_sent: true }).eq("id", cita.id).then();
           // Email de recordatorio
           const { data: cliente } = await supabase.from('clientes').select('email').eq('telefono', cita.cliente_telefono).maybeSingle();
           if (cliente?.email) {
+            console.info(`[Polling] Enviando email recordatorio a ${cliente.email}`);
             await enviarEmail(cliente.email, "⏰ Recordatorio: Cita en 2 horas", "cita_recordatorio", {
               nombre_cliente: nombreCliente,
               barbero: "Tu Barbero",
@@ -242,6 +276,7 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
 
       // 3. Recordatorio 30 minutos antes (entre 15 min y 45 min de antelación)
       else if (diffMin <= 45 && diffMin > 15 && !cita.reminder_30m_sent && cita.cliente_telefono) {
+        console.info(`[Polling] Enviando recordatorio 30m a ${cita.cliente_telefono}`);
         const { ok } = await enviarPush(supabase, negocioId, cita.cliente_telefono, "Cita en 30 minutos 🔔", `¡Ya casi es tu momento, ${nombreCliente}! Te esperamos.`);
         if (ok) {
           supabase.from("citas").update({ reminder_30m_sent: true }).eq("id", cita.id).then();
@@ -255,19 +290,31 @@ async function verificarRecordatoriosCitas(supabase: SupabaseClient, negocioId: 
 let cachedNegocios: { ids: string[], timestamp: number } | null = null;
 
 serve(async (req) => {
+  console.info("--- SISTEMA NOTIFICACIONES: INICIO ---");
+  console.info(`Método: ${req.method}`);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    const apikeyHeader = req.headers.get("apikey");
+    
+    console.info(`Auth Header: ${authHeader ? "Presente" : "Faltante"}`);
+    console.info(`API Key Header: ${apikeyHeader ? "Presente" : "Faltante"}`);
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("CRÍTICO: Faltan variables de entorno SUPABASE_URL o SERVICE_ROLE");
       return new Response(JSON.stringify({ error: "Faltan variables de entorno SUPABASE_URL/SERVICE_ROLE" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- MANEJO DE EVENTOS (LLAMADO DESDE TRIGGERS) ---
@@ -275,7 +322,8 @@ serve(async (req) => {
       const payload = await req.json().catch(() => ({}));
       const { event, record, old_record } = payload;
 
-      console.info(`Evento recibido: ${event || 'POLLING'}`, { id: record?.id });
+      console.info(`Evento recibido: ${event || 'POLLING'}`);
+      if (record) console.info(`Registro ID: ${record.id || 'N/A'}`);
 
       if (event) {
         // Marcar evento como procesado si viene de la tabla notification_events

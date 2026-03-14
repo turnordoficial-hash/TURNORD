@@ -158,15 +158,28 @@ async function login(externalId, tags = {}) {
 
         // --- SOLICITUD DE EMAIL ---
         // Forzar prompt de email si el usuario no tiene email registrado en OneSignal
-        if (OneSignal.Slidedown) {
-            const isEmailSubscribed = OneSignal.User.email !== undefined;
+        // NOTA: En v16 el acceso es via slidedown (minúscula)
+        try {
+            const isEmailSubscribed = OneSignal.User && OneSignal.User.email !== undefined;
             if (!isEmailSubscribed) {
-                console.log("OneSignal: Solicitando email...");
-                OneSignal.Slidedown.prompt({
-                    force: true,
-                    type: "email"
-                });
+                if (OneSignal.slidedown && typeof OneSignal.slidedown.prompt === 'function') {
+                    console.log("OneSignal: Solicitando email via slidedown.prompt...");
+                    await OneSignal.slidedown.prompt({
+                        force: true,
+                        type: "email"
+                    });
+                } else if (OneSignal.Slidedown && typeof OneSignal.Slidedown.prompt === 'function') {
+                    console.log("OneSignal: Solicitando email via Slidedown.prompt (fallback)...");
+                    await OneSignal.Slidedown.prompt({
+                        force: true,
+                        type: "email"
+                    });
+                } else {
+                    console.warn("OneSignal: API de Slidedown no encontrada para solicitar email.");
+                }
             }
+        } catch (promptErr) {
+            console.warn("OneSignal: Error al intentar mostrar prompt de email:", promptErr.message);
         }
 
         // --- REGISTRO EN SUPABASE ---

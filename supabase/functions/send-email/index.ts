@@ -15,6 +15,8 @@ interface EmailRequest {
 }
 
 serve(async (req) => {
+  console.info("--- SEND EMAIL: INICIO ---");
+  
   // Manejo de CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -22,12 +24,15 @@ serve(async (req) => {
 
   try {
     const { to, subject, template, data, body }: EmailRequest = await req.json();
+    console.info(`Destinatario: ${to}`);
+    console.info(`Asunto: ${subject}`);
+    console.info(`Template: ${template || "Personalizado"}`);
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    // Usa una variable de entorno para el remitente o un valor por defecto
     const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "JBarber <onboarding@resend.dev>";
 
     if (!RESEND_API_KEY) {
+      console.error("Falta RESEND_API_KEY");
       throw new Error("Falta la variable de entorno RESEND_API_KEY");
     }
 
