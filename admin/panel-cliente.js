@@ -2,6 +2,18 @@ import { supabase, ensureSupabase, GlobalCache, getNegocioId } from '../database
 import { obtenerRecompensasDisponibles, RECOMPENSAS } from './promociones.js';
 import { OneSignalManager } from './onesignal.js';
 
+// 8. Mejora crítica para producción: Global Error Boundary
+window.addEventListener('unhandledrejection', e => {
+    console.error("Unhandled Promise Rejection:", e.reason);
+    // Aquí se podría enviar el error a un servicio de logging como Sentry o LogRocket
+});
+
+window.onerror = (msg, url, line, col, error) => {
+    console.error("Global JS Error:", msg, `at ${url}:${line}:${col}`, error);
+    // Aquí se podría enviar el error a un servicio de logging
+    return false; // Permite que el manejador de errores por defecto del navegador también se ejecute
+};
+
 const negocioId = getNegocioId();
 
 // Estado centralizado para la aplicación
@@ -16,8 +28,8 @@ const appState = {
   abortController: null, // Para cancelar peticiones de slots
   isBooking: false, // Protección anti-doble click
   profileLoaded: false, // Control de carga inicial
-  profileRefreshed: false, // Nueva propiedad para control de refresco
   oneSignalLogged: false,
+  historialLoaded: false, // 5. Flag para Lazy Loading
   isEventsActivated: false, // Flag para activar eventos una sola vez
 };
 
@@ -47,6 +59,67 @@ async function getSupabase() {
   return sbInstance;
 }
 
+function bindProfileFormEvents() {
+    const formPerfil = document.getElementById('form-perfil');
+    if (formPerfil) {
+        const telInput = document.getElementById('edit-telefono');
+        if (telInput) {
+            telInput.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+            });
+        }
+
+        formPerfil.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('edit-nombre').value.trim();
+            const email = document.getElementById('edit-email').value.trim();
+            const telefono = document.getElementById('edit-telefono').value.trim();
+
+            if (telefono.length !== 10) return showToast('El teléfono debe tener 10 dígitos.', 'error');
+            if (nombre.length < 3) return showToast('El nombre es muy corto.', 'error');
+
+            const client = await getSupabase();
+            const { error } = await client.from('clientes').update({ nombre, email, telefono }).eq('id', appState.user.id);
+            if (error) showToast('Error al actualizar el perfil', 'error');
+            else {
+                showToast('Perfil actualizado con éxito', 'success');
+                cargarPerfil();
+            }
+        });
+    }
+}
+
+// 3. Cómo dejar OneSignal perfecto (producción)
+async function initPushNotifications() {
+    if (appState.oneSignalLogged || !appState.profile) return;
+
+    try {
+        await OneSignalManager.init();
+
+        // Verificar si el permiso ya fue otorgado
+        const permission = await window.OneSignal.Notifications.permission;
+        if (permission !== "granted") {
+            // Si no, solicitarlo
+            await window.OneSignal.Notifications.requestPermission();
+        }
+
+        // Loguear al usuario en OneSignal para asociar su dispositivo con su ID
+        if (appState.user?.id && appState.profile.telefono) {
+            await OneSignalManager.login(appState.user.id, {
+                negocio_id: negocioId,
+                role: 'cliente',
+                cliente_id: appState.user.id,
+                segmento: SmartMarketingEngine.getInstance(appState.profile).calculateSegment()
+            });
+        }
+
+        appState.oneSignalLogged = true;
+        console.log("Push notifications activado y usuario logueado en OneSignal.");
+
+    } catch (e) {
+        console.warn("Error durante la inicialización de Push Notifications:", e);
+    }
+}
 // --- MOTOR DE MARKETING INTELIGENTE (SINGLETON) ---
 const SmartMarketingEngine = (function() {
   let instance = null;
@@ -523,6 +596,12 @@ window.switchTab = function(tab){
   document.querySelectorAll('[id$="-panel"]').forEach(el=>{
     el.classList.add('hidden')
   })
+
+  // 5. Lazy loading del historial de puntos
+  if (tab === 'perfil' && !appState.historialLoaded) {
+    cargarHistorialPuntos();
+    appState.historialLoaded = true;
+  }
 
   const panel = document.getElementById(`tab-${tab}-panel`)
   if(panel){
@@ -1356,7 +1435,6 @@ async function processProfileData(data) {
         }
     }
     iniciarMotorMarketing();
-    cargarHistorialPuntos();
 
     // Cargar servicios y barberos aquí para asegurar que no se bloqueen por errores de OneSignal
     await Promise.all([cargarServicios(), cargarBarberos()]);
@@ -1413,6 +1491,51 @@ async function cargarConfigNegocio() {
   }, 60); // 1 hora
   
   if (data) processConfig(data);
+}
+
+async function cargarPerfil() {
+  const sb = await getSupabase();
+  const userId = appState.user.id;
+  const cacheKey = `profile_${userId}`;
+
+  try {
+    const fetcher = () => sb.from('clientes')
+        .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
+        .eq('id', userId)
+        .maybeSingle();
+
+    // Use smartQuery to get fresh data, falling back to cache
+    const { data } = await GlobalCache.smartQuery(cacheKey, fetcher, 15);
+
+    if (data) {
+        const oldPoints = appState.profile?.puntos_actuales || 0;
+        const newPoints = data.puntos_actuales || 0;
+        const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
+        const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);
+
+        if (appState.profileLoaded && newPoints > oldPoints) {
+            const unlocked = RECOMPENSAS.some(r => oldPoints < r.pts && newPoints >= r.pts);
+            const levelUp = newLevel.nombre !== oldLevel.nombre;
+            if ((unlocked || levelUp) && typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
+                if (levelUp) showToast(`¡Felicidades! Has subido al nivel ${newLevel.icon} ${newLevel.nombre}`, 'success');
+            }
+        }
+
+        appState.profile = data;
+        renderProfile(data);
+    } else {
+      if (appState.profile) {
+        console.warn("Usando perfil inicial como fallback tras fallo de refresco.");
+        renderProfile(appState.profile);
+        cargarHistorialPuntos();
+      } else {
+        console.error('No se pudo cargar el perfil del cliente.');
+      }
+    }
+  } catch (err) {
+    console.error('Excepción en cargarPerfil:', err);
+  }
 }
 
 async function verificarCitaActiva() {
@@ -1912,83 +2035,65 @@ async function confirmarReservaManual() {
     return;
   }
 
-  confirmarAccion('Confirmar', '¿Deseas reservar esta cita?', async () => {
-    if (appState.isBooking) return;
-    appState.isBooking = true;
+    confirmarAccion('Confirmar', '¿Deseas reservar esta cita?', async () => {
+        if (appState.isBooking) return;
+        appState.isBooking = true;
 
-    const btn = document.getElementById('btn-confirmar-reserva');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span class="animate-spin mr-2">⏳</span> Reservando...';
-    }
+        const btn = document.getElementById('btn-confirmar-reserva');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin mr-2">⏳</span> Reservando...';
+        }
 
-    try {
-      const duration = appState.serviceDuration || 30;
-      const endAt = new Date(date.getTime() + duration * 60000);
+        try {
+            const duration = appState.serviceDuration || 30;
+            const endAt = new Date(date.getTime() + duration * 60000);
 
-      // Re-verificar disponibilidad antes de enviar
-      const dayData = await fetchDayData(negocioId, barberId, date.toISOString().split('T')[0], undefined);
-      const freshSlots = calculateAvailableSlots(dayData.baseDay, dayData.config, dayData.citas, dayData.weeklyBreaks, duration);
-      const isStillAvailable = freshSlots.some(s => s.getTime() === date.getTime());
+            const dayData = await fetchDayData(negocioId, barberId, date.toISOString().split('T')[0], undefined);
+            const freshSlots = calculateAvailableSlots(dayData.baseDay, dayData.config, dayData.citas, dayData.weeklyBreaks, duration);
+            const isStillAvailable = freshSlots.some(s => s.getTime() === date.getTime());
 
-      if (!isStillAvailable) {
-        // Usar throw new Error para que el catch lo maneje
-        throw new Error("Este horario ya no está disponible. Por favor, elige otro.");
-      }
+            if (!isStillAvailable) {
+                throw new Error("Este horario ya no está disponible. Por favor, elige otro.");
+            }
 
-      const { error } = await sb.rpc('programar_cita', { 
-        p_negocio_id: negocioId, 
-        p_barber_id: Number(barberId), 
-        p_cliente_telefono: appState.profile.telefono, 
-        p_start: date.toISOString(), 
-        p_end: endAt.toISOString(), 
-        p_servicio: serv.nombre 
-      });
+            const { error } = await sb.rpc('programar_cita', {
+                p_negocio_id: negocioId,
+                p_barber_id: Number(barberId),
+                p_cliente_telefono: appState.profile.telefono,
+                p_start: date.toISOString(),
+                p_end: endAt.toISOString(),
+                p_servicio: serv.nombre
+            });
 
-      if (error) throw error;
-      
-      showToast('Cita agendada correctamente');
-      
-      // Notificaciones y Correos (Frontend fallback + Backend)
-      try {
-        await Promise.all([
-          enviarCorreoConfirmacion(date.toISOString(), serv.nombre, barberId),
-          solicitarPermisoNotificacion() // Re-intentar permiso después de una acción positiva
-        ]);
-      } catch (notiErr) {
-        console.warn('Error en notificaciones post-cita:', notiErr);
-      }
+            if (error) throw error;
 
-      // Reset booking flag on success
-      appState.isBooking = false;
+            showToast('Cita agendada correctamente');
+            enviarCorreoConfirmacion(date.toISOString(), serv.nombre, barberId);
+            navigator.vibrate?.(50);
 
-      // Invalidar el caché de slots para este día/barbero/servicio
-      const dateStr = date.toISOString().split('T')[0];
-      const cacheKey = `slots_${dateStr}_${barberId}_s${servicioId}`;
-      GlobalCache.remove(cacheKey);
+            const dateStr = date.toISOString().split('T')[0];
+            const cacheKey = `slots_${dateStr}_${barberId}_s${servicioId}`;
+            GlobalCache.remove(cacheKey);
 
-      // Notificaciones: Ahora las maneja el backend (Edge Functions + Triggers)
-      // para mayor confiabilidad y evitar duplicados.
+            setTimeout(() => {
+                verificarCitaActiva();
+                switchTab('inicio');
+            }, 1200);
 
-      navigator.vibrate?.(50);
-      
-      setTimeout(async () => {
-        await verificarCitaActiva();
-        switchTab('inicio');
-      }, 1200);
-    } catch (e) { 
-      showToast(e.message || 'Error al reservar', 'error'); 
-      appState.isBooking = false;
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = 'CONFIRMAR RESERVA';
-      }
-      // Si el error es por disponibilidad, refrescar los slots para el usuario
-      if (e.message.includes("disponible")) {
-        cargarSlotsInteligente();
-      }
-    }
-  });
+        } catch (e) {
+            showToast(e.message || 'Error al reservar', 'error');
+            if (e.message.includes("disponible")) {
+                cargarSlotsInteligente();
+            }
+        } finally {
+            appState.isBooking = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'CONFIRMAR RESERVA';
+            }
+        }
+    });
 }
 
 function resizeImage(file, maxSize = 512) {
