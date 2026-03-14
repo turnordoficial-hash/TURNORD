@@ -64,7 +64,25 @@ async function init() {
                 await OneSignal.init({
                     appId: ONESIGNAL_APP_ID,
                     serviceWorkerPath: 'sw.js',
-                    allowLocalhostAsSecureOrigin: true
+                    allowLocalhostAsSecureOrigin: true,
+                    promptOptions: {
+                        slidedown: {
+                            prompts: [{
+                                type: "email",
+                                autoPrompt: true,
+                                text: {
+                                    title: "Recibir notificaciones por correo",
+                                    actionMessage: "Deseamos enviarte actualizaciones y recordatorios de tus citas.",
+                                    acceptButton: "Suscribirme",
+                                    cancelButton: "No, gracias"
+                                },
+                                delay: {
+                                    pageViews: 1,
+                                    timeDelay: 5
+                                }
+                            }]
+                        }
+                    }
                 }).catch(err => {
                     if (err?.message?.includes('indexedDB') || err?.name === 'UnknownError') {
                         console.warn("OneSignal: Fallo crítico de IndexedDB en init.");
@@ -101,22 +119,54 @@ async function login(externalId, tags = {}) {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function (OneSignal) {
       try {
-        // Verificación extra de salud del SDK antes de llamar a login
-        if (!OneSignal || !OneSignal.User) {
-          console.warn("OneSignal: SDK no está en un estado saludable para login.");
+        // --- ROBUSTEZ EXTRA ---
+        // Si el SDK falló anteriormente o no está listo, abortar silenciosamente
+        if (!OneSignal || !OneSignal.User || isSDKDisabled) {
+          console.warn("OneSignal: SDK no disponible para login.");
           return;
         }
 
+        // Asegurar que el externalId sea un string válido y no esté vacío
+        const cleanExternalId = String(externalId).trim();
+        if (!cleanExternalId || cleanExternalId === 'undefined' || cleanExternalId === 'null') {
+           console.warn("OneSignal: ID de usuario inválido omitido.");
+           return;
+        }
+
         const currentId = OneSignal.User.externalId;
-        if (currentId !== String(externalId)) {
-          await OneSignal.login(String(externalId));
-          console.log("Login OneSignal OK:", externalId);
+        if (currentId !== cleanExternalId) {
+          // Intentar login con reintento simple para evitar errores temporales del SDK
+          try {
+            await OneSignal.login(cleanExternalId);
+            console.log("Login OneSignal OK:", cleanExternalId);
+          } catch (loginErr) {
+            if (loginErr instanceof TypeError) {
+               console.warn("OneSignal: Error 'Ye' detectado en login, reintentando en 2s...");
+               await new Promise(r => setTimeout(r, 2000));
+               if (OneSignal.User) await OneSignal.login(cleanExternalId);
+            } else {
+               throw loginErr;
+            }
+          }
         } else {
           console.log("OneSignal: Usuario ya conectado (login omitido)");
         }
 
         if (Object.keys(tags).length) {
           await OneSignal.User.addTags(tags);
+        }
+
+        // --- SOLICITUD DE EMAIL ---
+        // Forzar prompt de email si el usuario no tiene email registrado en OneSignal
+        if (OneSignal.Slidedown) {
+            const isEmailSubscribed = OneSignal.User.email !== undefined;
+            if (!isEmailSubscribed) {
+                console.log("OneSignal: Solicitando email...");
+                OneSignal.Slidedown.prompt({
+                    force: true,
+                    type: "email"
+                });
+            }
         }
 
         // --- REGISTRO EN SUPABASE ---

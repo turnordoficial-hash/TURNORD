@@ -934,11 +934,17 @@ BEGIN
   v_puntos := FLOOR(COALESCE(p_monto, 0) * 0.1);
 
   IF v_puntos > 0 AND v_turno.telefono IS NOT NULL THEN
+    -- To handle potential duplicate phone numbers, we target only the most recently created client profile.
     UPDATE public.clientes
     SET puntos_actuales = COALESCE(puntos_actuales, 0) + v_puntos,
         puntos_totales_historicos = COALESCE(puntos_totales_historicos, 0) + v_puntos,
         ultima_visita = NOW()
-    WHERE negocio_id = p_negocio_id AND telefono = v_turno.telefono
+    WHERE id = (
+      SELECT sub.id FROM public.clientes as sub
+      WHERE sub.negocio_id = p_negocio_id AND sub.telefono = v_turno.telefono
+      ORDER BY sub.created_at DESC
+      LIMIT 1
+    )
     RETURNING id INTO v_cliente_id;
 
     IF v_cliente_id IS NOT NULL THEN
@@ -1141,7 +1147,8 @@ BEGIN
     url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || v_service_role
+      'apikey', COALESCE(v_service_role, ''), -- Fallback para evitar 401 si es posible
+      'Authorization', 'Bearer ' || COALESCE(v_service_role, '')
     ),
     body := '{}'::jsonb,
     timeout_milliseconds := 3000 -- Añadir un timeout para evitar esperas indefinidas
@@ -1197,20 +1204,23 @@ BEGIN
 
   -- 1. Intentar llamar a la función directamente (Sincrónico para eventos críticos)
   -- Si falla (por timeout o error), al menos queda registrado en notification_events
-  BEGIN
-    PERFORM net.http_post(
-      url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || v_service_role
-      ),
-      body := v_payload,
-      timeout_milliseconds := 1000 -- Timeout corto para no bloquear el trigger
-    );
-  EXCEPTION WHEN OTHERS THEN
-    -- Ignorar error de red para no bloquear la transacción principal
-    NULL;
-  END;
+  IF v_service_role IS NOT NULL THEN
+    BEGIN
+      PERFORM net.http_post(
+        url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/sistema-notificaciones',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'apikey', v_service_role,
+          'Authorization', 'Bearer ' || v_service_role
+        ),
+        body := v_payload,
+        timeout_milliseconds := 1500 -- Aumentado un poco para dar tiempo a la función
+      );
+    EXCEPTION WHEN OTHERS THEN
+      -- Ignorar error de red para no bloquear la transacción principal
+      NULL;
+    END;
+  END IF;
 
   -- 2. Siempre insertar en la tabla de eventos para respaldo/auditoría/reintento
   INSERT INTO public.notification_events (negocio_id, event_type, payload)
@@ -1297,9 +1307,19 @@ BEGIN
         v_service_role text;
       BEGIN
         SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+        
+        IF v_service_role IS NULL THEN
+           -- Intentar obtener la clave anon si la de servicio no está disponible
+           SELECT decrypted_secret INTO v_service_role FROM vault.decrypted_secrets WHERE name = 'SUPABASE_ANON_KEY' LIMIT 1;
+        END IF;
+
         PERFORM net.http_post(
-          url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-push-notification',
-          headers := jsonb_build_object('Authorization', 'Bearer ' || v_service_role, 'Content-Type', 'application/json'),
+          url := 'https://wjvwjirhxenotvdewbmm.supabase.co/functions/v1/send-onesignal-notification', -- CAMBIADO DE send-push-notification
+          headers := jsonb_build_object(
+            'apikey', COALESCE(v_service_role, ''),
+            'Authorization', 'Bearer ' || COALESCE(v_service_role, ''), 
+            'Content-Type', 'application/json'
+          ),
           body := jsonb_build_object(
             'telefono', p_telefono,
             'negocio_id', p_negocio_id,
@@ -1308,7 +1328,7 @@ BEGIN
             'url', p_url
           )
         );
-        RETURN json_build_object('success', true, 'message', 'Llamada delegada a Edge Function');
+        RETURN json_build_object('success', true, 'message', 'Llamada delegada a Edge Function OneSignal');
       EXCEPTION WHEN OTHERS THEN
         RETURN json_build_object('success', false, 'error', 'Error delegando a Edge Function: ' || SQLERRM);
       END;

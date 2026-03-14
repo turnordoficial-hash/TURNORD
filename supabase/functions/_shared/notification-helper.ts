@@ -16,9 +16,10 @@ export async function sendPushInternal(payload: NotificationPayload): Promise<{ 
   }
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-onesignal-notification`, {
       method: "POST",
       headers: {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
         "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
       },
