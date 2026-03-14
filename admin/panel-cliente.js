@@ -1412,6 +1412,7 @@ async function processProfileData(data) {
     appState.profile = data;
     
     renderProfile(data); // Renderizamos siempre para reflejar cambios de puntos en tiempo real
+    cargarHistorialPuntos(); // Refrescar historial de puntos al procesar perfil
     
     // Iniciar lógica que depende del perfil (realtime, notificaciones)
     // Se hace aquí para asegurar que appState.profile está disponible.
@@ -1491,51 +1492,6 @@ async function cargarConfigNegocio() {
   }, 60); // 1 hora
   
   if (data) processConfig(data);
-}
-
-async function cargarPerfil() {
-  const sb = await getSupabase();
-  const userId = appState.user.id;
-  const cacheKey = `profile_${userId}`;
-
-  try {
-    const fetcher = () => sb.from('clientes')
-        .select('*, puntos_actuales, puntos_totales_historicos, ultima_visita')
-        .eq('id', userId)
-        .maybeSingle();
-
-    // Use smartQuery to get fresh data, falling back to cache
-    const { data } = await GlobalCache.smartQuery(cacheKey, fetcher, 15);
-
-    if (data) {
-        const oldPoints = appState.profile?.puntos_actuales || 0;
-        const newPoints = data.puntos_actuales || 0;
-        const oldLevel = calcularNivelInfo(appState.profile?.puntos_totales_historicos || 0);
-        const newLevel = calcularNivelInfo(data.puntos_totales_historicos || 0);
-
-        if (appState.profileLoaded && newPoints > oldPoints) {
-            const unlocked = RECOMPENSAS.some(r => oldPoints < r.pts && newPoints >= r.pts);
-            const levelUp = newLevel.nombre !== oldLevel.nombre;
-            if ((unlocked || levelUp) && typeof confetti === 'function') {
-                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#C1121F', '#FFD700', '#ffffff'] });
-                if (levelUp) showToast(`¡Felicidades! Has subido al nivel ${newLevel.icon} ${newLevel.nombre}`, 'success');
-            }
-        }
-
-        appState.profile = data;
-        renderProfile(data);
-    } else {
-      if (appState.profile) {
-        console.warn("Usando perfil inicial como fallback tras fallo de refresco.");
-        renderProfile(appState.profile);
-        cargarHistorialPuntos();
-      } else {
-        console.error('No se pudo cargar el perfil del cliente.');
-      }
-    }
-  } catch (err) {
-    console.error('Excepción en cargarPerfil:', err);
-  }
 }
 
 async function verificarCitaActiva() {
